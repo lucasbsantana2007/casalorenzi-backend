@@ -15,13 +15,13 @@ if not URL_TESTE:
     pytest.skip("Defina TEST_DATABASE_URL para rodar os testes.", allow_module_level=True)
 os.environ["DATABASE_URL"] = URL_TESTE  # precisa vir antes de importar o app
 
-from alembic import command  # noqa: E402
 from alembic.config import Config  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 
-from app.database import SessionLocal  # noqa: E402
-from app.main import app  # noqa: E402
-from app.seed import SENHA_DEMO, apagar_tudo, popular  # noqa: E402
+from alembic import command  # noqa: E402
+from src.app import app  # noqa: E402
+from src.database.connection import SessionLocal  # noqa: E402
+from src.database.seed import SENHA_DEMO, apagar_tudo, popular  # noqa: E402
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -63,6 +63,6 @@ def operador(client):
     return _entrar(client, "diego.almeida@casalorenzi.com.br")
 
 
-@pytest.fixture
-def cliente(client):
-    return _entrar(client, "mariana.costa@gmail.com")  # id 101
+# Cliente não tem login: os clientes de demonstração (ids 101 a 108, tabela clientes) são
+# usados pelos testes através das rotas da equipe (ex.: clienteId=101 ao abrir um chamado).
+CLIENTE_DEMO_ID = 101  # Mariana Costa
