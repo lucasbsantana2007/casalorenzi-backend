@@ -1,46 +1,53 @@
 # Casa Lorenzi — Backend
 
-API da plataforma integrada Casa Lorenzi. **FastAPI · SQLAlchemy 2 · Alembic · PostgreSQL · JWT.**
+API da plataforma integrada Casa Lorenzi (Insper Jr.). **FastAPI · SQLAlchemy 2 · Alembic · PostgreSQL · JWT.**
 
-As rotas e os formatos de resposta seguem exatamente a camada de serviços do frontend
-(`src/services/*Service.js` e `src/services/mock/*.js`). Para trocar os mocks pela API real,
-basta usar `VITE_USE_MOCKS=false` no `.env` do frontend.
+Os formatos de resposta seguem a camada de serviços do frontend (`src/services/*Service.js` e
+`src/services/mock/*.js` no repositório `casalorenzi-frontend`). Para o front usar esta API em vez
+dos dados simulados, basta `VITE_USE_MOCKS=false` no `.env` do frontend.
 
 ## Como rodar
 
-Pré-requisitos: Python 3.11+ e PostgreSQL rodando localmente.
+Pré-requisitos: **Python 3.11+** e **PostgreSQL** (16 ou mais novo) rodando na porta 5432.
 
 ```bash
 # 1. Ambiente virtual e dependências
-python3 -m venv .venv
-source .venv/bin/activate          # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
+python -m venv .venv
+.venv\Scripts\activate             # Mac/Linux: source .venv/bin/activate
+pip install -r requirements-dev.txt
 
-# 2. Configuração
-cp .env.example .env               # ajuste DATABASE_URL com usuário e senha do seu Postgres
+# 2. Configuração (o .env não vai para o git)
+copy .env.example .env             # Mac/Linux: cp .env.example .env
+#    edite o .env e troque a senha do Postgres em DATABASE_URL e TEST_DATABASE_URL
 
-# 3. Banco de dados
-createdb casalorenzi               # ou: CREATE DATABASE casalorenzi; no psql / pgAdmin
-alembic upgrade head               # cria as tabelas
-python -m app.seed                 # carrega os dados de demonstração
+# 3. Bancos de dados (uma vez só)
+createdb -U postgres casalorenzi
+createdb -U postgres casalorenzi_test
+#    ou, no psql/pgAdmin: CREATE DATABASE casalorenzi; CREATE DATABASE casalorenzi_test;
 
-# 4. API
-uvicorn app.main:app --reload --port 8000
+# 4. Tabelas e dados de demonstração
+alembic upgrade head
+python -m src.database.seed --recriar
+
+# 5. API
+uvicorn src.app:app --reload --port 8000
 ```
 
 - Documentação interativa (Swagger): http://localhost:8000/docs
 - Status: http://localhost:8000/api/health
 
-### Instalando o PostgreSQL no Mac
+> **Atualizando de uma versão antiga** (antes da pasta `src/`): rode `pip install -r requirements-dev.txt`,
+> `alembic upgrade head` (migra os clientes para a tabela nova sem perder pedidos nem chamados) e
+> `python -m src.database.seed --recriar` se quiser os dados de demonstração atualizados.
 
-```bash
-brew install postgresql@16
-brew services start postgresql@16
-createdb casalorenzi
-```
+### Instalando o PostgreSQL
 
-Com o Postgres do Homebrew o usuário é o do seu Mac e não há senha:
-`DATABASE_URL=postgresql+psycopg://SEU_USUARIO@localhost:5432/casalorenzi`.
+- **Windows:** instalador oficial em https://www.postgresql.org/download/windows/ (porta 5432, locale DEFAULT;
+  o Stack Builder do final não é necessário). Anote a senha do usuário `postgres`: ela vai no `.env`.
+- **Mac:** `brew install postgresql@16 && brew services start postgresql@16`. Sem senha, a URL fica
+  `postgresql+psycopg://SEU_USUARIO@localhost:5432/casalorenzi`.
+
+Se a senha tiver `@ : / # ? %`, escreva esses caracteres codificados na URL (ex.: `@` vira `%40`).
 
 ### Ligando o frontend na API
 
@@ -53,99 +60,154 @@ VITE_USE_MOCKS=false
 
 Reinicie o `npm run dev` depois de mudar o `.env`.
 
-## Dados de demonstração
+## Estrutura de pastas
 
-`python -m app.seed` usa o **mesmo gerador e as mesmas sementes** do frontend (`src/data/seed`),
-então lojas, produtos, histórico de estoque, transferências, pedidos e atendimentos ficam idênticos
-aos dos mocks. As datas são relativas ao momento da carga.
+Segue o padrão de boas práticas da Insper Jr.: **cada pasta tem uma responsabilidade só**.
 
-- `python -m app.seed --recriar` apaga tudo e carrega de novo (útil para "resetar" a demo).
-- Todas as contas usam a senha **`lorenzi2026`**.
+```
+src/
+  app.py          porta de entrada: CORS, logs, tratamento de erros e rotas em /api
+  config/         o que muda por ambiente (lido do .env)
+  database/       conexão com o banco e dados de demonstração (seed/: dados, gerador, carga)
+  models/         como cada dado vira tabela — um arquivo por tabela
+  entities/       regras do próprio dado: status permitidos, transições, papéis e acessos
+  repositories/   a única parte que busca e salva no banco
+  use_cases/      o que o sistema faz: as regras de negócio (não conhecem HTTP)
+  schemas/        contratos da API: o que entra (camelCase) e o que sai (JSON)
+  routers/        rotas finas: validam, conferem acesso, chamam o use case e respondem
+  middlewares/    login (JWT), permissões por papel e registro das requisições
+  utils/          funções pequenas: erros de negócio, datas, texto, senhas
+alembic/          histórico de mudanças no banco (migrations)
+tests/            testes de API (pytest) num banco separado
+```
 
-| Perfil        | E-mail                               | Acesso                                      |
-| ------------- | ------------------------------------ | ------------------------------------------- |
-| Administrador | helena@casalorenzi.com.br            | Tudo                                        |
-| Lojista       | rafael.monteiro@casalorenzi.com.br   | Dashboard (só a própria loja), estoque, atendimento |
-| Operador      | diego.almeida@casalorenzi.com.br     | Dashboard, estoque, transferências          |
-| Cliente       | mariana.costa@gmail.com              | Portal do cliente                           |
+**O caminho de uma requisição:** `routers` → `middlewares` (está logado? pode?) → `use_cases` (regra) →
+`repositories` (banco) → `models`; na volta, `schemas` monta a resposta.
+
+**Onde mexer:**
+
+| Quero… | Arquivo |
+| --- | --- |
+| mudar uma regra (ex.: quando aceitar devolução) | `src/use_cases/<assunto>.py` |
+| mudar quem acessa um módulo | `src/entities/papeis.py` (`ACESSO`) |
+| mudar um status permitido ou transição | `src/entities/<assunto>.py` |
+| mudar uma consulta ao banco | `src/repositories/<assunto>_repository.py` |
+| adicionar um campo na resposta | `src/schemas/<assunto>.py` (funções `*_saida`) |
+| adicionar uma coluna/tabela | `src/models/<tabela>.py` + migration (veja abaixo) |
+
+## Modelo de dados
+
+| Módulo | Tabelas |
+| --- | --- |
+| Núcleo | `lojas`, `usuarios` (só a equipe: ADMINISTRADOR, LOJISTA, OPERADOR) |
+| Clientes | `clientes` (e-mail único + PIN de 4 dígitos guardado só como hash), `tokens_pin` |
+| Catálogo | `categorias`, `produtos` (com descrição, composição e cuidados), `variacoes` (SKU) |
+| Estoque | `estoques` (saldo por **loja + SKU**), `movimentacoes` (histórico com sinal) |
+| Vendas | `pedidos` (com frete e endereço de entrega no e-commerce), `itens_pedido`, `pagamentos`, `devolucoes` |
+| Atendimento | `tipos_solicitacao`, `atendimentos` (sempre de um cliente), `mensagens`, `anexos` (foto) |
+
+**Cliente não tem login.** Ele se identifica por e-mail + PIN de 4 dígitos (criado no checkout) para ver
+pedidos e chamados. Só a equipe faz login (JWT).
 
 ## Rotas
 
-Todas sob o prefixo `/api`. As rotas internas exigem `Authorization: Bearer <token>`,
-obtido em `POST /api/auth/login`.
+Todas sob o prefixo `/api`. As rotas internas exigem `Authorization: Bearer <token>`, obtido em
+`POST /api/auth/login`. Detalhes de cada parâmetro e resposta em `/docs`.
 
 | Método | Rota | Quem acessa |
 | --- | --- | --- |
-| POST | `/auth/login` | público |
-| GET | `/auth/me` | logado |
+| POST | `/auth/login` · GET `/auth/me` | público · logado |
 | GET | `/lojas`, `/categorias`, `/tipos-solicitacao` | público |
 | GET | `/usuarios?papel=` | equipe |
 | GET | `/produtos?busca&categoria&ativo`, `/produtos/{id}` | público (vitrine) |
 | POST, PUT | `/produtos`, `/produtos/{id}` | administrador |
-| GET | `/estoque?busca&lojaId&categoria&status&variacaoId` | equipe |
-| GET | `/estoque/{id}` | equipe |
+| GET | `/estoque?busca&lojaId&categoria&status&variacaoId`, `/estoque/{id}` | equipe |
 | GET | `/estoque/posicao?data&lojaId&busca` | equipe |
-| GET | `/movimentacoes?estoqueId&lojaId&tipo&de&ate&busca` | equipe |
-| POST | `/movimentacoes` | equipe |
-| GET, POST | `/transferencias` | administrador, operador |
-| PATCH | `/transferencias/{id}` (status) | administrador, operador |
-| GET | `/atendimentos?busca&tipoSolicitacaoId&responsavelId&lojaId` | administrador, lojista |
-| POST | `/atendimentos` (abrir solicitação) | cliente (para si) ou administrador/lojista |
-| GET | `/atendimentos/{id}` | administrador, lojista ou o próprio cliente |
-| PATCH | `/atendimentos/{id}` (status, responsável) | administrador, lojista |
-| POST | `/atendimentos/{id}/mensagens` | administrador, lojista ou o próprio cliente |
-| GET | `/clientes/{id}`, `/clientes/{id}/atendimentos[/{id}]`, `/clientes/{id}/pedidos[/{numero}]` | o próprio cliente, administrador, lojista |
+| GET, POST | `/movimentacoes` (filtros: `estoqueId&lojaId&tipo&de&ate&busca`) | equipe |
+| GET, POST | `/transferencias` · PATCH `/transferencias/{id}` (status) | administrador, operador |
+| GET | `/pedidos/{id}/pagamentos` | equipe |
+| POST | `/pedidos/{id}/devolucoes` · GET `/devolucoes?de&ate&lojaId` | equipe |
+| GET, POST | `/atendimentos` · GET, PATCH `/atendimentos/{id}` | administrador, lojista |
+| POST | `/atendimentos/{id}/mensagens` (aceita `anexo`) | administrador, lojista |
+| GET | `/clientes?busca`, `/clientes/{id}`, `/clientes/{id}/pedidos`, `/clientes/{id}/atendimentos` | administrador, lojista |
 | GET | `/dashboard/resumo?lojaId` | equipe |
 | GET | `/financeiro/resumo?de&ate&comparar&agrupar&lojas&canais&categorias&generos` | administrador |
 
-Regras importantes:
+## Regras importantes
 
-- **Estoque = loja + variação (SKU).** O saldo nunca é editado direto: toda mudança é uma
-  movimentação com quantidade com sinal, e o saldo nunca fica negativo.
+- **Estoque = loja + SKU.** O saldo nunca é editado direto: toda mudança é uma movimentação com
+  quantidade com sinal, e o saldo nunca fica negativo.
 - **Transferências:** `SOLICITADA → EM_TRANSITO` (baixa na origem) `→ CONCLUIDA` (entrada no destino);
   `SOLICITADA → CANCELADA`. Outras mudanças devolvem 409.
+- **Devoluções:** por item do pedido; a peça volta ao estoque da loja com movimentação `DEVOLUCAO`.
+  Não deixa devolver mais que o comprado; pedido cancelado ou em separação recusa (409). O frete não é
+  devolvido. Quando todas as peças voltam, os pagamentos aprovados viram `ESTORNADO`.
+- **Fotos nos chamados:** JPG, PNG ou WEBP de até 2 MB, conferindo se o conteúdo é mesmo imagem.
+  Entram como `anexo: { nome, tipo, conteudoBase64 }` e saem como `anexo: { id, nome, tipo, url }`.
 - **Quem fez a ação vem do token.** Campos como `usuarioId`, `autorId` e `autorTipo` enviados pelo
   frontend são aceitos, mas ignorados.
-- Datas saem em milissegundos (como `Date.now()`); filtros de data usam `aaaa-mm-dd` no fuso `FUSO_HORARIO`.
-- Erros seguem o padrão do FastAPI: `{ "detail": "mensagem" }`.
+- **Erros** seguem o padrão do FastAPI, `{ "detail": "mensagem" }`, com o status certo
+  (401, 403, 404, 409, 410, 422, 429). Erro inesperado responde 500 genérico com um código; o detalhe
+  fica no log do servidor.
+- **Logs:** toda requisição é registrada com método, rota, status, duração e `request_id` (também
+  devolvido no cabeçalho `X-Request-ID`). Nível em `LOG_LEVEL`.
+- **Datas** saem em milissegundos (como `Date.now()`); filtros de data usam `aaaa-mm-dd` no fuso `FUSO_HORARIO`.
 
-## Estrutura
+## Dados de demonstração
 
-```
-app/
-  main.py          # cria o app, CORS e registra as rotas em /api
-  config.py        # variáveis do .env
-  database.py      # engine e sessão do SQLAlchemy
-  models.py        # tabelas
-  schemas.py       # corpos de requisição (camelCase)
-  views.py         # monta o JSON no formato que o frontend espera
-  security.py      # senhas, JWT e permissões por papel
-  services.py      # regras compartilhadas (movimentar estoque)
-  seed.py          # dados de demonstração
-  routers/         # uma rota por módulo da interface
-alembic/           # migrações
-tests/             # testes de regras e permissões
-```
+`python -m src.database.seed --recriar` apaga tudo e carrega de novo. Usa o **mesmo gerador e as
+mesmas sementes** do frontend (`src/data/seed`), então os dados ficam idênticos aos dos mocks. As datas
+são relativas ao momento da carga. Sem `--recriar`, só popula se o banco estiver vazio.
+
+| Perfil | E-mail | Acesso |
+| --- | --- | --- |
+| Administrador | helena@casalorenzi.com.br | tudo |
+| Lojista | rafael.monteiro@casalorenzi.com.br | dashboard (só a própria loja), pedidos, estoque, atendimento |
+| Operador | diego.almeida@casalorenzi.com.br | dashboard, pedidos, estoque, transferências |
+
+A senha da equipe e o PIN dos clientes de demonstração estão em `src/database/seed/dados.py`
+(`SENHA_DEMO` e `PIN_DEMO`). Os clientes (ex.: mariana.costa@gmail.com) não têm senha, só PIN.
 
 ## Migrações (Alembic)
 
-Sempre que mudar `app/models.py`:
+Sempre que mudar algo em `src/models/`:
 
 ```bash
 alembic revision --autogenerate -m "descreva a mudança"
-# confira o arquivo gerado em alembic/versions/
+# confira o arquivo gerado em alembic/versions/ (o autogenerate não move dados)
 alembic upgrade head
 ```
 
-Outros comandos úteis: `alembic current`, `alembic history`, `alembic downgrade -1`.
-Faça commit do arquivo de migração junto com a mudança no modelo, para o grupo aplicar com `alembic upgrade head`.
+Outros comandos: `alembic current`, `alembic history`, `alembic downgrade -1`.
+**A migration vai no mesmo commit do código que depende dela**, para o time aplicar com `alembic upgrade head`.
+Nunca mude o banco à mão.
 
 ## Testes
 
-Os testes usam um banco separado, recriado a cada teste:
+Rodam num banco separado (`TEST_DATABASE_URL` no `.env`), recriado a partir do seed a cada teste:
 
 ```bash
-pip install -r requirements-dev.txt
-createdb casalorenzi_test
-TEST_DATABASE_URL=postgresql+psycopg://postgres:postgres@localhost:5432/casalorenzi_test pytest
+pytest
 ```
+
+Rode os testes antes de cada commit. Toda regra nova ganha teste.
+
+## Padrão de código e commits
+
+```bash
+ruff check src tests alembic              # erros e imports
+ruff format src tests --exclude "src/database/seed/*"
+```
+
+Commits no formato convencional, no imperativo, sem ponto final e com até 50 caracteres no título,
+um assunto por commit: `feat:`, `fix:`, `refactor:`, `docs:`, `test:`, `chore:`, `revert:`.
+
+Exemplo: `feat: registra devoluções com volta ao estoque`.
+
+## Próximos passos
+
+- Rotas do e-commerce: checkout (`POST /checkout`), "Meus pedidos" por e-mail + PIN, chamados do cliente
+  e troca de PIN por link no e-mail — os contratos estão em `src/services/pedidosService.js` do frontend.
+- Gestão de pedidos no painel (`GET/PATCH /pedidos`).
+- Integração real de pagamento e envio de e-mails (hoje simulados no frontend).
+- Deploy: Render (API + banco) e Vercel (frontend), como no Plano de Execução.
