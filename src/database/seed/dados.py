@@ -78,12 +78,12 @@ PRODUTOS = [
         id=4,
         genero="Masculino",
         estacao="Inverno",
-        nome="Blazer Milano",
-        categoria="Alfaiataria",
+        nome="Jaqueta de Camurça Capri",
+        categoria="Outerwear",
         preco=1490,
-        codigo="BLZ",
+        codigo="JCC",
         tamanhos=["48", "50", "52"],
-        cores=["Marinho"],
+        cores=["Caramelo"],
     ),
     dict(
         id=5,
@@ -317,10 +317,10 @@ ROTEIROS = [
         dias=9,
         pedido=None,
         mensagens=[
-            ("CLIENTE", "Qual a composição do blazer Milano? Ele amassa muito em viagem?", 0),
+            ("CLIENTE", "Qual o material da jaqueta de camurça Capri? Ela mancha com chuva?", 0),
             (
                 "ATENDENTE",
-                "Gustavo, o Blazer Milano é 98% lã fria e 2% elastano, com ótima recuperação. Recomendamos transportá-lo em capa e pendurá-lo ao chegar.",
+                "Gustavo, a Jaqueta Capri é em camurça de couro bovino, com forro de viscose. Ela resiste a garoa, mas recomendamos evitar chuva forte e aplicar impermeabilizante para camurça.",
                 1,
             ),
             ("CLIENTE", "Ótimo, obrigado!", 2),
@@ -418,9 +418,9 @@ DETALHES_PRODUTOS = {
         cuidados="Lavar à mão ou na máquina em ciclo delicado, em água fria. Secar à sombra.",
     ),
     4: dict(
-        descricao="Blazer de dois botões com construção meio-forrada e ombros naturais, inspirado na alfaiataria de Milão. Lapela entalhada e bolsos com lapela.",
-        composicao="Tecido: 100% lã. Forro: 100% cupro",
-        cuidados="Somente lavagem a seco. Guardar em cabide de ombro largo.",
+        descricao="Jaqueta em camurça macia com gola de colarinho, zíper frontal e bolsos laterais. Leve o bastante para as noites de verão na costa e quente o suficiente para a meia-estação.",
+        composicao="Camurça (couro bovino). Forro: 100% viscose",
+        cuidados="Limpeza especializada em couro. Escovar no sentido do pelo e guardar em cabide, protegida do sol.",
     ),
     5: dict(
         descricao="Vestido midi em seda pura com decote em V e cintura marcada por amarração. O tecido fluido acompanha o movimento e brilha discretamente à luz do sol.",
