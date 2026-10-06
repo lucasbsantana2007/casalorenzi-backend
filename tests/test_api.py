@@ -95,7 +95,7 @@ def test_atualizar_produto_preserva_genero_e_adiciona_variacao(client, admin):
         "/api/produtos/2",
         headers=admin,
         json={
-            "nome": "Camisa Oxford Slim",
+            "nome": "Camisa de Linho Positano",
             "categoria": "Camisaria",
             "precoBase": 399,
             "ativo": True,
