@@ -8,9 +8,10 @@ HISTORICO_DIAS = 75
 
 LOJAS = [
     (1, "Oscar Freire", "São Paulo", "SP"),
-    (2, "Iguatemi São Paulo", "São Paulo", "SP"),
+    (2, "Lago Sul", "Brasília", "DF"),
     (3, "Leblon", "Rio de Janeiro", "RJ"),
     (4, "Pátio Batel", "Curitiba", "PR"),
+    (5, "Belvedere", "Belo Horizonte", "MG"),
 ]
 
 CATEGORIAS = ["Camisaria", "Alfaiataria", "Vestidos", "Tricô", "Malharia", "Saias", "Outerwear", "Acessórios"]
@@ -23,17 +24,18 @@ USUARIOS = [
     (5, "Camila Rocha", "camila.rocha@casalorenzi.com.br", "LOJISTA", 4),
     (6, "Diego Almeida", "diego.almeida@casalorenzi.com.br", "OPERADOR", 1),
     (7, "Carla Nunes", "carla.nunes@casalorenzi.com.br", "OPERADOR", 3),
+    (8, "Marina Duarte", "marina.duarte@casalorenzi.com.br", "LOJISTA", 5),
 ]
 
 # id, nome, email, telefone, cliente desde, loja preferida
 CLIENTES = [
     (101, "Mariana Costa", "mariana.costa@gmail.com", "(11) 98422-1937", "2021-03-14", 1),
-    (102, "Ricardo Fonseca", "ricardo.fonseca@outlook.com", "(11) 99710-4402", "2019-11-02", 2),
+    (102, "Ricardo Fonseca", "ricardo.fonseca@outlook.com", "(61) 99710-4402", "2019-11-02", 2),
     (103, "Juliana Prado", "ju.prado@gmail.com", "(21) 98134-7750", "2022-06-21", 3),
     (104, "Felipe Andrade", "felipe.andrade@icloud.com", "(41) 99288-3016", "2023-01-09", 4),
     (105, "Luiza Bastos", "luiza.bastos@gmail.com", "(21) 99640-2281", "2020-08-30", 3),
-    (106, "Gustavo Tavares", "gustavo.tavares@gmail.com", "(11) 97455-6190", "2024-02-17", 1),
-    (107, "Patrícia Moreira", "patricia.moreira@uol.com.br", "(11) 98820-5573", "2018-05-05", 2),
+    (106, "Gustavo Tavares", "gustavo.tavares@gmail.com", "(31) 97455-6190", "2024-02-17", 5),
+    (107, "Patrícia Moreira", "patricia.moreira@uol.com.br", "(61) 98820-5573", "2018-05-05", 2),
     (108, "Thiago Ribeiro", "thiago.ribeiro@gmail.com", "(41) 99107-8834", "2023-09-12", 4),
 ]
 
@@ -311,7 +313,7 @@ ROTEIROS = [
         cliente=106,
         tipo=6,
         status="CONCLUIDO",
-        responsavel=2,
+        responsavel=8,
         dias=9,
         pedido=None,
         mensagens=[
@@ -379,7 +381,7 @@ ROTEIROS = [
             ("CLIENTE", "O trench coat tem forro removível?", 0),
             (
                 "ATENDENTE",
-                "Ricardo, o forro não é removível, mas é em viscose leve, ideal para meia-estação. Quer que eu reserve um para você provar no Iguatemi?",
+                "Ricardo, o forro não é removível, mas é em viscose leve, ideal para meia-estação. Quer que eu reserve um para você provar no Lago Sul?",
                 2,
             ),
         ],

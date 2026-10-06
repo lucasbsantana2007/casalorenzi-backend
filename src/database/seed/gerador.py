@@ -130,17 +130,17 @@ def _montar_transferencias(rand: Aleatorio, relogio: Relogio, variacoes: list[di
     elegiveis = [v for v in variacoes if v["produto_id"] != 13]
     transferencias = []
     for indice, (dias, status) in enumerate(roteiro):
-        origem = rand.int(1, 4)
-        destino = rand.int(1, 4)
+        origem = rand.int(1, len(LOJAS))
+        destino = rand.int(1, len(LOJAS))
         if destino == origem:
-            destino = (origem % 4) + 1
+            destino = (origem % len(LOJAS)) + 1
         hora = rand.int(9, 12)
         minuto = rand.int(0, 59)
         criado = relogio.dias_atras(dias, hora, minuto)
         recebido = criado + rand.int(20, 60) * 3_600_000 if status == "CONCLUIDA" else None
         variacao_id = rand.pick(elegiveis)["id"]
         quantidade = rand.int(1, 3)
-        solicitante = rand.pick([1, 2, 3, 4, 5])
+        solicitante = rand.pick([1, 2, 3, 4, 5, 8])
         observacao = rand.pick(["Cliente aguardando na loja de destino", "Reposição de grade", "Ajuste de mix para vitrine", ""])
         transferencias.append(
             dict(
@@ -165,7 +165,7 @@ def _montar_transferencias(rand: Aleatorio, relogio: Relogio, variacoes: list[di
 def _eventos_aleatorios(rand: Aleatorio, relogio: Relogio, loja_id: int, produto: dict) -> list[dict]:
     eventos = []
     ativo = produto.get("ativo", True)
-    intensidade = {1: 0.13, 2: 0.11, 3: 0.1, 4: 0.07}[loja_id] * (1 if ativo else 0.3)
+    intensidade = {1: 0.13, 2: 0.11, 3: 0.1, 4: 0.07, 5: 0.09}[loja_id] * (1 if ativo else 0.3)
     for dia in range(HISTORICO_DIAS - 1, -1, -1):
         if rand.chance(intensidade):
             quantidade = -(1 if rand.chance(0.85) else 2)

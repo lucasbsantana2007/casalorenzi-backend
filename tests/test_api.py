@@ -75,7 +75,7 @@ def test_criar_produto_gera_estoque_zerado_nas_lojas(client, admin):
     assert produto["variacoes"][0]["sku"] == "CL-TST-AZU-M"
     assert produto["estoqueTotal"] == 0
     estoques = client.get(f"/api/estoque?variacaoId={produto['variacoes'][0]['id']}", headers=admin).json()
-    assert len(estoques) == 4
+    assert len(estoques) == len(client.get("/api/lojas").json())
     assert {e["status"] for e in estoques} == {"SEM_ESTOQUE"}
 
 
