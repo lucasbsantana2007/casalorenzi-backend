@@ -11,6 +11,7 @@ from src.models.categoria import Categoria
 from src.models.cliente import Cliente
 from src.models.devolucao import Devolucao
 from src.models.estoque import Estoque
+from src.models.evento_pedido import EventoPedido
 from src.models.item_pedido import ItemPedido
 from src.models.loja import Loja
 from src.models.mensagem import Mensagem
@@ -38,6 +39,7 @@ __all__ = [
     "Pedido",
     "ItemPedido",
     "Pagamento",
+    "EventoPedido",
     "Devolucao",
     "TipoSolicitacao",
     "Atendimento",

@@ -102,8 +102,8 @@ tests/            testes de API (pytest) num banco separado
 | Núcleo | `lojas`, `usuarios` (só a equipe: ADMINISTRADOR, LOJISTA, OPERADOR) |
 | Clientes | `clientes` (e-mail único + PIN de 4 dígitos guardado só como hash), `tokens_pin` |
 | Catálogo | `categorias`, `produtos` (com descrição, composição e cuidados), `variacoes` (SKU) |
-| Estoque | `estoques` (saldo por **loja + SKU**), `movimentacoes` (histórico com sinal) |
-| Vendas | `pedidos` (com frete e endereço de entrega no e-commerce), `itens_pedido`, `pagamentos`, `devolucoes` |
+| Estoque | `estoques` (saldo por **loja + SKU**), `movimentacoes` (histórico com sinal), `transferencias` (com `pedido_id` quando atendem um pedido) |
+| Vendas | `pedidos` (com frete e endereço de entrega no e-commerce), `itens_pedido`, `eventos_pedido` (histórico), `pagamentos`, `devolucoes` |
 | Atendimento | `tipos_solicitacao`, `atendimentos` (sempre de um cliente), `mensagens`, `anexos` (foto) |
 
 **Cliente não tem login.** Ele se identifica por e-mail + PIN de 4 dígitos (criado no checkout) para ver
@@ -125,6 +125,12 @@ Todas sob o prefixo `/api`. As rotas internas exigem `Authorization: Bearer <tok
 | GET | `/estoque/posicao?data&lojaId&busca` | equipe |
 | GET, POST | `/movimentacoes` (filtros: `estoqueId&lojaId&tipo&de&ate&busca`) | equipe |
 | GET, POST | `/transferencias` · PATCH `/transferencias/{id}` (status) | administrador, operador |
+| POST | `/checkout` (compra sem conta; cria o PIN de "Meus pedidos") | público |
+| POST | `/meus-pedidos` (e-mail + PIN no corpo) | público |
+| POST | `/meus-pedidos/esqueci-pin`, `/meus-pedidos/redefinir-pin` | público |
+| POST | `/meus-pedidos/solicitacoes/consulta`, `/meus-pedidos/solicitacoes`, `/meus-pedidos/solicitacoes/{id}/mensagens` | público (e-mail + PIN) |
+| GET | `/pedidos?status&lojaId&canal&busca`, `/pedidos/{id}` | equipe |
+| PATCH | `/pedidos/{id}` (loja de expedição ou status) | equipe |
 | GET | `/pedidos/{id}/pagamentos` | equipe |
 | POST | `/pedidos/{id}/devolucoes` · GET `/devolucoes?de&ate&lojaId` | equipe |
 | GET, POST | `/atendimentos` · GET, PATCH `/atendimentos/{id}` | administrador, lojista |
@@ -135,6 +141,16 @@ Todas sob o prefixo `/api`. As rotas internas exigem `Authorization: Bearer <tok
 
 ## Regras importantes
 
+- **Checkout e "Meus pedidos":** o cliente não tem conta. O e-mail + PIN de 4 dígitos criado no
+  checkout liberam os pedidos e chamados daquele e-mail (PIN só como hash; 5 erros seguidos
+  bloqueiam por 15 minutos). Preço e frete são sempre recalculados no servidor. As consultas são
+  POST para o PIN não ir na URL. "Esqueci o PIN" gera um link de uso único (30 minutos), que por
+  enquanto sai no log da API; com `PIN_LINK_NA_RESPOSTA=true` (só demonstração) ele volta na resposta.
+- **Expedição:** cada pedido sai da loja com mais peças da sacola em estoque (empate: a loja do mesmo
+  estado do CEP). O que faltar nela vira transferência automática (`SOLICITADA`, ligada ao pedido).
+  O envio (`PROCESSANDO → ENVIADO`, com código de rastreio) só é liberado com todas as peças na loja e
+  baixa o estoque (`VENDA`). Cancelar (`PROCESSANDO → CANCELADO`) estorna o pagamento e cancela as
+  transferências ainda não enviadas.
 - **Estoque = loja + SKU.** O saldo nunca é editado direto: toda mudança é uma movimentação com
   quantidade com sinal, e o saldo nunca fica negativo.
 - **Transferências:** `SOLICITADA → EM_TRANSITO` (baixa na origem) `→ CONCLUIDA` (entrada no destino);
@@ -206,8 +222,6 @@ Exemplo: `feat: registra devoluções com volta ao estoque`.
 
 ## Próximos passos
 
-- Rotas do e-commerce: checkout (`POST /checkout`), "Meus pedidos" por e-mail + PIN, chamados do cliente
-  e troca de PIN por link no e-mail — os contratos estão em `src/services/pedidosService.js` do frontend.
-- Gestão de pedidos no painel (`GET/PATCH /pedidos`).
-- Integração real de pagamento e envio de e-mails (hoje simulados no frontend).
+- Enviar por e-mail o link de "Esqueci o PIN" (hoje sai no log da API).
+- Integração real de pagamento (hoje simulado: todo checkout é aprovado).
 - Deploy: Render (API + banco) e Vercel (frontend), como no Plano de Execução.

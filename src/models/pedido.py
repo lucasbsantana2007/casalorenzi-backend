@@ -13,9 +13,11 @@ from src.models._restricoes import valor_em
 
 if TYPE_CHECKING:
     from src.models.cliente import Cliente
+    from src.models.evento_pedido import EventoPedido
     from src.models.item_pedido import ItemPedido
     from src.models.loja import Loja
     from src.models.pagamento import Pagamento
+    from src.models.transferencia import Transferencia
 
 
 class Pedido(Base):
@@ -56,3 +58,8 @@ class Pedido(Base):
     loja: Mapped[Loja] = relationship(lazy="joined")
     itens: Mapped[list[ItemPedido]] = relationship(back_populates="pedido", order_by="ItemPedido.id")
     pagamentos: Mapped[list[Pagamento]] = relationship(back_populates="pedido", order_by="Pagamento.id", lazy="selectin")
+    eventos: Mapped[list[EventoPedido]] = relationship(
+        back_populates="pedido", order_by="(EventoPedido.criado_em, EventoPedido.id)"
+    )
+    # Transferências automáticas criadas para juntar as peças na loja de expedição
+    transferencias: Mapped[list[Transferencia]] = relationship(back_populates="pedido", order_by="Transferencia.id")
