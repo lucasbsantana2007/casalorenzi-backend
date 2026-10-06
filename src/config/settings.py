@@ -28,3 +28,8 @@ FUSO = ZoneInfo(os.getenv("FUSO_HORARIO", "America/Sao_Paulo"))
 
 # Nível dos logs: DEBUG, INFO, WARNING ou ERROR
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
+
+# "Esqueci o PIN": o link de troca vai por e-mail (ainda não há envio de e-mail: ele sai no log).
+# true devolve o link também na resposta da API, para testar o fluxo na demonstração.
+# Nunca use true em produção: quem souber o e-mail de um cliente trocaria o PIN dele.
+PIN_LINK_NA_RESPOSTA = os.getenv("PIN_LINK_NA_RESPOSTA", "false").lower() == "true"

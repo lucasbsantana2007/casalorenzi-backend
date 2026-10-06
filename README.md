@@ -22,10 +22,10 @@ cp .env.example .env               # ajuste DATABASE_URL com usuário e senha do
 # 3. Banco de dados
 createdb casalorenzi               # ou: CREATE DATABASE casalorenzi; no psql / pgAdmin
 alembic upgrade head               # cria as tabelas
-python -m app.seed                 # carrega os dados de demonstração
+python -m src.database.seed        # carrega os dados de demonstração
 
 # 4. API
-uvicorn app.main:app --reload --port 8000
+uvicorn src.app:app --reload --port 8000
 ```
 
 - Documentação interativa (Swagger): http://localhost:8000/docs
@@ -55,12 +55,12 @@ Reinicie o `npm run dev` depois de mudar o `.env`.
 
 ## Dados de demonstração
 
-`python -m app.seed` usa o **mesmo gerador e as mesmas sementes** do frontend (`src/data/seed`),
+`python -m src.database.seed` usa o **mesmo gerador e as mesmas sementes** do frontend (`src/data/seed`),
 então lojas, produtos, histórico de estoque, transferências, pedidos e atendimentos ficam idênticos
 aos dos mocks. As datas são relativas ao momento da carga.
 
-- `python -m app.seed --recriar` apaga tudo e carrega de novo (útil para "resetar" a demo).
-- Todas as contas usam a senha **`lorenzi2026`**.
+- `python -m src.database.seed --recriar` apaga tudo e carrega de novo (útil para "resetar" a demo).
+- Todas as contas usam a senha **`lorenzi2026`**. Os clientes não têm senha: entram em "Meus pedidos" com o e-mail e o PIN **`1234`**.
 
 | Perfil        | E-mail                               | Acesso                                      |
 | ------------- | ------------------------------------ | ------------------------------------------- |
@@ -89,6 +89,12 @@ obtido em `POST /api/auth/login`.
 | POST | `/movimentacoes` | equipe |
 | GET, POST | `/transferencias` | administrador, operador |
 | PATCH | `/transferencias/{id}` (status) | administrador, operador |
+| POST | `/checkout` (compra sem conta; cria o PIN de "Meus pedidos") | público |
+| POST | `/meus-pedidos` (e-mail + PIN no corpo) | público |
+| POST | `/meus-pedidos/esqueci-pin`, `/meus-pedidos/redefinir-pin` | público |
+| POST | `/meus-pedidos/solicitacoes/consulta`, `/meus-pedidos/solicitacoes`, `/meus-pedidos/solicitacoes/{id}/mensagens` | público (e-mail + PIN) |
+| GET | `/pedidos?status&lojaId&canal&busca`, `/pedidos/{id}` | equipe |
+| PATCH | `/pedidos/{id}` (loja de expedição ou status) | equipe |
 | GET | `/atendimentos?busca&tipoSolicitacaoId&responsavelId&lojaId` | administrador, lojista |
 | POST | `/atendimentos` (abrir solicitação) | cliente (para si) ou administrador/lojista |
 | GET | `/atendimentos/{id}` | administrador, lojista ou o próprio cliente |
@@ -99,6 +105,16 @@ obtido em `POST /api/auth/login`.
 | GET | `/financeiro/resumo?de&ate&comparar&agrupar&lojas&canais&categorias&generos` | administrador |
 
 Regras importantes:
+
+- **Checkout e "Meus pedidos":** o cliente não tem conta. O e-mail + PIN de 4 dígitos criado no
+  checkout liberam os pedidos e chamados daquele e-mail (PIN só como hash; 5 erros seguidos
+  bloqueiam por 15 minutos). Preço e frete são sempre recalculados no servidor. As consultas são
+  POST para o PIN não ir na URL. "Esqueci o PIN" gera um link de uso único (30 minutos), que por
+  enquanto sai no log da API; com `PIN_LINK_NA_RESPOSTA=true` (só demonstração) ele volta na resposta.
+- **Expedição:** cada pedido sai da loja com mais peças da sacola em estoque. O que faltar nela
+  vira transferência automática (`SOLICITADA`, ligada ao pedido). O envio (`PROCESSANDO → ENVIADO`,
+  com código de rastreio) só é liberado com todas as peças na loja e baixa o estoque (`VENDA`).
+  Cancelar (`PROCESSANDO → CANCELADO`) estorna o pagamento e cancela as transferências ainda não enviadas.
 
 - **Estoque = loja + variação (SKU).** O saldo nunca é editado direto: toda mudança é uma
   movimentação com quantidade com sinal, e o saldo nunca fica negativo.

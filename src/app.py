@@ -20,7 +20,9 @@ from src.routers import (
     devolucoes,
     estoque,
     financeiro,
+    loja,
     pagamentos,
+    pedidos,
     produtos,
     transferencias,
 )
@@ -63,6 +65,8 @@ for modulo in (
     produtos,
     estoque,
     transferencias,
+    loja,
+    pedidos,
     pagamentos,
     devolucoes,
     atendimentos,

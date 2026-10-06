@@ -12,6 +12,7 @@ from src.models._restricoes import valor_em
 
 if TYPE_CHECKING:
     from src.models.loja import Loja
+    from src.models.pedido import Pedido
     from src.models.usuario import Usuario
     from src.models.variacao import Variacao
 
@@ -30,6 +31,8 @@ class Transferencia(Base):
     solicitante_id: Mapped[int | None] = mapped_column(ForeignKey("usuarios.id"))
     responsavel_id: Mapped[int | None] = mapped_column(ForeignKey("usuarios.id"))
     observacao: Mapped[str] = mapped_column(Text, default="")
+    # Preenchido nas transferências automáticas do e-commerce (peças que faltam na loja de expedição)
+    pedido_id: Mapped[int | None] = mapped_column(ForeignKey("pedidos.id"), index=True)
     criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     enviado_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     recebido_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
@@ -39,3 +42,4 @@ class Transferencia(Base):
     loja_destino: Mapped[Loja] = relationship(foreign_keys=[loja_destino_id], lazy="joined")
     solicitante: Mapped[Usuario | None] = relationship(foreign_keys=[solicitante_id], lazy="joined")
     responsavel: Mapped[Usuario | None] = relationship(foreign_keys=[responsavel_id], lazy="joined")
+    pedido: Mapped[Pedido | None] = relationship(back_populates="transferencias")
