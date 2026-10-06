@@ -4,6 +4,7 @@ import base64
 
 import pytest
 
+from src.entities.frete import uf_do_cep
 from src.use_cases import meus_pedidos
 
 PIN_DEMO = "1234"
@@ -129,6 +130,22 @@ def test_checkout_recusa_item_esgotado_e_cep_nao_atendido(client):
 
 
 # ---------- Meus pedidos (PIN) ----------
+
+
+@pytest.mark.parametrize(
+    "cep, uf",
+    [
+        ("01310-100", "SP"),
+        ("22430-041", "RJ"),
+        ("30320-570", "MG"),
+        ("71680-357", "DF"),
+        ("80420-090", "PR"),
+        ("72800-000", None),
+        ("4000", None),
+    ],
+)
+def test_uf_do_cep_cobre_os_estados_das_lojas(cep, uf):
+    assert uf_do_cep(cep) == uf
 
 
 def test_pin_errado_bloqueia_apos_cinco_tentativas(client):

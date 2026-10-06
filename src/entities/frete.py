@@ -56,14 +56,19 @@ def opcao_de_frete(cep: str | None, subtotal: Decimal, tipo: str) -> tuple[Decim
 
 def uf_do_cep(cep: str | None) -> str | None:
     """UF aproximada pelo CEP, usada só para preferir a loja mais próxima na expedição."""
-    prefixo = somente_digitos(cep)[:2]
-    if not prefixo:
+    prefixo = somente_digitos(cep)[:5]
+    if len(prefixo) < 5:
         return None
     numero = int(prefixo)
-    if 1 <= numero <= 19:
-        return "SP"
-    if 20 <= numero <= 28:
-        return "RJ"
-    if 80 <= numero <= 87:
-        return "PR"
-    return None
+    return next((uf for inicio, fim, uf in _FAIXAS_UF if inicio <= numero <= fim), None)
+
+
+# Faixas de CEP (5 primeiros dígitos) dos estados que têm loja
+_FAIXAS_UF = (
+    (1000, 19999, "SP"),
+    (20000, 28999, "RJ"),
+    (30000, 39999, "MG"),
+    (70000, 72799, "DF"),
+    (73000, 73699, "DF"),
+    (80000, 87999, "PR"),
+)
