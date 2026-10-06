@@ -3,9 +3,9 @@ from logging.config import fileConfig
 from sqlalchemy import engine_from_config, pool
 
 from alembic import context
-from app import models  # noqa: F401  (registra as tabelas no metadata)
-from app.config import DATABASE_URL
-from app.database import Base
+from src import models  # noqa: F401  (registra as tabelas no metadata)
+from src.config.settings import DATABASE_URL
+from src.database.connection import Base
 
 config = context.config
 # A URL vem do .env, para que app e migrações usem sempre o mesmo banco.
