@@ -19,6 +19,7 @@ from src.entities.devolucao import (
     saldo_devolvivel,
     valor_devolvido,
 )
+from src.entities.papeis import loja_do_escopo, ve_pedido_da_loja
 from src.repositories import (
     atendimento_repository,
     cadastro_repository,
@@ -65,7 +66,7 @@ def registrar(
 ) -> m.Devolucao:
     # Trava o pedido: duas devoluções simultâneas do mesmo item não passam juntas pela conferência de saldo
     pedido = pedido_repository.obter(db, pedido_id, travar=True)
-    if pedido is None:
+    if pedido is None or not ve_pedido_da_loja(usuario.papel, usuario.loja_id, pedido.loja_id):
         raise NaoEncontrado("Pedido não encontrado.")
     if pedido.status == "CANCELADO":
         raise Conflito("Pedido cancelado não aceita devolução: o pagamento já foi estornado.")
@@ -141,8 +142,14 @@ def registrar(
     return devolucao_repository.obter(db, devolucao.id)
 
 
-def listar(db: Session, *, de: str | None = None, ate: str | None = None, loja_id: int | None = None) -> list[m.Devolucao]:
-    """de/ate em aaaa-mm-dd (inclusive); loja_id = loja em que as peças voltaram."""
+def listar(
+    db: Session, usuario: m.Usuario, *, de: str | None = None, ate: str | None = None, loja_id: int | None = None
+) -> list[m.Devolucao]:
+    """de/ate em aaaa-mm-dd (inclusive); loja_id = loja em que as peças voltaram.
+    Lojista e Operador veem só as devoluções da própria loja."""
+    escopo = loja_do_escopo(usuario.papel, usuario.loja_id)
+    if escopo is not None:
+        loja_id = escopo
     dia_inicial = ler_data(de, "de")
     dia_final = ler_data(ate, "ate")
     if dia_inicial and dia_final and dia_final < dia_inicial:

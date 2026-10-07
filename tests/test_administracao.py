@@ -271,6 +271,8 @@ def test_frete_configurado_vale_no_checkout_e_o_custo_fica_no_pedido(client, adm
 
     painel = client.get(f"/api/pedidos?busca={pedido['numero']}", headers=admin).json()[0]
     assert painel["frete"]["custo"] == 30.0
+    if painel["lojaId"] != 1:  # o lojista de demonstração é da loja 1 e só vê os pedidos dela
+        client.patch(f"/api/pedidos/{painel['id']}", headers=admin, json={"lojaId": 1})
     da_loja = client.get(f"/api/pedidos/{painel['id']}", headers=lojista).json()
     assert "custo" not in da_loja["frete"]
 

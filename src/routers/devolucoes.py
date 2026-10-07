@@ -16,7 +16,8 @@ acesso = exigir_modulo("pedidos")
 @router.post("/pedidos/{pedido_id}/devolucoes", status_code=201)
 def registrar(pedido_id: int, dados: DevolucaoEntrada, db: Session = Depends(get_db), usuario: m.Usuario = Depends(acesso)):
     """Devolve peças de um item do pedido ao estoque (movimentação DEVOLUCAO). Pedido cancelado ou
-    ainda não enviado: 409. Quantidade acima do comprado menos o já devolvido: 422."""
+    ainda não enviado: 409. Quantidade acima do comprado menos o já devolvido: 422. Pedido de outra
+    loja (Lojista e Operador): 404."""
     d = devolucoes.registrar(
         db,
         pedido_id,
@@ -37,7 +38,8 @@ def listar(
     ate: str | None = None,
     lojaId: int | None = None,
     db: Session = Depends(get_db),
-    _: m.Usuario = Depends(acesso),
+    usuario: m.Usuario = Depends(acesso),
 ):
-    """de/ate em aaaa-mm-dd (inclusive). lojaId: loja em que as peças voltaram ao estoque."""
-    return [devolucao_saida(d) for d in devolucoes.listar(db, de=de, ate=ate, loja_id=lojaId)]
+    """de/ate em aaaa-mm-dd (inclusive). lojaId: loja em que as peças voltaram ao estoque
+    (Lojista e Operador: sempre a própria loja)."""
+    return [devolucao_saida(d) for d in devolucoes.listar(db, usuario, de=de, ate=ate, loja_id=lojaId)]

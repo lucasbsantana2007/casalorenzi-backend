@@ -11,13 +11,15 @@ from sqlalchemy.orm import Session
 
 from src import models as m
 from src.entities.pagamento import METODOS_PAGAMENTO, STATUS_PAGAMENTO, parcelas_validas, pode_mudar
+from src.entities.papeis import ve_pedido_da_loja
 from src.repositories import pagamento_repository, pedido_repository, sessao
 from src.utils.datas import agora
 from src.utils.erros import DadosInvalidos, NaoEncontrado
 
 
-def listar_do_pedido(db: Session, pedido_id: int) -> list[m.Pagamento]:
-    if pedido_repository.obter(db, pedido_id) is None:
+def listar_do_pedido(db: Session, pedido_id: int, usuario: m.Usuario) -> list[m.Pagamento]:
+    pedido = pedido_repository.obter(db, pedido_id)
+    if pedido is None or not ve_pedido_da_loja(usuario.papel, usuario.loja_id, pedido.loja_id):
         raise NaoEncontrado("Pedido não encontrado.")
     return pagamento_repository.do_pedido(db, pedido_id)
 
