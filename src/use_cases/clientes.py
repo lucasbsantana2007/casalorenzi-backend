@@ -4,6 +4,7 @@ Quem pode ver o quê é conferido na rota (o cliente só acessa o próprio id)."
 from sqlalchemy.orm import Session
 
 from src import models as m
+from src.entities.cliente import cpf_do_id
 from src.repositories import atendimento_repository, cliente_repository, pedido_repository
 from src.utils.erros import NaoEncontrado
 
@@ -11,6 +12,14 @@ from src.utils.erros import NaoEncontrado
 def listar(db: Session, busca: str | None = None) -> list[m.Cliente]:
     """Busca por nome, e-mail ou telefone (até 50 resultados)."""
     return cliente_repository.listar(db, busca)
+
+
+def por_cpf(db: Session, cpf: str | int) -> m.Cliente:
+    """Cliente pelo id público (CPF). Conta excluída (sem CPF) não aparece."""
+    cliente = cliente_repository.por_cpf(db, cpf_do_id(cpf))
+    if cliente is None:
+        raise NaoEncontrado("Cliente não encontrado.")
+    return cliente
 
 
 def obter(db: Session, cliente_id: int) -> m.Cliente:

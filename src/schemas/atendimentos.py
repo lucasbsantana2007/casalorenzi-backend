@@ -27,7 +27,8 @@ class MensagemEntrada(Entrada):
 class SolicitacaoEntrada(Entrada):
     """Cliente logado abre para si (clienteId ignorado); a equipe abre em nome de um cliente."""
 
-    cliente_id: int | None = None
+    # CPF do cliente (id público); a equipe informa ao abrir em nome dele
+    cliente_id: str | int | None = None
     tipo_solicitacao_id: int | None = None
     pedido_id: int | None = None
     descricao: str = ""
@@ -50,9 +51,9 @@ def atendimento_saida(a: m.Atendimento, ultima: m.Mensagem | None) -> dict:
     return {
         "id": a.id,
         "protocolo": a.protocolo,
-        "clienteId": a.cliente_id,
+        "clienteId": a.cliente.cpf,
         # Nome antigo, mantido enquanto o frontend usa solicitanteId
-        "solicitanteId": a.cliente_id,
+        "solicitanteId": a.cliente.cpf,
         "responsavelId": a.responsavel_id,
         "tipoSolicitacaoId": a.tipo_solicitacao_id,
         "status": a.status,
@@ -61,7 +62,7 @@ def atendimento_saida(a: m.Atendimento, ultima: m.Mensagem | None) -> dict:
         "criadoEm": ms(a.criado_em),
         "atualizadoEm": ms(a.atualizado_em),
         "tipoSolicitacao": tipo_solicitacao_saida(a.tipo_solicitacao),
-        "cliente": {"id": a.cliente_id, "nome": a.cliente.nome},
+        "cliente": {"id": a.cliente.cpf, "nome": a.cliente.nome},
         "responsavel": usuario_resumo(a.responsavel),
         "loja": loja_saida(a.loja),
         "ultimaMensagem": (

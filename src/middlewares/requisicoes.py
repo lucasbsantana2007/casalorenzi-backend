@@ -12,6 +12,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
 from src.utils.erros import ErroDeNegocio
+from src.utils.texto import mascarar_cpf
 from src.utils.urls import definir_base
 
 logger = logging.getLogger("casalorenzi")
@@ -29,7 +30,7 @@ def registrar(app: FastAPI) -> None:
         logger.info(
             "%s %s -> %s (%.0f ms) request_id=%s",
             request.method,
-            request.url.path,
+            mascarar_cpf(request.url.path),
             resposta.status_code,
             duracao,
             request.state.request_id,
@@ -43,7 +44,7 @@ def registrar(app: FastAPI) -> None:
             logger.warning(
                 "%s %s -> %s %s request_id=%s",
                 request.method,
-                request.url.path,
+                mascarar_cpf(request.url.path),
                 erro.status_code,
                 erro.mensagem,
                 getattr(request.state, "request_id", "-"),
@@ -55,7 +56,7 @@ def registrar(app: FastAPI) -> None:
     async def erro_inesperado(request: Request, erro: Exception):
         """Falha não prevista (banco fora do ar, bug): registra tudo para o time e responde 500 genérico."""
         request_id = getattr(request.state, "request_id", "-")
-        logger.exception("Falha em %s %s request_id=%s", request.method, request.url.path, request_id)
+        logger.exception("Falha em %s %s request_id=%s", request.method, mascarar_cpf(request.url.path), request_id)
         return JSONResponse(
             {"detail": f"Erro interno. Se persistir, informe o código {request_id} à equipe."},
             status_code=500,

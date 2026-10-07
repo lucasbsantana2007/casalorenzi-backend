@@ -45,7 +45,7 @@ def test_permissoes_por_papel(client, lojista, operador):
 
 def test_cliente_entra_no_mesmo_login_e_nao_acessa_o_painel(client, mariana):
     eu = client.get("/api/auth/me", headers=mariana).json()
-    assert eu["papel"] == "CLIENTE" and eu["cpf"] == "15881399803"
+    assert eu["papel"] == "CLIENTE" and eu["id"] == eu["cpf"] == "15881399803"
     assert client.get("/api/dashboard/resumo", headers=mariana).status_code == 401
     assert client.get("/api/clientes", headers=mariana).status_code == 401
     assert client.get("/api/atendimentos", headers=mariana).status_code == 401
@@ -213,12 +213,12 @@ def test_transferencia_valida_quantidade_disponivel(client, operador):
 
 
 def test_equipe_abre_solicitacao_para_cliente_e_responde(client, admin, lojista):
-    pedido = client.get("/api/clientes/101/pedidos", headers=admin).json()[0]
+    pedido = client.get("/api/clientes/15881399803/pedidos", headers=admin).json()[0]
     r = client.post(
         "/api/atendimentos",
         headers=admin,
         json={
-            "clienteId": 101,
+            "clienteId": "15881399803",
             "tipoSolicitacaoId": 1,
             "pedidoId": pedido["id"],
             "descricao": "Quero trocar o tamanho, por favor.",
@@ -227,7 +227,7 @@ def test_equipe_abre_solicitacao_para_cliente_e_responde(client, admin, lojista)
     assert r.status_code == 201, r.text
     atd = r.json()
     assert atd["status"] == "ABERTO" and atd["protocolo"] == f"ATD-{26000 + atd['id'] * 37:06d}"
-    assert atd["cliente"]["id"] == 101 and atd["clienteId"] == 101
+    assert atd["cliente"]["id"] == "15881399803" and atd["clienteId"] == "15881399803"
     # A descrição é a fala do cliente (sem autor da equipe); quem abriu fica registrado pelo sistema
     assert atd["mensagens"][0]["autorTipo"] == "CLIENTE" and atd["mensagens"][0]["autorId"] is None
     assert atd["mensagens"][1]["conteudo"] == "Aberto por Helena Lorenzi em nome do cliente."
@@ -237,7 +237,7 @@ def test_equipe_abre_solicitacao_para_cliente_e_responde(client, admin, lojista)
         headers=lojista,
         json={
             "conteudo": "Separamos para você!",
-            "autorId": 101,
+            "autorId": "15881399803",
             "autorTipo": "CLIENTE",
         },
     )
@@ -260,7 +260,7 @@ def test_solicitacao_exige_pedido_quando_o_tipo_pede(client, admin):
     r = client.post(
         "/api/atendimentos",
         headers=admin,
-        json={"clienteId": 101, "tipoSolicitacaoId": 1, "descricao": "Descrição longa o bastante"},
+        json={"clienteId": "15881399803", "tipoSolicitacaoId": 1, "descricao": "Descrição longa o bastante"},
     )
     assert r.status_code == 422
     assert r.json()["detail"] == "Este tipo de solicitação exige o número do pedido."
@@ -278,9 +278,9 @@ def test_atualizar_atendimento_registra_eventos(client, admin):
 
 def test_painel_consulta_cliente(client, admin):
     r = client.get("/api/clientes?busca=mariana", headers=admin)
-    assert [c["id"] for c in r.json()] == [101]
-    perfil = client.get("/api/clientes/101", headers=admin).json()
-    assert perfil["email"] == "mariana.costa@gmail.com" and perfil["temPin"] is True
-    assert "pinHash" not in perfil and "pin_hash" not in perfil
-    assert perfil["totalPedidos"] == len(client.get("/api/clientes/101/pedidos", headers=admin).json())
+    assert [c["id"] for c in r.json()] == ["15881399803"]
+    perfil = client.get("/api/clientes/15881399803", headers=admin).json()
+    assert perfil["email"] == "mariana.costa@gmail.com"
+    assert "senhaHash" not in perfil and "senha_hash" not in perfil
+    assert perfil["totalPedidos"] == len(client.get("/api/clientes/15881399803/pedidos", headers=admin).json())
     assert client.get("/api/clientes/9999", headers=admin).status_code == 404
