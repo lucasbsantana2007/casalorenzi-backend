@@ -3,10 +3,12 @@ from __future__ import annotations
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, ForeignKey, Numeric, String, Text
+from sqlalchemy import Boolean, CheckConstraint, ForeignKey, Numeric, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.database.connection import Base
+from src.entities.produto import ESTACOES, GENEROS
+from src.models._restricoes import valor_em
 
 if TYPE_CHECKING:
     from src.models.categoria import Categoria
@@ -16,6 +18,10 @@ if TYPE_CHECKING:
 
 class Produto(Base):
     __tablename__ = "produtos"
+    __table_args__ = (
+        CheckConstraint(f"genero IS NULL OR {valor_em('genero', GENEROS)}", name="ck_produtos_genero"),
+        CheckConstraint(f"estacao IS NULL OR {valor_em('estacao', ESTACOES)}", name="ck_produtos_estacao"),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     nome: Mapped[str] = mapped_column(String(160))

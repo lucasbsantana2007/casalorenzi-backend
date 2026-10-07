@@ -131,7 +131,7 @@ Todas sob o prefixo `/api`. As rotas internas exigem `Authorization: Bearer <tok
 | GET | `/admin/log?area&usuarioId&busca` | administrador |
 | GET | `/usuarios?papel=` | equipe |
 | GET | `/produtos?busca&categoria&ativo`, `/produtos/{id}` (`precoCusto` só para o administrador), `/produtos/{id}/imagem` | público (vitrine) |
-| POST, PUT | `/produtos`, `/produtos/{id}` (com `precoCusto`, `imagem` e `removerImagem`) | administrador |
+| POST, PUT | `/produtos`, `/produtos/{id}` (com `genero`, `estacao`, `precoCusto`, `imagem` e `removerImagem`; `genero` obrigatório no cadastro) | administrador |
 | GET | `/estoque?busca&lojaId&categoria&status&variacaoId`, `/estoque/{id}` | equipe |
 | GET | `/estoque/posicao?data&lojaId&busca` | equipe |
 | GET, POST | `/movimentacoes` (filtros: `estoqueId&lojaId&tipo&de&ate&busca`) | equipe |
