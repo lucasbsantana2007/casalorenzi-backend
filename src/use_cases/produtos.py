@@ -3,6 +3,7 @@ from decimal import Decimal
 from sqlalchemy.orm import Session
 
 from src import models as m
+from src.entities.produto import ESTACAO_PADRAO, ESTACOES, GENEROS
 from src.repositories import cadastro_repository, estoque_repository, produto_repository, sessao
 from src.schemas.produtos import ProdutoEntrada
 from src.use_cases import anexos, log_acoes
@@ -57,6 +58,12 @@ def _validar(db: Session, dados: ProdutoEntrada, produto_id: int | None) -> m.Ca
         raise DadosInvalidos("Há SKUs repetidos nas variações.")
     if skus and (duplicado := produto_repository.sku_em_uso(db, skus, produto_id)):
         raise DadosInvalidos(f"O SKU {duplicado.sku} já está em uso.")
+    if produto_id is None and not dados.genero:
+        raise DadosInvalidos("Selecione a coleção do produto: Masculino ou Feminino.")
+    if dados.genero is not None and dados.genero not in GENEROS:
+        raise DadosInvalidos("Coleção inválida. Use Masculino ou Feminino.")
+    if dados.estacao is not None and dados.estacao not in ESTACOES:
+        raise DadosInvalidos("Estação inválida. Use Inverno, Verão ou Atemporal.")
     sem_custo = next((v for v in dados.variacoes if v.preco_custo is None or not v.preco_custo >= 0), None)
     if sem_custo is not None:
         raise DadosInvalidos(f"Informe o preço de custo da variação {sem_custo.sku.strip().upper() or sem_custo.cor}.")
@@ -120,7 +127,14 @@ def _aplicar_imagem(produto: m.Produto, dados: ProdutoEntrada) -> dict | None:
     return None
 
 
-_ROTULOS = {"nome": "Nome", "categoria": "Categoria", "preco_base": "Preço de venda", "ativo": "Ativo"}
+_ROTULOS = {
+    "nome": "Nome",
+    "categoria": "Categoria",
+    "genero": "Coleção",
+    "estacao": "Estação",
+    "preco_base": "Preço de venda",
+    "ativo": "Ativo",
+}
 _FORMATOS = {"preco_base": moeda, "ativo": lambda v: "Sim" if v else "Não"}
 
 
@@ -128,6 +142,8 @@ def _campos_log(produto: m.Produto) -> dict:
     return {
         "nome": produto.nome,
         "categoria": produto.categoria.nome,
+        "genero": produto.genero,
+        "estacao": produto.estacao,
         "preco_base": Decimal(str(produto.preco_base)).quantize(Decimal("0.01")),
         "ativo": produto.ativo,
     }
@@ -141,7 +157,7 @@ def criar(db: Session, dados: ProdutoEntrada, usuario: m.Usuario) -> m.Produto:
         preco_base=dados.preco_base,
         ativo=dados.ativo,
         genero=dados.genero,
-        estacao=dados.estacao,
+        estacao=dados.estacao or ESTACAO_PADRAO,
         descricao=dados.descricao,
         composicao=dados.composicao,
         cuidados=dados.cuidados,
@@ -171,9 +187,9 @@ def atualizar(db: Session, produto_id: int, dados: ProdutoEntrada, usuario: m.Us
     produto.nome = dados.nome.strip()
     produto.preco_base = dados.preco_base
     produto.ativo = dados.ativo
-    # Campos que não aparecem no formulário do painel: só mudam se forem enviados
+    # Só mudam se forem enviados; coleção e estação nunca ficam vazias (o produto sairia da vitrine)
     for campo in ("genero", "estacao", "descricao", "composicao", "cuidados"):
-        if campo in dados.model_fields_set:
+        if campo in dados.model_fields_set and not (campo in ("genero", "estacao") and getattr(dados, campo) is None):
             setattr(produto, campo, getattr(dados, campo))
     alteracoes = log_acoes.mudancas(antes, _campos_log(produto), _ROTULOS, _FORMATOS)
     if foto:
