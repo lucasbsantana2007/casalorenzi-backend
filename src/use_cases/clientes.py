@@ -1,5 +1,5 @@
-"""Clientes vistos pela equipe no painel. Cliente não tem login: não existe portal com conta;
-a consulta pública de pedidos é por e-mail + PIN ("Meus pedidos")."""
+"""Clientes: vistos pela equipe no painel e, com a própria conta, pelo cliente na área do cliente.
+Quem pode ver o quê é conferido na rota (o cliente só acessa o próprio id)."""
 
 from sqlalchemy.orm import Session
 
@@ -33,3 +33,20 @@ def atendimentos(db: Session, cliente_id: int) -> list[m.Atendimento]:
 def totais(db: Session, cliente_id: int) -> tuple[int, int]:
     """(pedidos, atendimentos) do cliente."""
     return pedido_repository.contar_do_cliente(db, cliente_id), atendimento_repository.contar_do_cliente(db, cliente_id)
+
+
+def atendimento(db: Session, cliente_id: int, atendimento_id: int) -> m.Atendimento:
+    """Chamado do cliente. De outro cliente: aparece como inexistente (404)."""
+    a = atendimento_repository.obter(db, atendimento_id)
+    if a is None or a.cliente_id != cliente_id:
+        raise NaoEncontrado("Solicitação não encontrada.")
+    return a
+
+
+def pedido_por_numero(db: Session, cliente_id: int, numero: str) -> m.Pedido:
+    """Aceita "CL-104820", "cl 104820" ou só "104820". Só pedidos do próprio cliente."""
+    termo = "".join(c for c in (numero or "") if c.isdigit())
+    pedido = pedido_repository.do_cliente_por_numero(db, cliente_id, f"CL-{termo}") if termo else None
+    if pedido is None:
+        raise NaoEncontrado("Não encontramos um pedido com esse número.")
+    return pedido

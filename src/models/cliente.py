@@ -13,18 +13,22 @@ if TYPE_CHECKING:
 
 
 class Cliente(Base):
-    """Cliente da loja. Não é usuário: não tem login (regras em src/entities/cliente.py)."""
+    """Cliente da loja. Não é usuário da equipe: entra com a própria conta (CPF, e-mail, senha). Ver src/entities/cliente.py."""
 
     __tablename__ = "clientes"
     __table_args__ = (
         CheckConstraint("email = lower(email)", name="ck_clientes_email_minusculo"),
         CheckConstraint("tentativas_pin >= 0", name="ck_clientes_tentativas_pin"),
+        CheckConstraint("cpf IS NULL OR cpf ~ '^[0-9]{11}$'", name="ck_clientes_cpf"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     nome: Mapped[str] = mapped_column(String(120))
     email: Mapped[str] = mapped_column(String(255), unique=True, index=True)
     telefone: Mapped[str | None] = mapped_column(String(30))
+    # Conta do cliente: CPF (só dígitos) e hash da senha. Nulos nos clientes antigos, sem conta.
+    cpf: Mapped[str | None] = mapped_column(String(11), unique=True)
+    senha_hash: Mapped[str | None] = mapped_column(String(255))
     # Só o hash do PIN de 4 dígitos (bcrypt). Nulo até o cliente criar um PIN.
     pin_hash: Mapped[str | None] = mapped_column(String(255))
     tentativas_pin: Mapped[int] = mapped_column(Integer, default=0, server_default="0")

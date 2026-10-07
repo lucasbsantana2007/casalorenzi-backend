@@ -10,6 +10,8 @@ from datetime import datetime, timedelta
 TENTATIVAS_PIN_MAX = 5
 BLOQUEIO_PIN = timedelta(minutes=15)
 VALIDADE_TOKEN_PIN = timedelta(minutes=30)
+VALIDADE_TOKEN_SENHA = timedelta(minutes=30)
+SENHA_MINIMA = 8
 
 _PIN = re.compile(r"^\d{4}$")
 _EMAIL = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
@@ -37,3 +39,21 @@ def apos_erro_de_pin(tentativas: int, agora: datetime) -> tuple[int, datetime | 
     if tentativas >= TENTATIVAS_PIN_MAX:
         return 0, agora + BLOQUEIO_PIN
     return tentativas, None
+
+
+def somente_digitos_cpf(cpf: str | None) -> str:
+    return re.sub(r"\D", "", cpf or "")[:11]
+
+
+def _digito_verificador(base: str) -> int:
+    soma = sum(int(d) * (len(base) + 1 - i) for i, d in enumerate(base))
+    resto = (soma * 10) % 11
+    return 0 if resto == 10 else resto
+
+
+def cpf_valido(cpf: str | None) -> bool:
+    """11 dígitos, não todos iguais, e os dois dígitos verificadores corretos."""
+    d = somente_digitos_cpf(cpf)
+    if len(d) != 11 or len(set(d)) == 1:
+        return False
+    return _digito_verificador(d[:9]) == int(d[9]) and _digito_verificador(d[:10]) == int(d[10])

@@ -33,7 +33,7 @@ class MensagemEntrada(Entrada):
 
 
 class SolicitacaoEntrada(Entrada):
-    """A equipe abre o chamado em nome de um cliente (cliente não tem login)."""
+    """Cliente logado abre para si (clienteId ignorado); a equipe abre em nome de um cliente."""
 
     cliente_id: int | None = None
     tipo_solicitacao_id: int | None = None

@@ -1,11 +1,12 @@
-"""Atendimento: painel interno (administrador e lojista). A equipe abre chamados em nome do cliente."""
+"""Atendimento: painel interno (administrador e lojista) e o cliente logado, que abre e responde
+os próprios chamados. A equipe também abre chamados em nome do cliente."""
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from src import models as m
 from src.database.connection import get_db
-from src.middlewares.autenticacao import exigir_modulo
+from src.middlewares.autenticacao import Sessao, exigir_cliente_ou_modulo, exigir_modulo
 from src.repositories import atendimento_repository
 from src.schemas.atendimentos import (
     AtendimentoAtualizacao,
@@ -18,6 +19,7 @@ from src.use_cases import atendimentos
 
 router = APIRouter(prefix="/atendimentos", tags=["Atendimento"])
 acesso_painel = exigir_modulo("atendimento")
+acesso = exigir_cliente_ou_modulo("atendimento")
 
 
 def lista_saida(db: Session, lista: list[m.Atendimento]) -> list[dict]:
@@ -46,17 +48,19 @@ def listar(
 
 
 @router.post("", status_code=201)
-def abrir(dados: SolicitacaoEntrada, db: Session = Depends(get_db), usuario: m.Usuario = Depends(acesso_painel)):
-    """Abre um chamado em nome do cliente (clienteId obrigatório). A descrição entra como mensagem do cliente."""
-    a = atendimentos.abrir(
-        db,
-        usuario,
-        cliente_id=dados.cliente_id,
-        tipo_solicitacao_id=dados.tipo_solicitacao_id,
-        pedido_id=dados.pedido_id,
-        descricao=dados.descricao,
-        anexo=dados.anexo,
-    )
+def abrir(dados: SolicitacaoEntrada, db: Session = Depends(get_db), sessao: Sessao = Depends(acesso)):
+    """Cliente logado: abre o chamado para si (clienteId do corpo é ignorado).
+    Equipe: abre em nome do cliente (clienteId obrigatório). A descrição entra como mensagem do cliente."""
+    campos = {
+        "tipo_solicitacao_id": dados.tipo_solicitacao_id,
+        "pedido_id": dados.pedido_id,
+        "descricao": dados.descricao,
+        "anexo": dados.anexo,
+    }
+    if sessao.cliente is not None:
+        a = atendimentos.abrir_para_cliente(db, sessao.cliente, **campos)
+    else:
+        a = atendimentos.abrir(db, sessao.usuario, cliente_id=dados.cliente_id, **campos)
     return detalhe_saida(db, a)
 
 
@@ -80,10 +84,11 @@ def atualizar(
 
 
 @router.post("/{atendimento_id}/mensagens", status_code=201)
-def enviar_mensagem(
-    atendimento_id: int, dados: MensagemEntrada, db: Session = Depends(get_db), usuario: m.Usuario = Depends(acesso_painel)
-):
-    """Resposta da equipe, com imagem opcional em `anexo` ({ nome, tipo, conteudoBase64 }, até 2 MB).
-    O autor vem do token (autorId/autorTipo do corpo são ignorados)."""
-    a = atendimentos.enviar_mensagem(db, atendimento_id, usuario, dados.conteudo, dados.anexo)
+def enviar_mensagem(atendimento_id: int, dados: MensagemEntrada, db: Session = Depends(get_db), sessao: Sessao = Depends(acesso)):
+    """Resposta com imagem opcional em `anexo` ({ nome, tipo, conteudoBase64 }, até 2 MB).
+    O autor vem do token (autorId/autorTipo do corpo são ignorados): cliente só responde os próprios chamados."""
+    if sessao.cliente is not None:
+        a = atendimentos.responder_como_cliente(db, atendimento_id, sessao.cliente, dados.conteudo, dados.anexo)
+    else:
+        a = atendimentos.enviar_mensagem(db, atendimento_id, sessao.usuario, dados.conteudo, dados.anexo)
     return detalhe_saida(db, a)

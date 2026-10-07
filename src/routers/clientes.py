@@ -1,38 +1,66 @@
-"""Clientes no painel (equipe de atendimento). Cliente não tem login nem rotas próprias aqui."""
+"""Clientes: equipe de atendimento (painel) ou o próprio cliente logado (área do cliente).
+
+O cliente só acessa o próprio id: o de outra pessoa aparece como inexistente (404), para não
+revelar quem é cliente.
+"""
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from src import models as m
 from src.database.connection import get_db
-from src.middlewares.autenticacao import exigir_modulo
-from src.routers.atendimentos import lista_saida
+from src.middlewares.autenticacao import Sessao, exigir_cliente_ou_modulo, exigir_modulo
+from src.routers.atendimentos import detalhe_saida, lista_saida
 from src.schemas.clientes import cliente_saida
 from src.schemas.pedidos import pedido_saida
 from src.use_cases import clientes
+from src.utils.erros import NaoEncontrado
 
 router = APIRouter(prefix="/clientes", tags=["Clientes"])
-acesso = exigir_modulo("atendimento")
+acesso_painel = exigir_modulo("atendimento")
+acesso = exigir_cliente_ou_modulo("atendimento")
+
+
+def _conferir_dono(sessao: Sessao, cliente_id: int) -> None:
+    if sessao.cliente is not None and sessao.cliente.id != cliente_id:
+        raise NaoEncontrado("Cliente não encontrado.")
 
 
 @router.get("")
-def listar(busca: str | None = None, db: Session = Depends(get_db), _: m.Usuario = Depends(acesso)):
-    """Busca por nome, e-mail ou telefone (até 50 resultados). Usada para abrir chamado em nome do cliente."""
+def listar(busca: str | None = None, db: Session = Depends(get_db), _: m.Usuario = Depends(acesso_painel)):
+    """Busca por nome, e-mail, telefone (até 50 resultados). Só a equipe. Usada para abrir chamado em nome do cliente."""
     return [cliente_saida(c) for c in clientes.listar(db, busca)]
 
 
 @router.get("/{cliente_id}")
-def obter(cliente_id: int, db: Session = Depends(get_db), _: m.Usuario = Depends(acesso)):
+def obter(cliente_id: int, db: Session = Depends(get_db), sessao: Sessao = Depends(acesso)):
+    _conferir_dono(sessao, cliente_id)
     cliente = clientes.obter(db, cliente_id)
     total_pedidos, total_atendimentos = clientes.totais(db, cliente_id)
     return {**cliente_saida(cliente), "totalPedidos": total_pedidos, "totalAtendimentos": total_atendimentos}
 
 
 @router.get("/{cliente_id}/pedidos")
-def listar_pedidos(cliente_id: int, db: Session = Depends(get_db), _: m.Usuario = Depends(acesso)):
+def listar_pedidos(cliente_id: int, db: Session = Depends(get_db), sessao: Sessao = Depends(acesso)):
+    _conferir_dono(sessao, cliente_id)
     return [pedido_saida(p) for p in clientes.pedidos(db, cliente_id)]
 
 
+@router.get("/{cliente_id}/pedidos/{numero}")
+def consultar_pedido(cliente_id: int, numero: str, db: Session = Depends(get_db), sessao: Sessao = Depends(acesso)):
+    """Aceita "CL-104820" ou só "104820". Pedido de outro cliente: 404."""
+    _conferir_dono(sessao, cliente_id)
+    return pedido_saida(clientes.pedido_por_numero(db, cliente_id, numero))
+
+
 @router.get("/{cliente_id}/atendimentos")
-def listar_atendimentos(cliente_id: int, db: Session = Depends(get_db), _: m.Usuario = Depends(acesso)):
+def listar_atendimentos(cliente_id: int, db: Session = Depends(get_db), sessao: Sessao = Depends(acesso)):
+    _conferir_dono(sessao, cliente_id)
     return lista_saida(db, clientes.atendimentos(db, cliente_id))
+
+
+@router.get("/{cliente_id}/atendimentos/{atendimento_id}")
+def obter_atendimento(cliente_id: int, atendimento_id: int, db: Session = Depends(get_db), sessao: Sessao = Depends(acesso)):
+    """Chamado com a conversa e as fotos. Chamado de outro cliente: 404."""
+    _conferir_dono(sessao, cliente_id)
+    return detalhe_saida(db, clientes.atendimento(db, cliente_id, atendimento_id))

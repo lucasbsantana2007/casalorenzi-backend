@@ -1,14 +1,16 @@
-"""Rotas públicas da loja (sem login): checkout e "Meus pedidos".
+"""Rotas da loja: checkout (cliente logado) e "Meus pedidos" por e-mail + PIN (legado).
 
-O cliente não tem conta: o e-mail + PIN de 4 dígitos (criado no checkout) vão no corpo de
-cada requisição de "Meus pedidos". Por isso as consultas também são POST: o PIN nunca vai
-na URL. Regras em src/use_cases/checkout.py e src/use_cases/meus_pedidos.py.
+"Meus pedidos" atende os clientes antigos, sem conta: o e-mail + PIN de 4 dígitos vão no corpo
+de cada requisição. Por isso as consultas também são POST: o PIN nunca vai na URL. Clientes
+com conta usam as rotas de /clientes/{id} com o token. Regras em src/use_cases/checkout.py e src/use_cases/meus_pedidos.py.
 """
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
+from src import models as m
 from src.database.connection import get_db
+from src.middlewares.autenticacao import cliente_atual
 from src.schemas.meus_pedidos import (
     EsqueciPinEntrada,
     IdentificacaoEntrada,
@@ -24,10 +26,10 @@ router = APIRouter(tags=["Loja"])
 
 
 @router.post("/checkout", status_code=201)
-def finalizar_compra(dados: CheckoutEntrada, db: Session = Depends(get_db)):
-    """Cria o pedido (pagamento simulado, aprovado). Preços e frete são recalculados aqui.
-    E-mail que já tem PIN precisa usar o mesmo: 409. Item esgotado: 409."""
-    return pedido_publico_saida(checkout.finalizar_compra(db, dados))
+def finalizar_compra(dados: CheckoutEntrada, db: Session = Depends(get_db), cliente: m.Cliente = Depends(cliente_atual)):
+    """Cria o pedido do cliente logado (pagamento simulado, aprovado). Preços e frete são recalculados
+    aqui. Sem sessão de cliente: 401. Item esgotado: 409."""
+    return pedido_publico_saida(checkout.finalizar_compra(db, cliente, dados))
 
 
 @router.post("/meus-pedidos")

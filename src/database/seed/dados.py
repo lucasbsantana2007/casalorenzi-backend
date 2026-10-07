@@ -8,7 +8,7 @@ HISTORICO_DIAS = 75
 
 LOJAS = [
     (1, "Oscar Freire", "São Paulo", "SP"),
-    (2, "Lago Sul", "Brasília", "DF"),
+    (2, "Lago Norte", "Brasília", "DF"),
     (3, "Leblon", "Rio de Janeiro", "RJ"),
     (4, "Pátio Batel", "Curitiba", "PR"),
     (5, "Belvedere", "Belo Horizonte", "MG"),
@@ -28,15 +28,16 @@ USUARIOS = [
 ]
 
 # id, nome, email, telefone, cliente desde, loja preferida
+# (id, cpf, nome, e-mail, telefone, cliente desde, loja preferida) — mesmos CPFs do frontend
 CLIENTES = [
-    (101, "Mariana Costa", "mariana.costa@gmail.com", "(11) 98422-1937", "2021-03-14", 1),
-    (102, "Ricardo Fonseca", "ricardo.fonseca@outlook.com", "(61) 99710-4402", "2019-11-02", 2),
-    (103, "Juliana Prado", "ju.prado@gmail.com", "(21) 98134-7750", "2022-06-21", 3),
-    (104, "Felipe Andrade", "felipe.andrade@icloud.com", "(41) 99288-3016", "2023-01-09", 4),
-    (105, "Luiza Bastos", "luiza.bastos@gmail.com", "(21) 99640-2281", "2020-08-30", 3),
-    (106, "Gustavo Tavares", "gustavo.tavares@gmail.com", "(31) 97455-6190", "2024-02-17", 5),
-    (107, "Patrícia Moreira", "patricia.moreira@uol.com.br", "(61) 98820-5573", "2018-05-05", 2),
-    (108, "Thiago Ribeiro", "thiago.ribeiro@gmail.com", "(41) 99107-8834", "2023-09-12", 4),
+    (101, "15881399803", "Mariana Costa", "mariana.costa@gmail.com", "(11) 98422-1937", "2021-03-14", 1),
+    (102, "69879730917", "Ricardo Fonseca", "ricardo.fonseca@outlook.com", "(61) 99710-4402", "2019-11-02", 2),
+    (103, "11417075350", "Juliana Prado", "ju.prado@gmail.com", "(21) 98134-7750", "2022-06-21", 3),
+    (104, "64556815177", "Felipe Andrade", "felipe.andrade@icloud.com", "(41) 99288-3016", "2023-01-09", 4),
+    (105, "88447294072", "Luiza Bastos", "luiza.bastos@gmail.com", "(21) 99640-2281", "2020-08-30", 3),
+    (106, "55761698757", "Gustavo Tavares", "gustavo.tavares@gmail.com", "(31) 97455-6190", "2024-02-17", 5),
+    (107, "16897684600", "Patrícia Moreira", "patricia.moreira@uol.com.br", "(61) 98820-5573", "2018-05-05", 2),
+    (108, "97880932054", "Thiago Ribeiro", "thiago.ribeiro@gmail.com", "(41) 99107-8834", "2023-09-12", 4),
 ]
 
 # As variações são tamanhos × cores. genero/estacao alimentam a vitrine.
@@ -381,7 +382,7 @@ ROTEIROS = [
             ("CLIENTE", "O trench coat tem forro removível?", 0),
             (
                 "ATENDENTE",
-                "Ricardo, o forro não é removível, mas é em viscose leve, ideal para meia-estação. Quer que eu reserve um para você provar no Lago Sul?",
+                "Ricardo, o forro não é removível, mas é em viscose leve, ideal para meia-estação. Quer que eu reserve um para você provar no Lago Norte?",
                 2,
             ),
         ],

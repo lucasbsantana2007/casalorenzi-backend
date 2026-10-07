@@ -1,14 +1,16 @@
 """Papéis da equipe e o que cada um acessa. Espelha src/utils/permissions.js do frontend:
 o frontend só esconde menus; quem garante a regra é a API.
 
-Cliente não é usuário: não tem login nem papel. Fica na tabela `clientes` e se identifica
-por e-mail + PIN (src/entities/cliente.py)."""
+Cliente não é usuário da equipe: fica na tabela `clientes`, entra pelo mesmo login com a
+conta criada no checkout (e-mail + senha) e recebe um token com papel "CLIENTE"."""
 
 ADMINISTRADOR = "ADMINISTRADOR"
 LOJISTA = "LOJISTA"
 OPERADOR = "OPERADOR"
 
 EQUIPE = (ADMINISTRADOR, LOJISTA, OPERADOR)
+# Papel gravado no token de um cliente logado (não é papel da equipe)
+CLIENTE = "CLIENTE"
 PAPEIS = EQUIPE
 
 ACESSO = {

@@ -21,6 +21,7 @@ from src.models.pedido import Pedido
 from src.models.produto import Produto
 from src.models.tipo_solicitacao import TipoSolicitacao
 from src.models.token_pin import TokenPin
+from src.models.token_senha import TokenSenha
 from src.models.transferencia import Transferencia
 from src.models.usuario import Usuario
 from src.models.variacao import Variacao
@@ -31,6 +32,7 @@ __all__ = [
     "Usuario",
     "Cliente",
     "TokenPin",
+    "TokenSenha",
     "Produto",
     "Variacao",
     "Estoque",

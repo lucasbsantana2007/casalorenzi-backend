@@ -1,4 +1,4 @@
-"""Checkout, "Meus pedidos" (e-mail + PIN) e gestão dos pedidos do e-commerce no painel."""
+"""Checkout (com conta de cliente), "Meus pedidos" legado (e-mail + PIN) e gestão dos pedidos no painel."""
 
 import base64
 
@@ -9,6 +9,7 @@ from src.use_cases import meus_pedidos
 
 PIN_DEMO = "1234"
 MARIANA = "mariana.costa@gmail.com"  # cliente de demonstração (PIN 1234)
+CLIENTE_DEMO_ID = 101  # Mariana
 CEP_SP = "01310-100"
 # Menor PNG válido (1x1): os anexos são conferidos pela assinatura do arquivo
 PNG_1X1 = base64.b64encode(
@@ -28,14 +29,9 @@ def _variacao_com_estoque(client, minimo=1):
     raise AssertionError("nenhuma variação com estoque")
 
 
-def _compra(variacao_id, *, email="novo.cliente@exemplo.com", pin="4321", quantidade=1, **extra):
+def _compra(variacao_id, *, quantidade=1, **extra):
+    """O cliente vem do token (conta do cliente), não do corpo."""
     dados = {
-        "email": email,
-        "emailConfirmacao": email,
-        "pin": pin,
-        "pinConfirmacao": pin,
-        "nome": "Cliente Novo",
-        "telefone": "(11) 99999-0000",
         "endereco": {
             "cep": CEP_SP,
             "rua": "Av. Paulista",
@@ -61,12 +57,13 @@ def _pedido_no_painel(client, headers, numero):
 # ---------- Checkout ----------
 
 
-def test_checkout_cria_pedido_com_precos_e_frete_do_servidor(client, admin):
+def test_checkout_cria_pedido_com_precos_e_frete_do_servidor(client, admin, novo_cliente):
+    headers, cliente_id = novo_cliente
     variacao_id, preco = _variacao_com_estoque(client)
     # Preço enviado pelo navegador é ignorado: vale o do cadastro
     dados = _compra(variacao_id)
     dados["itens"][0]["precoUnitario"] = 1
-    r = client.post("/api/checkout", json=dados)
+    r = client.post("/api/checkout", json=dados, headers=headers)
     assert r.status_code == 201, r.text
     pedido = r.json()
     assert pedido["numero"].startswith("CL-") and pedido["status"] == "PROCESSANDO"
@@ -78,8 +75,8 @@ def test_checkout_cria_pedido_com_precos_e_frete_do_servidor(client, admin):
     assert pedido["historico"][0]["status"] == "PROCESSANDO"
     assert "loja" not in pedido and "transferencias" not in pedido  # visão pública
 
-    # O PIN criado no checkout libera "Meus pedidos"
-    meus = client.post("/api/meus-pedidos", json={"email": "NOVO.Cliente@exemplo.com", "pin": "4321"})
+    # Aparece na área do cliente
+    meus = client.get(f"/api/clientes/{cliente_id}/pedidos", headers=headers)
     assert meus.status_code == 200
     assert [p["numero"] for p in meus.json()] == [pedido["numero"]]
 
@@ -89,44 +86,42 @@ def test_checkout_cria_pedido_com_precos_e_frete_do_servidor(client, admin):
     assert painel["historico"][0]["observacao"].startswith("Pagamento aprovado")
 
 
-def test_checkout_de_cliente_existente_exige_o_mesmo_pin(client):
+def test_checkout_exige_conta_de_cliente(client, admin, mariana):
     variacao_id, _ = _variacao_com_estoque(client)
-    errado = client.post("/api/checkout", json=_compra(variacao_id, email=MARIANA, pin="9999"))
-    assert errado.status_code == 409
-    assert "mesmo PIN" in errado.json()["detail"]
+    assert client.post("/api/checkout", json=_compra(variacao_id)).status_code == 401
+    # Conta da equipe não compra
+    equipe = client.post("/api/checkout", json=_compra(variacao_id), headers=admin)
+    assert equipe.status_code == 401 and "conta de cliente" in equipe.json()["detail"]
 
-    certo = client.post("/api/checkout", json=_compra(variacao_id, email=MARIANA, pin=PIN_DEMO))
+    certo = client.post("/api/checkout", json=_compra(variacao_id), headers=mariana)
     assert certo.status_code == 201
-    numeros = [p["numero"] for p in client.post("/api/meus-pedidos", json={"email": MARIANA, "pin": PIN_DEMO}).json()]
+    numeros = [p["numero"] for p in client.get(f"/api/clientes/{CLIENTE_DEMO_ID}/pedidos", headers=mariana).json()]
     assert certo.json()["numero"] in numeros and len(numeros) > 1  # junta com os pedidos antigos da Mariana
 
 
 @pytest.mark.parametrize(
     ("alteracao", "status", "trecho"),
     [
-        ({"emailConfirmacao": "outro@exemplo.com"}, 422, "e-mails não conferem"),
-        ({"pinConfirmacao": "1111"}, 422, "PINs não conferem"),
-        ({"pin": "12a4", "pinConfirmacao": "12a4"}, 422, "4 números"),
         ({"itens": []}, 422, "sacola está vazia"),
         ({"pagamento": {"metodo": "BOLETO"}}, 422, "forma de pagamento"),
     ],
 )
-def test_checkout_valida_os_dados(client, alteracao, status, trecho):
+def test_checkout_valida_os_dados(client, mariana, alteracao, status, trecho):
     variacao_id, _ = _variacao_com_estoque(client)
-    r = client.post("/api/checkout", json=_compra(variacao_id, **alteracao))
+    r = client.post("/api/checkout", json=_compra(variacao_id, **alteracao), headers=mariana)
     assert r.status_code == status
     assert trecho in r.json()["detail"]
 
 
-def test_checkout_recusa_item_esgotado_e_cep_nao_atendido(client):
+def test_checkout_recusa_item_esgotado_e_cep_nao_atendido(client, mariana):
     variacao_id, _ = _variacao_com_estoque(client)
     total = next(v["estoqueTotal"] for p in client.get("/api/produtos").json() for v in p["variacoes"] if v["id"] == variacao_id)
     if total < 20:
-        r = client.post("/api/checkout", json=_compra(variacao_id, quantidade=total + 1))
+        r = client.post("/api/checkout", json=_compra(variacao_id, quantidade=total + 1), headers=mariana)
         assert r.status_code == 409 and "esgotou" in r.json()["detail"]
     sem_entrega = _compra(variacao_id)
     sem_entrega["endereco"]["cep"] = "00000-000"
-    assert client.post("/api/checkout", json=sem_entrega).status_code == 422
+    assert client.post("/api/checkout", json=sem_entrega, headers=mariana).status_code == 422
 
 
 # ---------- Meus pedidos (PIN) ----------
@@ -263,7 +258,8 @@ def _loja_sem_e_com_estoque(client, headers, variacao_id):
     return sem, {e["lojaId"]: e["quantidade"] for e in estoques}
 
 
-def test_fluxo_completo_com_transferencia_automatica(client, admin):
+def test_fluxo_completo_com_transferencia_automatica(client, admin, novo_cliente):
+    headers, cliente_id = novo_cliente
     # Variação com estoque em alguma loja e zerada em outra
     for produto in client.get("/api/produtos?ativo=true").json():
         for v in produto["variacoes"]:
@@ -274,7 +270,7 @@ def test_fluxo_completo_com_transferencia_automatica(client, admin):
         else:
             continue
         break
-    numero = client.post("/api/checkout", json=_compra(variacao_id)).json()["numero"]
+    numero = client.post("/api/checkout", json=_compra(variacao_id), headers=headers).json()["numero"]
     pedido = _pedido_no_painel(client, admin, numero)
 
     # Expedição passa para a loja sem a peça: o sistema pede a transferência
@@ -304,14 +300,14 @@ def test_fluxo_completo_com_transferencia_automatica(client, admin):
     assert client.patch(f"/api/pedidos/{pedido['id']}", headers=admin, json={"status": "ENTREGUE"}).json()["status"] == "ENTREGUE"
     # Fora do fluxo
     assert client.patch(f"/api/pedidos/{pedido['id']}", headers=admin, json={"status": "CANCELADO"}).status_code == 409
-    publico = client.post("/api/meus-pedidos", json={"email": "novo.cliente@exemplo.com", "pin": "4321"}).json()[0]
-    assert [h["status"] for h in publico["historico"]] == ["PROCESSANDO", "PROCESSANDO", "ENVIADO", "ENTREGUE"]
+    publico = client.get(f"/api/clientes/{cliente_id}/pedidos/{numero.removeprefix('CL-')}", headers=headers).json()
+    assert publico["status"] == "ENTREGUE" and publico["codigoRastreio"] == "BR123456789SP"
 
 
-def test_cancelar_estorna_e_cancela_transferencias_pendentes(client, admin):
+def test_cancelar_estorna_e_cancela_transferencias_pendentes(client, admin, mariana):
     variacao_id, _ = _variacao_com_estoque(client)
     sem, _ = _loja_sem_e_com_estoque(client, admin, variacao_id)
-    numero = client.post("/api/checkout", json=_compra(variacao_id)).json()["numero"]
+    numero = client.post("/api/checkout", json=_compra(variacao_id), headers=mariana).json()["numero"]
     pedido = _pedido_no_painel(client, admin, numero)
     if sem and sem != pedido["loja"]["id"]:
         pedido = client.patch(f"/api/pedidos/{pedido['id']}", headers=admin, json={"lojaId": sem}).json()
