@@ -12,7 +12,7 @@ import argparse
 from datetime import date
 from decimal import ROUND_HALF_UP, Decimal
 
-from sqlalchemy import func, select, text
+from sqlalchemy import delete, func, select, text
 from sqlalchemy.orm import Session
 
 from src import models as m
@@ -62,7 +62,11 @@ def _pagamento(pedido: dict) -> tuple[str, int]:
 
 
 def _popular_frete(db: Session) -> None:
-    """Configuração de frete inicial (a mesma que a migração grava num banco novo)."""
+    """Configuração de frete inicial (a mesma que a migração grava num banco novo).
+    Num banco recém-criado, a migração já gravou essas linhas: elas são trocadas, para o seed
+    funcionar logo depois de `alembic upgrade head` (é o que acontece no primeiro deploy)."""
+    db.execute(delete(m.FreteRegiao))
+    db.execute(delete(m.ConfigFrete))
     db.add(m.ConfigFrete(id=1, gratis_minimo=FRETE_INICIAL["gratis_minimo"], expresso_ativo=FRETE_INICIAL["expresso_ativo"]))
     for ordem, (regiao, nome, padrao, expresso) in enumerate(FRETE_INICIAL["regioes"], start=1):
         db.add(

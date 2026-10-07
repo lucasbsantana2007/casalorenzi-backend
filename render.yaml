@@ -1,0 +1,37 @@
+# Deploy no Render (Blueprint). No painel do Render: New > Blueprint > este repositório.
+# Cria o banco PostgreSQL e a API. A cada deploy, as migrações deixam as tabelas em dia; o seed só
+# carrega os dados de demonstração quando o banco ainda está vazio (no primeiro deploy).
+databases:
+  - name: casalorenzi-db
+    plan: free
+    region: virginia
+    databaseName: casalorenzi
+    user: casalorenzi
+
+services:
+  - type: web
+    name: casalorenzi-api
+    runtime: python
+    plan: free
+    region: virginia
+    buildCommand: pip install -r requirements.txt
+    startCommand: alembic upgrade head && python -m src.database.seed && uvicorn src.app:app --host 0.0.0.0 --port $PORT --proxy-headers --forwarded-allow-ips="*"
+    healthCheckPath: /api/health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.13.5
+      - key: DATABASE_URL
+        fromDatabase:
+          name: casalorenzi-db
+          property: connectionString
+      # Chave aleatória gerada pelo Render (nunca a do código)
+      - key: JWT_SECRET
+        generateValue: true
+      # Endereço do site na Vercel, ex.: https://casalorenzi.vercel.app (o Render pede na criação)
+      - key: CORS_ORIGINS
+        sync: false
+      - key: URL_FRONTEND
+        sync: false
+      # Demonstração: sem envio de e-mail, o link de nova senha e de convite aparece na tela
+      - key: LINK_SENHA_NA_RESPOSTA
+        value: "true"

@@ -280,7 +280,38 @@ um assunto por commit: `feat:`, `fix:`, `refactor:`, `docs:`, `test:`, `chore:`,
 
 Exemplo: `feat: registra devoluções com volta ao estoque`.
 
+## Deploy (Render)
+
+A API e o banco vão para o Render; o site, para a Vercel (passo a passo no README do frontend).
+O arquivo `render.yaml` descreve tudo, então o Render cria os dois de uma vez:
+
+1. No painel do Render: **New > Blueprint** e escolha este repositório.
+2. Ele pede `CORS_ORIGINS` e `URL_FRONTEND`: os dois são o endereço do site na Vercel (ex.:
+   `https://casalorenzi.vercel.app`). Se ainda não souber, coloque o endereço que pretende usar e
+   corrija depois em **Environment** (salvar refaz o deploy).
+3. O Render cria o banco `casalorenzi-db` e a API `casalorenzi-api`. A cada deploy, o start command
+   roda `alembic upgrade head` (tabelas em dia) e `python -m src.database.seed`, que só carrega os
+   dados de demonstração quando o banco está vazio; depois sobe a API. Confira em
+   `https://SUA-API.onrender.com/api/health`.
+
+O `render.yaml` já define: `JWT_SECRET` aleatório (gerado pelo Render), `DATABASE_URL` do banco,
+`PYTHON_VERSION` e `LINK_SENHA_NA_RESPOSTA=true`. O link das fotos dos produtos usa sozinho o
+endereço público do serviço (`RENDER_EXTERNAL_URL`).
+
+Este primeiro deploy é uma **demonstração**: as contas usam a senha de demonstração, não há envio
+de e-mail (o conteúdo vai para o log do Render) e, por isso, os links de nova senha e de convite
+aparecem na tela. Antes de um uso real, troque as senhas, configure o Resend e defina
+`LINK_SENHA_NA_RESPOSTA=false`.
+
+Para recarregar os dados de demonstração do banco do Render (apaga tudo), rode do seu computador
+com a "External Database URL" que o Render mostra na página do banco:
+
+```bash
+DATABASE_URL="postgresql://..." .venv/bin/python -m src.database.seed --recriar
+```
+
+No plano grátis, a API "dorme" sem uso e o primeiro acesso seguinte demora perto de um minuto.
+
 ## Próximos passos
 
 - Integração real de pagamento (hoje simulado: todo checkout é aprovado).
-- Deploy: Render (API + banco) e Vercel (frontend), como no Plano de Execução.
