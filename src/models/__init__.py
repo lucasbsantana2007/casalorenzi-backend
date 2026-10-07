@@ -12,7 +12,10 @@ from src.models.cliente import Cliente
 from src.models.devolucao import Devolucao
 from src.models.estoque import Estoque
 from src.models.evento_pedido import EventoPedido
+from src.models.frete import ConfigFrete, FreteRegiao
+from src.models.imagem_produto import ImagemProduto
 from src.models.item_pedido import ItemPedido
+from src.models.log_acao import LogAcao
 from src.models.loja import Loja
 from src.models.mensagem import Mensagem
 from src.models.movimentacao import Movimentacao
@@ -35,6 +38,7 @@ __all__ = [
     "TokenSenha",
     "Produto",
     "Variacao",
+    "ImagemProduto",
     "Estoque",
     "Transferencia",
     "Movimentacao",
@@ -47,4 +51,7 @@ __all__ = [
     "Atendimento",
     "Mensagem",
     "Anexo",
+    "ConfigFrete",
+    "FreteRegiao",
+    "LogAcao",
 ]

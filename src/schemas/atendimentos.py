@@ -3,7 +3,7 @@ from typing import Literal
 
 from src import models as m
 from src.schemas.clientes import cliente_saida
-from src.schemas.comum import Entrada, loja_saida, usuario_resumo
+from src.schemas.comum import AnexoEntrada, Entrada, loja_saida, usuario_resumo  # noqa: F401 (AnexoEntrada é reexportada)
 from src.schemas.pedidos import pedido_saida
 from src.utils.datas import ms
 
@@ -14,14 +14,6 @@ class AtendimentoAtualizacao(Entrada):
     status: StatusAtendimento | None = None
     # Enviar null remove o responsável; omitir o campo mantém o atual
     responsavel_id: int | None = None
-
-
-class AnexoEntrada(Entrada):
-    """Imagem JPG/PNG/WEBP de até 2 MB. conteudoBase64 aceita o base64 puro ou um data URL."""
-
-    nome: str = ""
-    tipo: str = ""
-    conteudo_base64: str = ""
 
 
 class MensagemEntrada(Entrada):

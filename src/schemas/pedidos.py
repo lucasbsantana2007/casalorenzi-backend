@@ -53,15 +53,19 @@ class PedidoAtualizacao(Entrada):
 # ---------- Saídas ----------
 
 
-def _frete(pedido: m.Pedido) -> dict | None:
+def _frete(pedido: m.Pedido, com_custo: bool = False) -> dict | None:
+    """com_custo: só para o Administrador (quanto o envio custou para a loja)."""
     if pedido.frete_tipo is None:
         return None
-    return {
+    frete = {
         "tipo": pedido.frete_tipo,
         "label": ROTULOS.get(pedido.frete_tipo, pedido.frete_tipo),
         "valor": float(pedido.frete_valor or 0),
         "prazoDias": pedido.frete_prazo_dias,
     }
+    if com_custo and pedido.frete_custo is not None:
+        frete["custo"] = float(pedido.frete_custo)
+    return frete
 
 
 def _endereco(pedido: m.Pedido) -> dict | None:
@@ -133,10 +137,11 @@ def _eventos(pedido: m.Pedido, completo: bool) -> list[dict]:
     return [{"status": e.status, "em": ms(e.criado_em)} for e in pedido.eventos]
 
 
-def pedido_admin_saida(pedido: m.Pedido, saldos_na_loja: dict[int, int]) -> dict:
+def pedido_admin_saida(pedido: m.Pedido, saldos_na_loja: dict[int, int], ve_custo: bool = False) -> dict:
     """Painel: pedido completo, com o saldo de cada peça na loja de expedição, as transferências
-    automáticas e o histórico com quem fez cada mudança."""
+    automáticas e o histórico com quem fez cada mudança. ve_custo: Administrador vê o custo do frete."""
     base = pedido_saida(pedido)
+    base["frete"] = _frete(pedido, com_custo=ve_custo)
     for item in base["itens"]:
         item["saldoNaLoja"] = saldos_na_loja.get(item["variacaoId"], 0)
     return {

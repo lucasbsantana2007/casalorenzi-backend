@@ -29,6 +29,10 @@ FUSO = ZoneInfo(os.getenv("FUSO_HORARIO", "America/Sao_Paulo"))
 # Nível dos logs: DEBUG, INFO, WARNING ou ERROR
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
 
+# Endereço público da API, usado nos links das fotos de produto (imagemUrl). Vazio: usa o endereço
+# pelo qual a requisição chegou (bom no ambiente local; atrás de um proxy, defina o https público).
+URL_PUBLICA_API = os.getenv("URL_PUBLICA_API", "").rstrip("/")
+
 # "Esqueci o PIN": o link de troca vai por e-mail (ainda não há envio de e-mail: ele sai no log).
 # true devolve o link também na resposta da API, para testar o fluxo na demonstração.
 # Nunca use true em produção: quem souber o e-mail de um cliente trocaria o PIN dele.

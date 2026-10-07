@@ -14,11 +14,12 @@ from decimal import Decimal
 from sqlalchemy.orm import Session
 
 from src import models as m
-from src.entities.frete import ROTULOS, opcao_de_frete, somente_digitos
+from src.entities.frete import ROTULOS, somente_digitos
 from src.entities.pagamento import METODOS_ECOMMERCE, PARCELAS_MAX
 from src.entities.pedido import proximo_numero
 from src.repositories import estoque_repository, pedido_repository, produto_repository, sessao
 from src.schemas.pedidos import CheckoutEntrada
+from src.use_cases import frete as frete_config
 from src.use_cases import pagamentos
 from src.use_cases.pedidos import escolher_loja_expedicao, planejar_transferencias, registrar_evento
 from src.utils.datas import agora
@@ -75,10 +76,11 @@ def finalizar_compra(db: Session, cliente: m.Cliente, dados: CheckoutEntrada) ->
     itens = _itens(db, dados)
 
     subtotal = sum((preco * quantidade for _, quantidade, preco in itens), Decimal("0"))
-    frete = opcao_de_frete(cep, subtotal, dados.frete_tipo)
+    # Valores da configuração de frete do momento (Administração > Frete); o custo fica guardado no pedido
+    frete = frete_config.opcao_para(db, cep, subtotal, dados.frete_tipo)
     if frete is None:
         raise DadosInvalidos("Escolha uma opção de frete para o CEP informado.")
-    frete_valor, prazo = frete
+    frete_valor, prazo = frete.valor, frete.prazo_dias
     metodo = dados.pagamento.metodo
     if metodo not in METODOS_ECOMMERCE:
         raise DadosInvalidos("Escolha a forma de pagamento.")
@@ -97,6 +99,7 @@ def finalizar_compra(db: Session, cliente: m.Cliente, dados: CheckoutEntrada) ->
         frete_tipo=dados.frete_tipo,
         frete_valor=frete_valor,
         frete_prazo_dias=prazo,
+        frete_custo=frete.custo,
         entrega_cep=cep,
         entrega_rua=campos["rua"],
         entrega_numero=campos["numero"],

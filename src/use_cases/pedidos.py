@@ -18,7 +18,7 @@ from src.entities.frete import uf_do_cep
 from src.entities.pedido import STATUS_PEDIDO, pode_mudar, pontuar_loja
 from src.entities.transferencia import pode_mudar as transferencia_pode_mudar
 from src.repositories import cadastro_repository, estoque_repository, pedido_repository, sessao
-from src.use_cases import transferencias
+from src.use_cases import log_acoes, transferencias
 from src.use_cases.estoque import aplicar_movimentacao
 from src.use_cases.pagamentos import estornar_aprovados
 from src.utils.datas import agora
@@ -62,7 +62,7 @@ def escolher_loja_expedicao(db: Session, itens: list[tuple[int, int]], cep: str)
         cobertos = sum(1 for variacao_id, quantidade in itens if saldo_na_loja(db, loja.id, variacao_id) >= quantidade)
         return pontuar_loja(cobertos, loja.uf == uf)
 
-    lojas = cadastro_repository.lojas(db)
+    lojas = cadastro_repository.lojas(db, somente_ativas=True)  # loja desativada não despacha
     if not lojas:
         raise Conflito("Nenhuma loja disponível para expedir o pedido.")
     return max(lojas, key=lambda loja: (pontos(loja), -loja.id))
@@ -75,7 +75,11 @@ def planejar_transferencias(db: Session, pedido: m.Pedido) -> list[m.Transferenc
     for item in pedido.itens:
         falta = item.quantidade - saldo_na_loja(db, pedido.loja_id, item.variacao_id)
         doadoras = sorted(
-            (e for e in estoque_repository.da_variacao(db, item.variacao_id) if e.loja_id != pedido.loja_id and e.quantidade > 0),
+            (
+                e
+                for e in estoque_repository.da_variacao(db, item.variacao_id)
+                if e.loja_id != pedido.loja_id and e.quantidade > 0 and e.loja.ativa
+            ),
             key=lambda e: (-e.quantidade, e.loja_id),
         )
         for estoque in doadoras:
@@ -128,6 +132,10 @@ def saldos_na_loja(db: Session, pedido: m.Pedido) -> dict[int, int]:
     return {item.variacao_id: saldo_na_loja(db, pedido.loja_id, item.variacao_id) for item in pedido.itens}
 
 
+def _log(db: Session, usuario: m.Usuario, pedido: m.Pedido, descricao: str) -> None:
+    log_acoes.registrar(db, usuario, "PEDIDOS", "ATUALIZOU", descricao, referencia=("pedido", pedido.id))
+
+
 def _trocar_loja(db: Session, pedido: m.Pedido, loja_id: int, usuario: m.Usuario, momento: datetime) -> None:
     if pedido.status != "PROCESSANDO":
         raise Conflito("A loja só pode ser trocada antes do envio.")
@@ -136,6 +144,9 @@ def _trocar_loja(db: Session, pedido: m.Pedido, loja_id: int, usuario: m.Usuario
         raise DadosInvalidos("Loja inválida.")
     if loja.id == pedido.loja_id:
         return
+    if not loja.ativa:
+        raise DadosInvalidos("Esta loja está desativada e não expede pedidos.")
+    anterior = pedido.loja.nome
     _cancelar_transferencias_pendentes(pedido)
     pedido.loja_id = loja.id
     sessao.gerar_ids(db)
@@ -143,6 +154,7 @@ def _trocar_loja(db: Session, pedido: m.Pedido, loja_id: int, usuario: m.Usuario
     registrar_evento(
         db, pedido, pedido.status, usuario_id=usuario.id, observacao=f"Expedição transferida para {loja.nome}", quando=momento
     )
+    _log(db, usuario, pedido, f"Mudou a expedição do pedido {pedido.numero} de {anterior} para {loja.nome}")
 
 
 def _enviar(db: Session, pedido: m.Pedido, codigo_rastreio: str | None, usuario: m.Usuario, momento: datetime) -> None:
@@ -169,6 +181,7 @@ def _enviar(db: Session, pedido: m.Pedido, codigo_rastreio: str | None, usuario:
     pedido.status = "ENVIADO"
     pedido.codigo_rastreio = codigo
     registrar_evento(db, pedido, "ENVIADO", usuario_id=usuario.id, observacao=f"Rastreio {codigo}", quando=momento)
+    _log(db, usuario, pedido, f"Marcou o pedido {pedido.numero} como enviado (rastreio {codigo})")
 
 
 def atualizar(
@@ -197,11 +210,13 @@ def atualizar(
     elif status == "ENTREGUE":
         pedido.status = status
         registrar_evento(db, pedido, status, usuario_id=usuario.id, quando=momento)
+        _log(db, usuario, pedido, f"Marcou o pedido {pedido.numero} como entregue")
     else:  # CANCELADO
         _cancelar_transferencias_pendentes(pedido)
         estornar_aprovados(db, pedido, momento)
         pedido.status = status
         registrar_evento(db, pedido, status, usuario_id=usuario.id, observacao="Pagamento estornado", quando=momento)
+        _log(db, usuario, pedido, f"Cancelou o pedido {pedido.numero} e estornou o pagamento")
 
     sessao.confirmar(db)
     sessao.descartar_cache(db)  # volta com eventos, transferências e pagamentos atualizados

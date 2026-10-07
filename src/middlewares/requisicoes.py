@@ -12,6 +12,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
 from src.utils.erros import ErroDeNegocio
+from src.utils.urls import definir_base
 
 logger = logging.getLogger("casalorenzi")
 
@@ -20,6 +21,7 @@ def registrar(app: FastAPI) -> None:
     @app.middleware("http")
     async def request_id(request: Request, call_next):
         request.state.request_id = request.headers.get("X-Request-ID") or uuid.uuid4().hex[:12]
+        definir_base(str(request.base_url))
         inicio = time.perf_counter()
         resposta = await call_next(request)
         duracao = (time.perf_counter() - inicio) * 1000

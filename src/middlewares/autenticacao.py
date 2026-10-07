@@ -50,6 +50,20 @@ def sessao_atual(
     raise NaoAutenticado(MENSAGEM_SESSAO)
 
 
+def sessao_opcional(
+    credenciais: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    db: Session = Depends(get_db),
+) -> Sessao | None:
+    """Para rotas públicas que mostram mais a quem está logado (ex.: custo dos produtos para o
+    Administrador). Sem token ou com token inválido: None, sem erro."""
+    if credenciais is None:
+        return None
+    try:
+        return sessao_atual(credenciais, db)
+    except NaoAutenticado:
+        return None
+
+
 def usuario_atual(sessao: Sessao = Depends(sessao_atual)) -> m.Usuario:
     """Membro da equipe do token. Token de cliente nas rotas da equipe = 401."""
     if sessao.usuario is None:

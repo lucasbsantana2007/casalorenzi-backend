@@ -21,6 +21,8 @@ ACESSO = {
     "transferencias": (ADMINISTRADOR, OPERADOR),
     "atendimento": (ADMINISTRADOR, LOJISTA),
     "financeiro": (ADMINISTRADOR,),
+    # Central administrativa: funcionários, lojas, frete e log de ações
+    "administracao": (ADMINISTRADOR,),
 }
 
 
