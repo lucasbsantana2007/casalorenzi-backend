@@ -21,11 +21,20 @@ def por_loja_e_variacao(db: Session, loja_id: int, variacao_id: int, travar: boo
 
 
 def listar(
-    db: Session, *, loja_id: int | None = None, variacao_id: int | None = None, categoria: str | None = None
+    db: Session,
+    *,
+    loja_id: int | None = None,
+    variacao_id: int | None = None,
+    categoria: str | None = None,
+    incluir_removidos: bool = False,
 ) -> list[m.Estoque]:
+    """incluir_removidos: só para reconstruir o passado (posição em data); o estoque atual não mostra
+    produtos removidos do catálogo."""
     consulta = (
         select(m.Estoque).join(m.Estoque.variacao).join(m.Variacao.produto).join(m.Produto.categoria).order_by(m.Estoque.id)
     )
+    if not incluir_removidos:
+        consulta = consulta.where(m.Produto.removido_em.is_(None))
     if loja_id:
         consulta = consulta.where(m.Estoque.loja_id == loja_id)
     if variacao_id:

@@ -1,7 +1,8 @@
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
 from src import models as m
+from src.entities.transferencia import PENDENTES
 
 
 def obter(db: Session, produto_id: int) -> m.Produto | None:
@@ -9,7 +10,13 @@ def obter(db: Session, produto_id: int) -> m.Produto | None:
 
 
 def listar(db: Session, categoria: str | None = None, ativo: bool | None = None) -> list[m.Produto]:
-    consulta = select(m.Produto).join(m.Produto.categoria).options(selectinload(m.Produto.variacoes)).order_by(m.Produto.id)
+    consulta = (
+        select(m.Produto)
+        .join(m.Produto.categoria)
+        .options(selectinload(m.Produto.variacoes))
+        .where(m.Produto.removido_em.is_(None))
+        .order_by(m.Produto.id)
+    )
     if categoria:
         consulta = consulta.where(m.Categoria.nome == categoria)
     if ativo is not None:
@@ -19,6 +26,22 @@ def listar(db: Session, categoria: str | None = None, ativo: bool | None = None)
 
 def variacao(db: Session, variacao_id: int) -> m.Variacao | None:
     return db.get(m.Variacao, variacao_id)
+
+
+def em_andamento(db: Session, produto_id: int) -> tuple[int, int]:
+    """(pedidos em processamento, transferências pendentes) com peças do produto."""
+    pedidos = db.scalar(
+        select(func.count(func.distinct(m.Pedido.id)))
+        .join(m.Pedido.itens)
+        .join(m.ItemPedido.variacao)
+        .where(m.Variacao.produto_id == produto_id, m.Pedido.status == "PROCESSANDO")
+    )
+    transferencias = db.scalar(
+        select(func.count(m.Transferencia.id))
+        .join(m.Transferencia.variacao)
+        .where(m.Variacao.produto_id == produto_id, m.Transferencia.status.in_(PENDENTES))
+    )
+    return pedidos or 0, transferencias or 0
 
 
 def sku_em_uso(db: Session, skus: list[str], exceto_produto_id: int | None = None) -> m.Variacao | None:

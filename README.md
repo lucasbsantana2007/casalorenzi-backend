@@ -132,6 +132,7 @@ Todas sob o prefixo `/api`. As rotas internas exigem `Authorization: Bearer <tok
 | GET | `/usuarios?papel=` | equipe |
 | GET | `/produtos?busca&categoria&ativo`, `/produtos/{id}` (`precoCusto` só para o administrador), `/produtos/{id}/imagem` | público (vitrine) |
 | POST, PUT | `/produtos`, `/produtos/{id}` (com `genero`, `estacao`, `precoCusto`, `imagem` e `removerImagem`; `genero` obrigatório no cadastro) | administrador |
+| DELETE | `/produtos/{id}` (remove do catálogo; o histórico continua) | administrador |
 | GET | `/estoque?busca&lojaId&categoria&status&variacaoId`, `/estoque/{id}` | equipe |
 | GET | `/estoque/posicao?data&lojaId&busca` | equipe |
 | GET, POST | `/movimentacoes` (filtros: `estoqueId&lojaId&tipo&de&ate&busca`) | equipe |
@@ -179,6 +180,11 @@ Todas sob o prefixo `/api`. As rotas internas exigem `Authorization: Bearer <tok
 - **Frete configurável:** valor, custo e prazo por região do CEP, mínimo do frete grátis e
   Expresso liga/desliga, em `config_frete` e `frete_regioes`. O checkout usa a configuração do
   momento e guarda o custo no pedido; só o Administrador vê o custo (no frete e nos produtos).
+- **Remover produto:** marca `removido_em` (e `ativo = false`) em vez de apagar, porque pedidos,
+  vendas e movimentações apontam para as variações. O produto some da loja, do painel e do estoque
+  atual (a posição em data passada ainda o mostra), e não recebe movimentações nem transferências.
+  Com pedido em processamento ou transferência pendente da peça, responde 409. Os SKUs continuam
+  reservados.
 - **Foto do produto:** JPG, PNG ou WebP de até 2 MB (conferida pelo conteúdo), guardada em
   `imagens_produto` e servida em `/api/produtos/{id}/imagem`. `imagemUrl` é um link absoluto
   (defina `URL_PUBLICA_API` atrás de um proxy); trocar para S3 depois muda só onde o arquivo fica.

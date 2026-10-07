@@ -57,3 +57,10 @@ def criar(dados: ProdutoEntrada, db: Session = Depends(get_db), usuario: m.Usuar
 def atualizar(produto_id: int, dados: ProdutoEntrada, db: Session = Depends(get_db), usuario: m.Usuario = Depends(acesso_admin)):
     """Só Administrador. `imagem` troca a foto; `removerImagem: true` volta à ilustração. Mudanças vão para o log."""
     return _saida(db, produtos.atualizar(db, produto_id, dados, usuario), com_custo=True)
+
+
+@router.delete("/{produto_id}", status_code=204, response_class=Response)
+def remover(produto_id: int, db: Session = Depends(get_db), usuario: m.Usuario = Depends(acesso_admin)):
+    """Só Administrador. Tira o produto da loja, do painel e do estoque; pedidos, vendas e o histórico
+    continuam. Pedido em processamento ou transferência pendente da peça: 409."""
+    produtos.remover(db, produto_id, usuario)
