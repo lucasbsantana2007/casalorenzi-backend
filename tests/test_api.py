@@ -3,6 +3,7 @@
 Os formatos de resposta seguem os mocks do frontend (src/services/mock).
 """
 
+import pytest
 
 # ---------- Autenticação e permissões ----------
 
@@ -66,9 +67,53 @@ def _novo_produto(**extra):
         "categoria": "Camisaria",
         "precoBase": 199.9,
         "ativo": True,
+        "genero": "Masculino",
         "variacoes": [{"sku": "cl-tst-azu-m", "tamanho": "M", "cor": "Azul", "precoCusto": 80}],
         **extra,
     }
+
+
+def test_produto_novo_entra_na_vitrine_da_colecao_escolhida(client, admin):
+    r = client.post("/api/produtos", headers=admin, json=_novo_produto(genero="Feminino", estacao="Verão"))
+    assert r.status_code == 201, r.text
+    vitrine = client.get("/api/produtos?ativo=true").json()
+    novo = next(p for p in vitrine if p["id"] == r.json()["id"])
+    assert (novo["genero"], novo["estacao"]) == ("Feminino", "Verão")
+
+
+def test_estacao_padrao_e_atemporal(client, admin):
+    r = client.post("/api/produtos", headers=admin, json=_novo_produto())
+    assert r.status_code == 201 and r.json()["estacao"] == "Atemporal"
+
+
+@pytest.mark.parametrize(
+    ("alteracao", "trecho"),
+    [
+        ({"genero": None}, "Selecione a coleção do produto"),
+        ({"genero": "Infantil"}, "Coleção inválida"),
+        ({"estacao": "Primavera"}, "Estação inválida"),
+    ],
+)
+def test_cadastro_exige_colecao_valida(client, admin, alteracao, trecho):
+    r = client.post("/api/produtos", headers=admin, json=_novo_produto(**alteracao))
+    assert r.status_code == 422 and trecho in r.json()["detail"]
+
+
+def test_trocar_a_colecao_muda_a_vitrine_e_vai_para_o_log(client, admin):
+    produto = client.get("/api/produtos/2", headers=admin).json()
+    corpo = {
+        "nome": produto["nome"],
+        "categoria": produto["categoria"],
+        "precoBase": produto["precoBase"],
+        "ativo": True,
+        "variacoes": [{c: v[c] for c in ("id", "sku", "tamanho", "cor", "precoCusto")} for v in produto["variacoes"]],
+    }
+    # Sem coleção no corpo (ou com null), mantém a atual
+    assert client.put("/api/produtos/2", headers=admin, json={**corpo, "genero": None}).json()["genero"] == "Masculino"
+    r = client.put("/api/produtos/2", headers=admin, json={**corpo, "genero": "Feminino", "estacao": "Inverno"})
+    assert (r.json()["genero"], r.json()["estacao"]) == ("Feminino", "Inverno")
+    registro = client.get("/api/admin/log?area=PRODUTOS", headers=admin).json()[0]
+    assert {"campo": "Coleção", "de": "Masculino", "para": "Feminino"} in registro["alteracoes"]
 
 
 def test_criar_produto_gera_estoque_zerado_nas_lojas(client, admin):

@@ -9,7 +9,7 @@ from src.entities.estoque import ORDEM_STATUS, SINAL_POR_TIPO_MANUAL, quantidade
 from src.repositories import cadastro_repository, estoque_repository, sessao
 from src.use_cases import log_acoes
 from src.utils.datas import agora, fim_do_dia, inicio_do_dia, ler_data
-from src.utils.erros import DadosInvalidos, NaoEncontrado
+from src.utils.erros import Conflito, DadosInvalidos, NaoEncontrado
 from src.utils.texto import chave_texto, corresponde
 
 
@@ -100,7 +100,7 @@ def posicao_em_data(
     if dia is None:
         raise DadosInvalidos("Informe a data de referência.")
     saldos = estoque_repository.saldos_ate(db, fim_do_dia(dia))
-    itens = _filtrar(estoque_repository.listar(db, loja_id=loja_id), busca, None)
+    itens = _filtrar(estoque_repository.listar(db, loja_id=loja_id, incluir_removidos=True), busca, None)
     itens.sort(key=lambda e: (not e.variacao.produto.ativo, chave_texto(e.variacao.produto.nome), e.loja_id))
     return [(e, int(saldos.get(e.id) or 0)) for e in itens]
 
@@ -140,6 +140,8 @@ def registrar_movimentacao(
     estoque = estoque_repository.obter(db, estoque_id, travar=True)
     if estoque is None:
         raise NaoEncontrado("Item de estoque não encontrado.")
+    if estoque.variacao.produto.removido_em is not None:
+        raise Conflito("Este produto foi removido do catálogo.")
     if tipo not in SINAL_POR_TIPO_MANUAL:
         raise DadosInvalidos("Movimentações de transferência são geradas pela tela de transferências.")
     if not quantidade_valida_para_tipo(tipo, quantidade):

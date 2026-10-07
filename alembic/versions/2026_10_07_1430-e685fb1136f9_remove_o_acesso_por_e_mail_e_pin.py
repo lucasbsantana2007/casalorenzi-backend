@@ -5,7 +5,7 @@ mais o PIN. Saem a tabela tokens_pin e as colunas de PIN de clientes (o check
 ck_clientes_tentativas_pin cai junto com a coluna).
 
 Revision ID: e685fb1136f9
-Revises: bbfdeb8e8e3f
+Revises: 33ff73b0bdfa
 Create Date: 2026-10-07 13:53:25.476302
 
 """
@@ -18,7 +18,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = "e685fb1136f9"
-down_revision: str | Sequence[str] | None = "bbfdeb8e8e3f"
+down_revision: str | Sequence[str] | None = "33ff73b0bdfa"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

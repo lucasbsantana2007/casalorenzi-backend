@@ -19,6 +19,8 @@ class ProdutoEntrada(Entrada):
     categoria: str = ""
     preco_base: float = 0
     ativo: bool = True
+    # Coleção da vitrine (Masculino ou Feminino), obrigatória no cadastro; estação: Inverno, Verão
+    # ou Atemporal (padrão). Na edição, só mudam se forem enviadas
     genero: str | None = None
     estacao: str | None = None
     # Textos da página do produto: na edição, só mudam se forem enviados
