@@ -75,7 +75,8 @@ src/
   use_cases/      o que o sistema faz: as regras de negócio (não conhecem HTTP)
   schemas/        contratos da API: o que entra (camelCase) e o que sai (JSON)
   routers/        rotas finas: validam, conferem acesso, chamam o use case e respondem
-  middlewares/    login (JWT), permissões por papel e registro das requisições
+  middlewares/    login (JWT), permissões por papel, limite de tentativas e registro das requisições
+  integrations/   serviços externos: envio de e-mails pelo Resend (email.py) e os textos (modelos_email.py)
   utils/          funções pequenas: erros de negócio, datas, texto, senhas
 alembic/          histórico de mudanças no banco (migrations)
 tests/            testes de API (pytest) num banco separado
@@ -94,13 +95,26 @@ tests/            testes de API (pytest) num banco separado
 | mudar uma consulta ao banco | `src/repositories/<assunto>_repository.py` |
 | adicionar um campo na resposta | `src/schemas/<assunto>.py` (funções `*_saida`) |
 | adicionar uma coluna/tabela | `src/models/<tabela>.py` + migration (veja abaixo) |
+| mudar o texto de um e-mail | `src/integrations/modelos_email.py` |
+
+### Configurando o Resend (e-mails)
+
+1. Crie a conta em https://resend.com e, em **API Keys**, gere uma chave com permissão *Sending access*.
+2. No `.env`: `RESEND_API_KEY=re_...` e `URL_FRONTEND` com o endereço do site (os links dos e-mails apontam para ele).
+3. Para testar sem domínio, deixe `EMAIL_REMETENTE=Casa Lorenzi <onboarding@resend.dev>`: o Resend só entrega
+   para o e-mail dono da conta. Para mandar a qualquer cliente, em **Domains** adicione o domínio da loja,
+   crie no DNS os registros que o Resend mostrar (SPF e DKIM) e use um remetente desse domínio
+   (ex.: `Casa Lorenzi <nao-responda@casalorenzi.com.br>`).
+4. Confira: `python -m src.integrations.email seu@email.com` envia um e-mail de teste.
+
+Nunca coloque a chave no git; no deploy (Render), cadastre as mesmas variáveis no painel do serviço.
 
 ## Modelo de dados
 
 | Módulo | Tabelas |
 | --- | --- |
 | Núcleo | `lojas` (endereço, telefone, horários e `ativa`), `usuarios` (só a equipe: ADMINISTRADOR, LOJISTA, OPERADOR; sem senha enquanto o convite está pendente) |
-| Clientes | `clientes` (CPF e e-mail únicos, senha só como hash; PIN legado), `tokens_senha`, `tokens_pin` |
+| Clientes | `clientes` (CPF e e-mail únicos, senha só como hash), `tokens_senha` |
 | Catálogo | `categorias`, `produtos` (com descrição, composição e cuidados), `variacoes` (SKU, com `preco_custo`), `imagens_produto` (foto enviada no cadastro) |
 | Estoque | `estoques` (saldo por **loja + SKU**), `movimentacoes` (histórico com sinal), `transferencias` (com `pedido_id` quando atendem um pedido) |
 | Vendas | `pedidos` (com frete e endereço de entrega no e-commerce), `itens_pedido`, `eventos_pedido` (histórico), `pagamentos`, `devolucoes` |
@@ -109,9 +123,11 @@ tests/            testes de API (pytest) num banco separado
 
 **Um login só para equipe e clientes.** O cliente cria a conta no checkout (nome, CPF, e-mail,
 telefone e senha) e entra pelo mesmo `POST /auth/login`; o token traz o papel `CLIENTE`, que só
-abre a área do cliente (nunca as rotas do painel). O `id` do cliente continua sendo o número da
-tabela `clientes`; o CPF é um campo à parte (11 dígitos, único, conferido pelos dígitos verificadores).
-O acesso por e-mail + PIN ("Meus pedidos") ficou como legado.
+abre a área do cliente (nunca as rotas do painel). **Para o site, o id do cliente é o CPF**
+(11 dígitos, sem pontuação): é ele que sai em `usuario.id` no login, em `clienteId` de pedidos e
+chamados e nas rotas `/clientes/{cpf}/...`. Por dentro, o banco continua ligando tudo pelo número da
+tabela `clientes`, que nunca sai da API; assim a exclusão de conta pode apagar o CPF sem quebrar os
+pedidos. Nos logs da API, o CPF que aparece no caminho sai mascarado (`*********03`).
 
 ## Rotas
 
@@ -137,9 +153,6 @@ Todas sob o prefixo `/api`. As rotas internas exigem `Authorization: Bearer <tok
 | GET, POST | `/movimentacoes` (filtros: `estoqueId&lojaId&tipo&de&ate&busca`) | equipe |
 | GET, POST | `/transferencias` · PATCH `/transferencias/{id}` (status) | administrador, operador |
 | POST | `/checkout` (o cliente vem do token) | cliente logado |
-| POST | `/meus-pedidos` (legado: e-mail + PIN no corpo) | público |
-| POST | `/meus-pedidos/esqueci-pin`, `/meus-pedidos/redefinir-pin` | público |
-| POST | `/meus-pedidos/solicitacoes/consulta`, `/meus-pedidos/solicitacoes`, `/meus-pedidos/solicitacoes/{id}/mensagens` | público (e-mail + PIN) |
 | GET | `/pedidos?status&lojaId&canal&busca`, `/pedidos/{id}` | equipe |
 | PATCH | `/pedidos/{id}` (loja de expedição ou status) | equipe |
 | GET | `/pedidos/{id}/pagamentos` | equipe |
@@ -161,18 +174,23 @@ Todas sob o prefixo `/api`. As rotas internas exigem `Authorization: Bearer <tok
   troca a senha e exclui a conta. Trocar o e-mail e excluir pedem a senha; senha errada responde
   422. A exclusão apaga os dados pessoais (`excluido_em`), o token deixa de valer e os pedidos e
   chamados ficam anônimos; CPF e e-mail ficam livres para uma conta nova.
-- **Esqueceu a senha:** link de uso único (30 minutos) para `/login/nova-senha?token=...`, que por
-  enquanto sai no log da API; com `LINK_SENHA_NA_RESPOSTA=true` (só demonstração) ele volta na
-  resposta. A resposta é a mesma exista ou não a conta.
-- **"Meus pedidos" (legado):** e-mail + PIN de 4 dígitos (só como hash; 5 erros seguidos bloqueiam
-  por 15 minutos), com `PIN_LINK_NA_RESPOSTA` para o link de "Esqueci o PIN".
+- **Esqueceu a senha:** link de uso único (30 minutos) para `/login/nova-senha?token=...`, enviado
+  por e-mail; com `LINK_SENHA_NA_RESPOSTA=true` (só demonstração) ele volta também na resposta. A
+  resposta é a mesma exista ou não a conta. No máximo 3 pedidos por e-mail e 10 por IP a cada 15
+  minutos (429); o contador fica na memória do servidor (vale para uma instância).
+- **E-mails (Resend):** link de nova senha, convite de funcionário e confirmação do pedido. Saem em
+  segundo plano, depois de gravar no banco; falha do Resend fica no log e não desfaz a operação. Sem
+  `RESEND_API_KEY`, o conteúdo vai para o log da API. Veja "Configurando o Resend".
+- **Pedidos por loja:** Lojista e Operador só veem, alteram e devolvem pedidos que a própria loja
+  expede (o `lojaId` da consulta é ignorado; pedido de outra loja responde 404). Só o Administrador
+  troca a loja de expedição (os demais: 403).
 - **Central administrativa (só Administrador):** funcionário novo nasce sem senha e recebe um
   convite (link de uso único, 7 dias) para criá-la; até lá, o login responde que falta criar a
   senha. Desativado recebe 403 no login (só depois da senha certa) e a sessão aberta deixa de valer.
   Ninguém desativa a própria conta e sempre fica pelo menos um Administrador ativo. Loja nova
   nasce com estoque zerado de todas as variações; loja desativada sai do site, da expedição e das
-  transferências automáticas. O link do convite sai no log da API; com `LINK_SENHA_NA_RESPOSTA=true`
-  ele volta na resposta (só demonstração).
+  transferências automáticas. O convite vai por e-mail; com `LINK_SENHA_NA_RESPOSTA=true`
+  o link volta também na resposta (só demonstração).
 - **Log de ações:** funcionários, lojas, frete, produtos (preço, custo, foto), pedidos,
   transferências e movimentações de estoque gravam quem fez (do token), quando e o que mudou,
   na mesma transação da ação.
@@ -217,8 +235,8 @@ são relativas ao momento da carga. Sem `--recriar`, só popula se o banco estiv
 | Lojista | rafael.monteiro@casalorenzi.com.br | dashboard (só a própria loja), pedidos, estoque, atendimento |
 | Operador | diego.almeida@casalorenzi.com.br | dashboard, pedidos, estoque, transferências |
 
-A senha da equipe e dos clientes de demonstração e o PIN legado estão em `src/database/seed/dados.py`
-(`SENHA_DEMO` e `PIN_DEMO`). Clientes entram pelo mesmo login (ex.: mariana.costa@gmail.com, CPF 158.813.998-03).
+A senha da equipe e dos clientes de demonstração está em `src/database/seed/dados.py`
+(`SENHA_DEMO`). Clientes entram pelo mesmo login (ex.: mariana.costa@gmail.com, CPF 158.813.998-03).
 
 ## Migrações (Alembic)
 
@@ -258,8 +276,5 @@ Exemplo: `feat: registra devoluções com volta ao estoque`.
 
 ## Próximos passos
 
-- Enviar por e-mail o link de "Esqueceu a senha?" (hoje sai no log da API).
-- Enviar por e-mail o convite dos funcionários novos (hoje sai no log da API).
-- Guardar as fotos dos produtos no S3 (hoje ficam no banco).
 - Integração real de pagamento (hoje simulado: todo checkout é aprovado).
 - Deploy: Render (API + banco) e Vercel (frontend), como no Plano de Execução.
