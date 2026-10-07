@@ -26,3 +26,9 @@ def lista_csv(valor: str | None) -> list[str]:
 
 def somente_digitos(valor: str | None) -> str:
     return "".join(c for c in (valor or "") if c.isdigit())
+
+
+def moeda(valor) -> str:
+    """R$ 1.234,56 (como o formatCurrency do frontend), usado nas descrições do log."""
+    texto = f"{float(valor or 0):,.2f}".replace(",", "_").replace(".", ",").replace("_", ".")
+    return f"R$ {texto}"

@@ -12,6 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from src.config.settings import CORS_ORIGINS, LOG_LEVEL
 from src.middlewares import requisicoes
 from src.routers import (
+    administracao,
     atendimentos,
     autenticacao,
     cadastros,
@@ -20,6 +21,7 @@ from src.routers import (
     devolucoes,
     estoque,
     financeiro,
+    frete,
     loja,
     pagamentos,
     pedidos,
@@ -73,6 +75,8 @@ for modulo in (
     clientes,
     dashboard,
     financeiro,
+    frete,
+    administracao,
 ):
     api.include_router(modulo.router)
 

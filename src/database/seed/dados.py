@@ -6,13 +6,57 @@ PIN_DEMO = "1234"
 DIA = 86_400_000
 HISTORICO_DIAS = 75
 
+# (id, nome, cidade, uf, endereço, telefone, horários): mesmos dados da página Lojas do frontend
 LOJAS = [
-    (1, "Oscar Freire", "São Paulo", "SP"),
-    (2, "Lago Norte", "Brasília", "DF"),
-    (3, "Leblon", "Rio de Janeiro", "RJ"),
-    (4, "Pátio Batel", "Curitiba", "PR"),
-    (5, "Belvedere", "Belo Horizonte", "MG"),
+    (
+        1,
+        "Oscar Freire",
+        "São Paulo",
+        "SP",
+        "Rua Oscar Freire, 645 - Cerqueira César, São Paulo - SP",
+        "+55 11 93394-9003",
+        ["Quarta a domingo: 10:00–18:00"],
+    ),
+    (
+        2,
+        "Lago Norte",
+        "Brasília",
+        "DF",
+        "Shopping Iguatemi, 1º Piso - St. de Habitações Individuais Norte CA 4, Lago Norte, Brasília - DF",
+        "+55 61 99674-1929",
+        ["Segunda a sábado: 10:00–22:00", "Domingo: 12:00–20:00"],
+    ),
+    (
+        3,
+        "Leblon",
+        "Rio de Janeiro",
+        "RJ",
+        "Av. Afrânio de Melo Franco, 290, Piso L1 - Leblon, Rio de Janeiro - RJ",
+        "+55 11 91717-9405",
+        ["Segunda a sábado: 10:00–22:00", "Domingo: 13:00–21:00"],
+    ),
+    (
+        4,
+        "Pátio Batel",
+        "Curitiba",
+        "PR",
+        "Av. do Batel, 1868, Shopping Batel (Piso L2) - Batel, Curitiba - PR",
+        "+55 11 91652-9058",
+        ["Segunda a sábado: 10:00–22:00", "Domingo: 12:00–20:00", "Feriados: 14:00–20:00"],
+    ),
+    (
+        5,
+        "Belvedere",
+        "Belo Horizonte",
+        "MG",
+        "Meeting Shops - R. Dicíola Horta, 77 - Belvedere, Belo Horizonte - MG",
+        "+55 31 8435-7742",
+        ["Segunda a sábado: 10:00–20:00", "Domingo: 10:00–16:00"],
+    ),
 ]
+
+# Preço de custo de demonstração: 40% do preço de venda (igual ao frontend)
+CUSTO_DEMO = "0.40"
 
 CATEGORIAS = ["Camisaria", "Alfaiataria", "Vestidos", "Tricô", "Malharia", "Saias", "Outerwear", "Acessórios"]
 

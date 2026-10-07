@@ -66,7 +66,7 @@ def _novo_produto(**extra):
         "categoria": "Camisaria",
         "precoBase": 199.9,
         "ativo": True,
-        "variacoes": [{"sku": "cl-tst-azu-m", "tamanho": "M", "cor": "Azul"}],
+        "variacoes": [{"sku": "cl-tst-azu-m", "tamanho": "M", "cor": "Azul", "precoCusto": 80}],
         **extra,
     }
 
@@ -91,9 +91,10 @@ def test_criar_produto_valida_sku_duplicado(client, admin):
 
 
 def test_atualizar_produto_preserva_genero_e_adiciona_variacao(client, admin):
-    atual = client.get("/api/produtos/2").json()
-    variacoes = [{"id": v["id"], "sku": v["sku"], "tamanho": v["tamanho"], "cor": v["cor"]} for v in atual["variacoes"]]
-    variacoes.append({"sku": "CL-COX-BRA-P", "tamanho": "P", "cor": "Branco"})
+    atual = client.get("/api/produtos/2", headers=admin).json()
+    campos = ("id", "sku", "tamanho", "cor", "precoCusto")
+    variacoes = [{c: v[c] for c in campos} for v in atual["variacoes"]]
+    variacoes.append({"sku": "CL-COX-BRA-P", "tamanho": "P", "cor": "Branco", "precoCusto": 150})
     r = client.put(
         "/api/produtos/2",
         headers=admin,

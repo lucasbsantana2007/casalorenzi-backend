@@ -20,6 +20,12 @@ def _nome_seguro(nome: str | None) -> str:
 
 def preparar(nome: str | None, tipo: str | None, conteudo_base64: str | None) -> m.Anexo:
     """Confere tipo, tamanho e conteúdo e devolve o anexo pronto para ligar a uma mensagem (sem gravar)."""
+    nome, tipo, dados = ler_imagem(nome, tipo, conteudo_base64)
+    return m.Anexo(nome=nome, tipo=tipo, tamanho=len(dados), dados=dados)
+
+
+def ler_imagem(nome: str | None, tipo: str | None, conteudo_base64: str | None) -> tuple[str, str, bytes]:
+    """(nome seguro, tipo, bytes) de uma imagem enviada em base64. Também usada na foto do produto."""
     tipo = (tipo or "").strip().lower()
     if tipo not in TIPOS_ANEXO:
         raise DadosInvalidos("O anexo deve ser uma imagem JPG, PNG ou WEBP.")
@@ -41,4 +47,4 @@ def preparar(nome: str | None, tipo: str | None, conteudo_base64: str | None) ->
         raise DadosInvalidos("O anexo deve ter no máximo 2 MB.")
     if tipo_pelo_conteudo(dados) != tipo:
         raise DadosInvalidos("O conteúdo do anexo não corresponde ao tipo informado.")
-    return m.Anexo(nome=_nome_seguro(nome), tipo=tipo, tamanho=len(dados), dados=dados)
+    return _nome_seguro(nome), tipo, dados

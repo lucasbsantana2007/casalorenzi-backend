@@ -45,6 +45,8 @@ class Pedido(Base):
     frete_tipo: Mapped[str | None] = mapped_column(String(20))
     frete_valor: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))
     frete_prazo_dias: Mapped[int | None] = mapped_column(Integer)
+    # Quanto o envio custou para a loja (configuração de frete do dia da compra). Só o Administrador vê
+    frete_custo: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))
     entrega_cep: Mapped[str | None] = mapped_column(String(8))
     entrega_rua: Mapped[str | None] = mapped_column(String(160))
     entrega_numero: Mapped[str | None] = mapped_column(String(20))

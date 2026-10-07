@@ -10,6 +10,7 @@ from src.database.connection import Base
 
 if TYPE_CHECKING:
     from src.models.categoria import Categoria
+    from src.models.imagem_produto import ImagemProduto
     from src.models.variacao import Variacao
 
 
@@ -31,3 +32,7 @@ class Produto(Base):
 
     categoria: Mapped[Categoria] = relationship(lazy="joined")
     variacoes: Mapped[list[Variacao]] = relationship(back_populates="produto", order_by="Variacao.id")
+    # Foto enviada no cadastro (sem ela, o site usa a ilustração do produto)
+    imagem: Mapped[ImagemProduto | None] = relationship(
+        back_populates="produto", lazy="joined", cascade="all, delete-orphan", uselist=False
+    )

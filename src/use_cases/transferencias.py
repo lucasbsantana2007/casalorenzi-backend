@@ -6,7 +6,8 @@ from sqlalchemy.orm import Session
 
 from src import models as m
 from src.entities.transferencia import codigo, pode_mudar
-from src.repositories import estoque_repository, produto_repository, sessao, transferencia_repository
+from src.repositories import cadastro_repository, estoque_repository, produto_repository, sessao, transferencia_repository
+from src.use_cases import log_acoes
 from src.use_cases.estoque import aplicar_movimentacao
 from src.utils.datas import agora
 from src.utils.erros import Conflito, DadosInvalidos, NaoEncontrado
@@ -82,8 +83,22 @@ def criar(
         solicitante_id=usuario_id,
         observacao=observacao.strip(),
     )
+    log_acoes.registrar(
+        db,
+        usuario_id,
+        "TRANSFERENCIAS",
+        "SOLICITOU",
+        f"Solicitou a transferência {transferencia.codigo}: {quantidade}× {origem.variacao.sku} "
+        f"de {origem.loja.nome} para {transferencia_destino_nome(db, loja_destino_id)}",
+        referencia=("transferencia", transferencia.id),
+    )
     sessao.confirmar(db)
     return transferencia
+
+
+def transferencia_destino_nome(db: Session, loja_id: int) -> str:
+    loja = cadastro_repository.loja(db, loja_id)
+    return loja.nome if loja else "—"
 
 
 def mudar_status(db: Session, transferencia_id: int, status: str, usuario_id: int) -> m.Transferencia:
@@ -121,5 +136,9 @@ def mudar_status(db: Session, transferencia_id: int, status: str, usuario_id: in
     else:
         t.status = "CANCELADA"
 
+    verbo = {"EM_TRANSITO": "Enviou", "CONCLUIDA": "Recebeu", "CANCELADA": "Cancelou"}[status]
+    log_acoes.registrar(
+        db, usuario_id, "TRANSFERENCIAS", status, f"{verbo} a transferência {rota}", referencia=("transferencia", t.id)
+    )
     sessao.confirmar(db, t)
     return t

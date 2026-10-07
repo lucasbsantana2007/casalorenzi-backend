@@ -99,3 +99,9 @@ def pecas_vendidas_desde(db: Session, momento: datetime, loja_id: int | None = N
         )
     )
     return int(total)
+
+
+def pecas_por_loja(db: Session) -> dict[int, int]:
+    """Soma das peças em estoque de cada loja."""
+    consulta = select(m.Estoque.loja_id, func.coalesce(func.sum(m.Estoque.quantidade), 0)).group_by(m.Estoque.loja_id)
+    return {loja_id: int(total) for loja_id, total in db.execute(consulta).all()}

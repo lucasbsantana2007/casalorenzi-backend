@@ -1,12 +1,19 @@
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from src import models as m
 from src.entities.papeis import EQUIPE
 
 
-def lojas(db: Session) -> list[m.Loja]:
-    return list(db.scalars(select(m.Loja).order_by(m.Loja.id)))
+def lojas(db: Session, somente_ativas: bool = False) -> list[m.Loja]:
+    consulta = select(m.Loja).order_by(m.Loja.id)
+    if somente_ativas:
+        consulta = consulta.where(m.Loja.ativa.is_(True))
+    return list(db.scalars(consulta))
+
+
+def loja_por_nome(db: Session, nome: str) -> m.Loja | None:
+    return db.scalar(select(m.Loja).where(func.lower(m.Loja.nome) == nome.strip().lower()))
 
 
 def loja(db: Session, loja_id: int) -> m.Loja | None:

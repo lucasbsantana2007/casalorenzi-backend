@@ -99,12 +99,13 @@ tests/            testes de API (pytest) num banco separado
 
 | Módulo | Tabelas |
 | --- | --- |
-| Núcleo | `lojas`, `usuarios` (só a equipe: ADMINISTRADOR, LOJISTA, OPERADOR) |
+| Núcleo | `lojas` (endereço, telefone, horários e `ativa`), `usuarios` (só a equipe: ADMINISTRADOR, LOJISTA, OPERADOR; sem senha enquanto o convite está pendente) |
 | Clientes | `clientes` (CPF e e-mail únicos, senha só como hash; PIN legado), `tokens_senha`, `tokens_pin` |
-| Catálogo | `categorias`, `produtos` (com descrição, composição e cuidados), `variacoes` (SKU) |
+| Catálogo | `categorias`, `produtos` (com descrição, composição e cuidados), `variacoes` (SKU, com `preco_custo`), `imagens_produto` (foto enviada no cadastro) |
 | Estoque | `estoques` (saldo por **loja + SKU**), `movimentacoes` (histórico com sinal), `transferencias` (com `pedido_id` quando atendem um pedido) |
 | Vendas | `pedidos` (com frete e endereço de entrega no e-commerce), `itens_pedido`, `eventos_pedido` (histórico), `pagamentos`, `devolucoes` |
 | Atendimento | `tipos_solicitacao`, `atendimentos` (sempre de um cliente), `mensagens`, `anexos` (foto) |
+| Administração | `config_frete` e `frete_regioes` (frete configurável), `log_acoes` (quem fez o quê) |
 
 **Um login só para equipe e clientes.** O cliente cria a conta no checkout (nome, CPF, e-mail,
 telefone e senha) e entra pelo mesmo `POST /auth/login`; o token traz o papel `CLIENTE`, que só
@@ -121,10 +122,15 @@ Todas sob o prefixo `/api`. As rotas internas exigem `Authorization: Bearer <tok
 | --- | --- | --- |
 | POST | `/auth/login` · GET `/auth/me` | público · logado (equipe ou cliente) |
 | POST | `/auth/cadastro` (conta do cliente; já devolve a sessão), `/auth/esqueci-senha`, `/auth/redefinir-senha` | público |
-| GET | `/lojas`, `/categorias`, `/tipos-solicitacao` | público |
+| GET | `/lojas` (com endereço, telefone, horários e `ativa`), `/categorias`, `/tipos-solicitacao` | público |
+| GET | `/frete/condicoes` (valores e prazos, sem custo) | público |
+| GET, PUT | `/frete/config` · POST `/frete/simulacao` | administrador |
+| GET, POST | `/admin/funcionarios` · PUT `/admin/funcionarios/{id}` · PATCH `/admin/funcionarios/{id}/status` · POST `/admin/funcionarios/{id}/convite` | administrador |
+| GET, POST | `/admin/lojas` · PUT `/admin/lojas/{id}` | administrador |
+| GET | `/admin/log?area&usuarioId&busca` | administrador |
 | GET | `/usuarios?papel=` | equipe |
-| GET | `/produtos?busca&categoria&ativo`, `/produtos/{id}` | público (vitrine) |
-| POST, PUT | `/produtos`, `/produtos/{id}` | administrador |
+| GET | `/produtos?busca&categoria&ativo`, `/produtos/{id}` (`precoCusto` só para o administrador), `/produtos/{id}/imagem` | público (vitrine) |
+| POST, PUT | `/produtos`, `/produtos/{id}` (com `precoCusto`, `imagem` e `removerImagem`) | administrador |
 | GET | `/estoque?busca&lojaId&categoria&status&variacaoId`, `/estoque/{id}` | equipe |
 | GET | `/estoque/posicao?data&lojaId&busca` | equipe |
 | GET, POST | `/movimentacoes` (filtros: `estoqueId&lojaId&tipo&de&ate&busca`) | equipe |
@@ -155,6 +161,22 @@ Todas sob o prefixo `/api`. As rotas internas exigem `Authorization: Bearer <tok
   resposta. A resposta é a mesma exista ou não a conta.
 - **"Meus pedidos" (legado):** e-mail + PIN de 4 dígitos (só como hash; 5 erros seguidos bloqueiam
   por 15 minutos), com `PIN_LINK_NA_RESPOSTA` para o link de "Esqueci o PIN".
+- **Central administrativa (só Administrador):** funcionário novo nasce sem senha e recebe um
+  convite (link de uso único, 7 dias) para criá-la; até lá, o login responde que falta criar a
+  senha. Desativado recebe 403 no login (só depois da senha certa) e a sessão aberta deixa de valer.
+  Ninguém desativa a própria conta e sempre fica pelo menos um Administrador ativo. Loja nova
+  nasce com estoque zerado de todas as variações; loja desativada sai do site, da expedição e das
+  transferências automáticas. O link do convite sai no log da API; com `LINK_SENHA_NA_RESPOSTA=true`
+  ele volta na resposta (só demonstração).
+- **Log de ações:** funcionários, lojas, frete, produtos (preço, custo, foto), pedidos,
+  transferências e movimentações de estoque gravam quem fez (do token), quando e o que mudou,
+  na mesma transação da ação.
+- **Frete configurável:** valor, custo e prazo por região do CEP, mínimo do frete grátis e
+  Expresso liga/desliga, em `config_frete` e `frete_regioes`. O checkout usa a configuração do
+  momento e guarda o custo no pedido; só o Administrador vê o custo (no frete e nos produtos).
+- **Foto do produto:** JPG, PNG ou WebP de até 2 MB (conferida pelo conteúdo), guardada em
+  `imagens_produto` e servida em `/api/produtos/{id}/imagem`. `imagemUrl` é um link absoluto
+  (defina `URL_PUBLICA_API` atrás de um proxy); trocar para S3 depois muda só onde o arquivo fica.
 - **Expedição:** cada pedido sai da loja com mais peças da sacola em estoque (empate: a loja do mesmo
   estado do CEP). O que faltar nela vira transferência automática (`SOLICITADA`, ligada ao pedido).
   O envio (`PROCESSANDO → ENVIADO`, com código de rastreio) só é liberado com todas as peças na loja e
@@ -232,5 +254,7 @@ Exemplo: `feat: registra devoluções com volta ao estoque`.
 ## Próximos passos
 
 - Enviar por e-mail o link de "Esqueceu a senha?" (hoje sai no log da API).
+- Enviar por e-mail o convite dos funcionários novos (hoje sai no log da API).
+- Guardar as fotos dos produtos no S3 (hoje ficam no banco).
 - Integração real de pagamento (hoje simulado: todo checkout é aprovado).
 - Deploy: Render (API + banco) e Vercel (frontend), como no Plano de Execução.

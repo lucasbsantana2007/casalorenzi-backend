@@ -1,11 +1,12 @@
 """Frete do e-commerce por região do CEP. Espelha src/utils/frete.js do frontend: a loja mostra
-as opções antes da compra e a API recalcula no checkout (o valor nunca vem do navegador)."""
+as opções antes da compra e a API recalcula no checkout (o valor nunca vem do navegador).
+
+Valores, custos e prazos ficam no banco (config_frete e frete_regioes), editáveis pelo
+Administrador; FRETE_INICIAL é a configuração de partida (seed e migração)."""
 
 import re
+from dataclasses import dataclass
 from decimal import Decimal
-
-# Pedidos a partir deste valor têm o frete padrão grátis
-FRETE_GRATIS_MINIMO = Decimal("1000")
 
 # Faixas de CEP (8 dígitos, como número) por região: (início, fim, região)
 _FAIXAS = (
@@ -18,15 +19,32 @@ _FAIXAS = (
     (66000000, 69999999, "NORTE"),
 )
 
-# região → {tipo: (valor, prazo em dias úteis)}
-_TABELA = {
-    "SP": {"PADRAO": ("19.90", 3), "EXPRESSO": ("39.90", 1)},
-    "SUDESTE": {"PADRAO": ("29.90", 5), "EXPRESSO": ("59.90", 2)},
-    "SUL": {"PADRAO": ("34.90", 6), "EXPRESSO": ("64.90", 3)},
-    "CENTRO_OESTE": {"PADRAO": ("39.90", 7), "EXPRESSO": ("74.90", 3)},
-    "NORDESTE": {"PADRAO": ("44.90", 9), "EXPRESSO": ("84.90", 4)},
-    "NORTE": {"PADRAO": ("54.90", 12), "EXPRESSO": ("99.90", 5)},
+TIPOS = ("PADRAO", "EXPRESSO")
+
+# Configuração inicial: gratis_minimo, expresso_ativo e, por região,
+# (regiao, nome, (valor, custo, prazo) do Padrão, (valor, custo, prazo) do Expresso).
+# Os custos são de demonstração; na operação real vêm do contrato com a transportadora.
+FRETE_INICIAL = {
+    "gratis_minimo": Decimal("1000"),
+    "expresso_ativo": True,
+    "regioes": (
+        ("SP", "Estado de São Paulo", ("19.90", "16.50", 3), ("39.90", "31.00", 1)),
+        ("SUDESTE", "Rio de Janeiro, Espírito Santo e Minas Gerais", ("29.90", "24.00", 5), ("59.90", "46.00", 2)),
+        ("SUL", "Região Sul", ("34.90", "29.00", 6), ("64.90", "52.00", 3)),
+        ("CENTRO_OESTE", "Região Centro-Oeste", ("39.90", "33.00", 7), ("74.90", "58.00", 3)),
+        ("NORDESTE", "Região Nordeste", ("44.90", "38.00", 9), ("84.90", "66.00", 4)),
+        ("NORTE", "Região Norte", ("54.90", "47.00", 12), ("99.90", "78.00", 5)),
+    ),
 }
+
+
+@dataclass(frozen=True)
+class OpcaoFrete:
+    tipo: str
+    valor: Decimal  # o que o cliente paga (zero no Padrão acima do mínimo do frete grátis)
+    custo: Decimal  # o que o envio custa para a loja
+    prazo_dias: int
+
 
 ROTULOS = {"PADRAO": "Padrão", "EXPRESSO": "Expresso"}
 
@@ -43,15 +61,13 @@ def regiao_do_cep(cep: str | None) -> str | None:
     return next((regiao for inicio, fim, regiao in _FAIXAS if inicio <= numero <= fim), None)
 
 
-def opcao_de_frete(cep: str | None, subtotal: Decimal, tipo: str) -> tuple[Decimal, int] | None:
-    """(valor, prazo em dias) do frete escolhido, ou None se o CEP não é atendido ou o tipo não existe."""
-    regiao = regiao_do_cep(cep)
-    if regiao is None or tipo not in _TABELA[regiao]:
-        return None
-    valor, prazo = _TABELA[regiao][tipo]
-    if tipo == "PADRAO" and subtotal >= FRETE_GRATIS_MINIMO:
-        return Decimal("0"), prazo
-    return Decimal(valor), prazo
+def opcoes_de_frete(regiao, subtotal: Decimal, gratis_minimo: Decimal, expresso_ativo: bool) -> list[OpcaoFrete]:
+    """Opções para uma região já configurada (m.FreteRegiao ou equivalente), na ordem Padrão, Expresso."""
+    padrao_valor = Decimal("0") if subtotal >= gratis_minimo else regiao.padrao_valor
+    opcoes = [OpcaoFrete("PADRAO", padrao_valor, regiao.padrao_custo, regiao.padrao_prazo_dias)]
+    if expresso_ativo:
+        opcoes.append(OpcaoFrete("EXPRESSO", regiao.expresso_valor, regiao.expresso_custo, regiao.expresso_prazo_dias))
+    return opcoes
 
 
 def uf_do_cep(cep: str | None) -> str | None:

@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from src import models as m
 from src.entities.estoque import ORDEM_STATUS, SINAL_POR_TIPO_MANUAL, quantidade_valida_para_tipo, status_estoque
 from src.repositories import cadastro_repository, estoque_repository, sessao
+from src.use_cases import log_acoes
 from src.utils.datas import agora, fim_do_dia, inicio_do_dia, ler_data
 from src.utils.erros import DadosInvalidos, NaoEncontrado
 from src.utils.texto import chave_texto, corresponde
@@ -144,5 +145,14 @@ def registrar_movimentacao(
     if not quantidade_valida_para_tipo(tipo, quantidade):
         raise DadosInvalidos("Informe uma quantidade válida.")
     mov = aplicar_movimentacao(db, estoque, tipo=tipo, quantidade=quantidade, origem=origem.strip(), usuario_id=usuario_id)
+    sinal = "+" if quantidade > 0 else ""
+    log_acoes.registrar(
+        db,
+        usuario_id,
+        "ESTOQUE",
+        tipo,
+        f"Registrou {sinal}{quantidade} un. ({tipo.lower()}) de {estoque.variacao.sku} na loja {estoque.loja.nome}",
+        referencia=("estoque", estoque.id),
+    )
     sessao.confirmar(db)
     return mov

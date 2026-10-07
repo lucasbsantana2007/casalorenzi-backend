@@ -11,6 +11,7 @@ As datas são relativas ao momento da carga.
 
 import argparse
 from datetime import date
+from decimal import ROUND_HALF_UP, Decimal
 
 from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
@@ -20,6 +21,7 @@ from src.database.connection import Base, SessionLocal
 from src.database.seed.dados import (
     CATEGORIAS,
     CLIENTES,
+    CUSTO_DEMO,
     DETALHES_PRODUTOS,
     LOJAS,
     PIN_DEMO,
@@ -29,6 +31,7 @@ from src.database.seed.dados import (
     USUARIOS,
 )
 from src.database.seed.gerador import Relogio, montar_atendimentos, montar_estoque, montar_pedidos, montar_variacoes
+from src.entities.frete import FRETE_INICIAL
 from src.entities.pagamento import PARCELAS_MAX, status_inicial
 from src.utils.datas import de_ms
 from src.utils.seguranca import gerar_hash
@@ -60,6 +63,26 @@ def _pagamento(pedido: dict) -> tuple[str, int]:
     return metodo, (1 + pid % 3) if metodo == "CARTAO" else 1
 
 
+def _popular_frete(db: Session) -> None:
+    """Configuração de frete inicial (a mesma que a migração grava num banco novo)."""
+    db.add(m.ConfigFrete(id=1, gratis_minimo=FRETE_INICIAL["gratis_minimo"], expresso_ativo=FRETE_INICIAL["expresso_ativo"]))
+    for ordem, (regiao, nome, padrao, expresso) in enumerate(FRETE_INICIAL["regioes"], start=1):
+        db.add(
+            m.FreteRegiao(
+                id=ordem,
+                regiao=regiao,
+                nome=nome,
+                ordem=ordem,
+                padrao_valor=Decimal(padrao[0]),
+                padrao_custo=Decimal(padrao[1]),
+                padrao_prazo_dias=padrao[2],
+                expresso_valor=Decimal(expresso[0]),
+                expresso_custo=Decimal(expresso[1]),
+                expresso_prazo_dias=expresso[2],
+            )
+        )
+
+
 def apagar_tudo(db: Session) -> None:
     for tabela in reversed(Base.metadata.sorted_tables):
         db.execute(tabela.delete())
@@ -74,7 +97,11 @@ def popular(db: Session) -> None:
     pedidos = montar_pedidos(relogio, variacoes)
     atendimentos, mensagens = montar_atendimentos(relogio, pedidos, variacoes)
 
-    db.add_all(m.Loja(id=i, nome=n, cidade=c, uf=uf) for i, n, c, uf in LOJAS)
+    db.add_all(
+        m.Loja(id=i, nome=n, cidade=c, uf=uf, endereco=end, telefone=tel, horarios=list(horarios), ativa=True)
+        for i, n, c, uf, end, tel, horarios in LOJAS
+    )
+    _popular_frete(db)
     db.add_all(m.Categoria(id=i, nome=nome) for i, nome in enumerate(CATEGORIAS, start=1))
     db.flush()
     db.add_all(m.Usuario(id=i, nome=n, email=e, papel=p, loja_id=loja, senha_hash=senha) for i, n, e, p, loja in USUARIOS)
@@ -108,7 +135,13 @@ def popular(db: Session) -> None:
         for p in PRODUTOS
     )
     db.flush()
-    db.add_all(m.Variacao(**v) for v in variacoes)
+    preco_do_produto = {p["id"]: Decimal(str(p["preco"])) for p in PRODUTOS}
+    db.add_all(
+        m.Variacao(
+            **v, preco_custo=(preco_do_produto[v["produto_id"]] * Decimal(CUSTO_DEMO)).quantize(Decimal("0.01"), ROUND_HALF_UP)
+        )
+        for v in variacoes
+    )
     db.add_all(
         m.TipoSolicitacao(
             id=i, titulo=t, categoria=c, exige_venda=ev, ordem_exibicao=o, descricao=d, conta_pos_venda=pv, ativo=True
