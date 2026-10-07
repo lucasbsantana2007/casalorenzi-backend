@@ -14,6 +14,7 @@ URL_TESTE = os.getenv("TEST_DATABASE_URL")
 if not URL_TESTE:
     pytest.skip("Defina TEST_DATABASE_URL para rodar os testes.", allow_module_level=True)
 os.environ["DATABASE_URL"] = URL_TESTE  # precisa vir antes de importar o app
+os.environ["RESEND_API_KEY"] = ""  # testes nunca mandam e-mail de verdade (sem chave, vai para o log)
 
 from alembic.config import Config  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
@@ -22,6 +23,7 @@ from alembic import command  # noqa: E402
 from src.app import app  # noqa: E402
 from src.database.connection import SessionLocal  # noqa: E402
 from src.database.seed import SENHA_DEMO, apagar_tudo, popular  # noqa: E402
+from src.middlewares import limite  # noqa: E402
 
 
 @pytest.fixture(scope="session", autouse=True)
@@ -31,6 +33,7 @@ def migrar():
 
 @pytest.fixture(autouse=True)
 def banco_limpo(migrar):
+    limite.limpar()  # cada teste começa sem tentativas contadas
     with SessionLocal() as db:
         apagar_tudo(db)
         popular(db)
@@ -63,8 +66,8 @@ def operador(client):
     return _entrar(client, "diego.almeida@casalorenzi.com.br")
 
 
-# Clientes de demonstração: ids 101 a 108 (tabela clientes), com conta (CPF, e-mail e a senha de demonstração)
-CLIENTE_DEMO_ID = 101  # Mariana Costa
+# Clientes de demonstração: o id público é o CPF (com conta: e-mail e a senha de demonstração)
+CLIENTE_DEMO_ID = "15881399803"  # Mariana Costa
 CPF_NOVO = "52998224725"  # CPF válido que não está no seed
 
 

@@ -7,7 +7,7 @@ import pytest
 from src.entities.cliente import cpf_valido
 from src.use_cases import autenticacao
 
-MARIANA_ID = 101
+MARIANA_ID = "15881399803"  # o id público do cliente é o CPF
 RICARDO = "ricardo.fonseca@outlook.com"
 PNG_1X1 = base64.b64encode(
     bytes.fromhex(
@@ -38,7 +38,11 @@ def test_cadastro_cria_conta_e_ja_entra(client):
     r = client.post("/api/auth/cadastro", json=_cadastro())
     assert r.status_code == 201, r.text
     usuario = r.json()["usuario"]
-    assert usuario["papel"] == "CLIENTE" and usuario["cpf"] == "52998224725" and usuario["nome"] == "Ana Beatriz Souza"
+    assert (
+        usuario["papel"] == "CLIENTE"
+        and usuario["id"] == usuario["cpf"] == "52998224725"
+        and usuario["nome"] == "Ana Beatriz Souza"
+    )
 
     login = client.post("/api/auth/login", json={"email": "ANA.SOUZA@exemplo.com", "senha": "minha-senha"})
     assert login.status_code == 200 and login.json()["usuario"]["id"] == usuario["id"]
@@ -99,6 +103,18 @@ def test_link_da_senha_nao_vem_na_resposta_com_a_opcao_desligada(client, monkeyp
     assert client.post("/api/auth/esqueci-senha", json={"email": RICARDO}).json() == {"enviado": True, "linkDemo": None}
 
 
+def test_esqueci_a_senha_limita_tentativas(client):
+    # Por e-mail: 3 pedidos em 15 minutos; o 4º é recusado, exista ou não a conta
+    for email in (RICARDO, "ninguem@exemplo.com"):
+        for _ in range(3):
+            assert client.post("/api/auth/esqueci-senha", json={"email": email}).status_code == 200
+        r = client.post("/api/auth/esqueci-senha", json={"email": email})
+        assert r.status_code == 429 and "Muitas tentativas" in r.json()["detail"]
+    # Por IP: no máximo 10 pedidos, mesmo trocando o e-mail
+    codigos = [client.post("/api/auth/esqueci-senha", json={"email": f"pessoa{i}@exemplo.com"}).status_code for i in range(6)]
+    assert codigos == [200, 200, 200, 200, 429, 429]  # 6 já usados acima (3 + 3) + 4 = 10
+
+
 def test_area_do_cliente_so_mostra_o_que_e_dele(client, mariana):
     conta = client.get(f"/api/clientes/{MARIANA_ID}", headers=mariana)
     assert conta.status_code == 200 and conta.json()["totalPedidos"] >= 1
@@ -113,7 +129,7 @@ def test_area_do_cliente_so_mostra_o_que_e_dele(client, mariana):
 
     # Outro cliente: aparece como inexistente
     for rota in ("", "/pedidos", "/atendimentos", f"/pedidos/{numero}"):
-        assert client.get(f"/api/clientes/102{rota}", headers=mariana).status_code == 404
+        assert client.get(f"/api/clientes/69879730917{rota}", headers=mariana).status_code == 404
     # Sem sessão
     assert client.get(f"/api/clientes/{MARIANA_ID}").status_code == 401
 
@@ -126,7 +142,7 @@ def test_cliente_abre_chamado_com_foto_e_conversa_com_a_equipe(client, mariana, 
         "/api/atendimentos",
         headers=mariana,
         json={
-            "clienteId": 102,  # ignorado: o chamado é de quem está logado
+            "clienteId": "69879730917",  # ignorado: o chamado é de quem está logado
             "tipoSolicitacaoId": tipo["id"],
             "pedidoId": pedido["id"],
             "descricao": "A camisa veio com um botão solto.",
@@ -154,9 +170,9 @@ def test_cliente_abre_chamado_com_foto_e_conversa_com_a_equipe(client, mariana, 
 
 
 def test_cliente_nao_ve_nem_responde_chamado_de_outro(client, mariana, admin):
-    outro = client.get("/api/clientes/102/atendimentos", headers=admin).json()
+    outro = client.get("/api/clientes/69879730917/atendimentos", headers=admin).json()
     if not outro:
-        pytest.skip("cliente 102 sem chamados no seed")
+        pytest.skip("Ricardo sem chamados no seed")
     chamado_id = outro[0]["id"]
     assert client.get(f"/api/clientes/{MARIANA_ID}/atendimentos/{chamado_id}", headers=mariana).status_code == 404
     r = client.post(f"/api/atendimentos/{chamado_id}/mensagens", headers=mariana, json={"conteudo": "Olá"})

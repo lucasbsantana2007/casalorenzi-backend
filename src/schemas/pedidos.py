@@ -97,7 +97,7 @@ def pedido_saida(pedido: m.Pedido | None) -> dict | None:
     return {
         "id": pedido.id,
         "numero": pedido.numero,
-        "clienteId": pedido.cliente_id,
+        "clienteId": cliente.cpf if cliente else None,  # id público do cliente = CPF
         "lojaId": pedido.loja_id,
         "canal": pedido.canal,
         "status": pedido.status,

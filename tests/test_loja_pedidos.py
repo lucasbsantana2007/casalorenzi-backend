@@ -1,23 +1,11 @@
-"""Checkout (com conta de cliente), "Meus pedidos" legado (e-mail + PIN) e gestão dos pedidos no painel."""
-
-import base64
+"""Checkout (com conta de cliente) e gestão dos pedidos no painel."""
 
 import pytest
 
 from src.entities.frete import uf_do_cep
-from src.use_cases import meus_pedidos
 
-PIN_DEMO = "1234"
-MARIANA = "mariana.costa@gmail.com"  # cliente de demonstração (PIN 1234)
-CLIENTE_DEMO_ID = 101  # Mariana
+CLIENTE_DEMO_ID = "15881399803"  # Mariana (id público = CPF)
 CEP_SP = "01310-100"
-# Menor PNG válido (1x1): os anexos são conferidos pela assinatura do arquivo
-PNG_1X1 = base64.b64encode(
-    bytes.fromhex(
-        "89504e470d0a1a0a0000000d4948445200000001000000010806000000"
-        "1f15c4890000000d4944415478da63f8ffff3f0005fe02fea7d6a4d30000000049454e44ae426082"
-    )
-).decode()
 
 
 def _variacao_com_estoque(client, minimo=1):
@@ -124,7 +112,7 @@ def test_checkout_recusa_item_esgotado_e_cep_nao_atendido(client, mariana):
     assert client.post("/api/checkout", json=sem_entrega, headers=mariana).status_code == 422
 
 
-# ---------- Meus pedidos (PIN) ----------
+# ---------- Expedição ----------
 
 
 @pytest.mark.parametrize(
@@ -143,106 +131,6 @@ def test_uf_do_cep_cobre_os_estados_das_lojas(cep, uf):
     assert uf_do_cep(cep) == uf
 
 
-def test_pin_errado_bloqueia_apos_cinco_tentativas(client):
-    for _ in range(5):
-        r = client.post("/api/meus-pedidos", json={"email": MARIANA, "pin": "0000"})
-        assert r.status_code == 401
-        assert r.json()["detail"] == "E-mail ou PIN incorretos."
-    # Bloqueado: nem o PIN certo entra
-    assert client.post("/api/meus-pedidos", json={"email": MARIANA, "pin": PIN_DEMO}).status_code == 429
-
-
-def test_email_inexistente_tem_a_mesma_resposta_do_pin_errado(client):
-    r = client.post("/api/meus-pedidos", json={"email": "ninguem@exemplo.com", "pin": PIN_DEMO})
-    assert r.status_code == 401
-    assert r.json()["detail"] == "E-mail ou PIN incorretos."
-
-
-def test_esqueci_e_redefinir_pin(client, monkeypatch):
-    monkeypatch.setattr(meus_pedidos, "PIN_LINK_NA_RESPOSTA", True)
-    # E-mail desconhecido: mesma resposta, sem link
-    assert client.post("/api/meus-pedidos/esqueci-pin", json={"email": "ninguem@exemplo.com"}).json() == {
-        "enviado": True,
-        "linkDemo": None,
-    }
-    link = client.post("/api/meus-pedidos/esqueci-pin", json={"email": MARIANA}).json()["linkDemo"]
-    assert link.startswith("/meus-pedidos/novo-pin?token=")
-    token = link.split("token=")[1]
-
-    assert (
-        client.post("/api/meus-pedidos/redefinir-pin", json={"token": token, "pin": "1111", "pinConfirmacao": "2222"}).status_code
-        == 422
-    )
-    r = client.post("/api/meus-pedidos/redefinir-pin", json={"token": token, "pin": "0987", "pinConfirmacao": "0987"})
-    assert r.status_code == 200 and r.json() == {"email": MARIANA}
-
-    assert client.post("/api/meus-pedidos", json={"email": MARIANA, "pin": PIN_DEMO}).status_code == 401
-    assert client.post("/api/meus-pedidos", json={"email": MARIANA, "pin": "0987"}).status_code == 200
-    # Link de uso único
-    reuso = client.post("/api/meus-pedidos/redefinir-pin", json={"token": token, "pin": "5555", "pinConfirmacao": "5555"})
-    assert reuso.status_code == 410
-
-
-def test_link_do_pin_nao_vem_na_resposta_com_a_opcao_desligada(client, monkeypatch):
-    # Explícito: o teste não pode depender do .env de quem roda (a opção existe só para demonstração)
-    monkeypatch.setattr(meus_pedidos, "PIN_LINK_NA_RESPOSTA", False)
-    assert client.post("/api/meus-pedidos/esqueci-pin", json={"email": MARIANA}).json() == {"enviado": True, "linkDemo": None}
-
-
-def test_cliente_abre_chamado_com_foto_e_responde(client):
-    numero = client.post("/api/meus-pedidos", json={"email": MARIANA, "pin": PIN_DEMO}).json()[0]["numero"]
-    tipo_troca = 1
-    r = client.post(
-        "/api/meus-pedidos/solicitacoes",
-        json={
-            "email": MARIANA,
-            "pin": PIN_DEMO,
-            "numero": numero,
-            "tipoSolicitacaoId": tipo_troca,
-            "descricao": "A peça veio com a costura aberta na manga.",
-            "anexo": {"nome": "manga.png", "tipo": "image/png", "conteudoBase64": PNG_1X1},
-        },
-    )
-    assert r.status_code == 201, r.text
-    criado = r.json()
-    assert criado["protocolo"].startswith("ATD-") and criado["tipo"]
-
-    chamados = client.post("/api/meus-pedidos/solicitacoes/consulta", json={"email": MARIANA, "pin": PIN_DEMO}).json()
-    chamado = next(c for c in chamados if c["id"] == criado["id"])
-    assert chamado["pedidoNumero"] == numero
-    assert chamado["mensagens"][0]["anexo"]["url"].startswith("data:image/png;base64,")
-    assert "responsavel" not in chamado and "loja" not in chamado
-
-    resposta = client.post(
-        f"/api/meus-pedidos/solicitacoes/{criado['id']}/mensagens",
-        json={"email": MARIANA, "pin": PIN_DEMO, "conteudo": "Posso trocar na loja Oscar Freire?"},
-    )
-    assert resposta.status_code == 200
-    assert resposta.json()["mensagens"][-1]["autorTipo"] == "CLIENTE"
-
-
-def test_cliente_nao_ve_pedido_nem_chamado_de_outro(client):
-    numero_mariana = client.post("/api/meus-pedidos", json={"email": MARIANA, "pin": PIN_DEMO}).json()[0]["numero"]
-    outro = "ricardo.fonseca@outlook.com"
-    r = client.post(
-        "/api/meus-pedidos/solicitacoes",
-        json={
-            "email": outro,
-            "pin": PIN_DEMO,
-            "numero": numero_mariana,
-            "tipoSolicitacaoId": 1,
-            "descricao": "Quero trocar esta peça.",
-        },
-    )
-    assert r.status_code == 404
-    chamado_mariana = client.post("/api/meus-pedidos/solicitacoes/consulta", json={"email": MARIANA, "pin": PIN_DEMO}).json()[0]
-    r = client.post(
-        f"/api/meus-pedidos/solicitacoes/{chamado_mariana['id']}/mensagens",
-        json={"email": outro, "pin": PIN_DEMO, "conteudo": "Olá"},
-    )
-    assert r.status_code == 404
-
-
 # ---------- Painel ----------
 
 
@@ -250,6 +138,38 @@ def test_pedidos_do_painel_exigem_login_e_modulo(client, operador, lojista):
     assert client.get("/api/pedidos").status_code == 401
     assert client.get("/api/pedidos", headers=operador).status_code == 200
     assert client.get("/api/pedidos", headers=lojista).status_code == 200
+
+
+def test_lojista_e_operador_so_veem_pedidos_da_propria_loja(client, admin, lojista, operador):
+    todos = client.get("/api/pedidos", headers=admin).json()
+    de_outra_loja = next(p for p in todos if p["lojaId"] != 1)
+    da_loja_1 = next(p for p in todos if p["lojaId"] == 1)
+    for headers in (lojista, operador):  # os dois são da loja 1 no seed
+        # Mesmo pedindo outra loja, a lista vem só com a própria
+        for rota in ("/api/pedidos", f"/api/pedidos?lojaId={de_outra_loja['lojaId']}"):
+            assert {p["lojaId"] for p in client.get(rota, headers=headers).json()} == {1}
+        # Pedido de outra loja aparece como inexistente, inclusive pagamentos e devolução
+        assert client.get(f"/api/pedidos/{de_outra_loja['id']}", headers=headers).status_code == 404
+        assert client.get(f"/api/pedidos/{de_outra_loja['id']}/pagamentos", headers=headers).status_code == 404
+        devolucao = {"itemPedidoId": de_outra_loja["itens"][0]["id"], "quantidade": 1, "motivo": "teste"}
+        assert client.post(f"/api/pedidos/{de_outra_loja['id']}/devolucoes", headers=headers, json=devolucao).status_code == 404
+        assert (
+            client.patch(f"/api/pedidos/{de_outra_loja['id']}", headers=headers, json={"status": "ENTREGUE"}).status_code == 404
+        )
+        assert client.get(f"/api/pedidos/{da_loja_1['id']}", headers=headers).status_code == 200
+    assert len(client.get("/api/pedidos", headers=admin).json()) == len(todos)
+
+
+def test_so_o_administrador_troca_a_loja_de_expedicao(client, admin, operador, mariana):
+    variacao_id, _ = _variacao_com_estoque(client)
+    numero = client.post("/api/checkout", json=_compra(variacao_id), headers=mariana).json()["numero"]
+    pedido = _pedido_no_painel(client, admin, numero)
+    if pedido["lojaId"] != 1:  # leva para a loja do operador, para ele enxergar o pedido
+        pedido = client.patch(f"/api/pedidos/{pedido['id']}", headers=admin, json={"lojaId": 1}).json()
+
+    r = client.patch(f"/api/pedidos/{pedido['id']}", headers=operador, json={"lojaId": 2})
+    assert r.status_code == 403 and "administrador" in r.json()["detail"]
+    assert client.get(f"/api/pedidos/{pedido['id']}", headers=admin).json()["lojaId"] == 1
 
 
 def _loja_sem_e_com_estoque(client, headers, variacao_id):

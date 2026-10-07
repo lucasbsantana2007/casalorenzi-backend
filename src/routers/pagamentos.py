@@ -13,5 +13,6 @@ router = APIRouter(tags=["Pedidos"])
 
 
 @router.get("/pedidos/{pedido_id}/pagamentos")
-def listar_do_pedido(pedido_id: int, db: Session = Depends(get_db), _: m.Usuario = Depends(exigir_modulo("pedidos"))):
-    return [pagamento_saida(p) for p in pagamentos.listar_do_pedido(db, pedido_id)]
+def listar_do_pedido(pedido_id: int, db: Session = Depends(get_db), usuario: m.Usuario = Depends(exigir_modulo("pedidos"))):
+    """Pedido de outra loja (Lojista e Operador): 404."""
+    return [pagamento_saida(p) for p in pagamentos.listar_do_pedido(db, pedido_id, usuario)]

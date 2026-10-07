@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 
 from src import models as m
 from src.entities.frete import uf_do_cep
+from src.entities.papeis import ADMINISTRADOR, loja_do_escopo, ve_pedido_da_loja
 from src.entities.pedido import STATUS_PEDIDO, pode_mudar, pontuar_loja
 from src.entities.transferencia import pode_mudar as transferencia_pode_mudar
 from src.repositories import cadastro_repository, estoque_repository, pedido_repository, sessao
@@ -22,7 +23,7 @@ from src.use_cases import log_acoes, transferencias
 from src.use_cases.estoque import aplicar_movimentacao
 from src.use_cases.pagamentos import estornar_aprovados
 from src.utils.datas import agora
-from src.utils.erros import Conflito, DadosInvalidos, NaoEncontrado
+from src.utils.erros import Conflito, DadosInvalidos, NaoEncontrado, SemPermissao
 from src.utils.texto import corresponde
 
 RASTREIO_MAX = 40
@@ -111,20 +112,34 @@ def _cancelar_transferencias_pendentes(pedido: m.Pedido) -> None:
 # ---------- Painel ----------
 
 
+def conferir_acesso(usuario: m.Usuario, pedido: m.Pedido | None) -> m.Pedido:
+    """Pedido de outra loja aparece como inexistente para Lojista e Operador (404)."""
+    if pedido is None or not ve_pedido_da_loja(usuario.papel, usuario.loja_id, pedido.loja_id):
+        raise NaoEncontrado("Pedido não encontrado.")
+    return pedido
+
+
 def listar(
-    db: Session, *, status: str | None = None, loja_id: int | None = None, canal: str | None = None, busca: str | None = None
+    db: Session,
+    usuario: m.Usuario,
+    *,
+    status: str | None = None,
+    loja_id: int | None = None,
+    canal: str | None = None,
+    busca: str | None = None,
 ) -> list[m.Pedido]:
+    """Lojista e Operador recebem só os pedidos da própria loja, qualquer que seja o lojaId pedido."""
     if status and status not in STATUS_PEDIDO:
         raise DadosInvalidos("Status de pedido inválido.")
+    escopo = loja_do_escopo(usuario.papel, usuario.loja_id)
+    if escopo is not None:
+        loja_id = escopo
     pedidos = pedido_repository.listar(db, status=status, loja_id=loja_id, canal=canal)
     return [p for p in pedidos if corresponde(busca, p.numero, p.cliente.nome, p.cliente.email)]
 
 
-def obter(db: Session, pedido_id: int) -> m.Pedido:
-    pedido = pedido_repository.obter(db, pedido_id)
-    if pedido is None:
-        raise NaoEncontrado("Pedido não encontrado.")
-    return pedido
+def obter(db: Session, pedido_id: int, usuario: m.Usuario) -> m.Pedido:
+    return conferir_acesso(usuario, pedido_repository.obter(db, pedido_id))
 
 
 def saldos_na_loja(db: Session, pedido: m.Pedido) -> dict[int, int]:
@@ -194,12 +209,12 @@ def atualizar(
     codigo_rastreio: str | None = None,
 ) -> m.Pedido:
     """Troca a loja de expedição (loja_id) ou muda o status. Mudança fora do fluxo: 409."""
-    pedido = pedido_repository.obter(db, pedido_id, travar=True)
-    if pedido is None:
-        raise NaoEncontrado("Pedido não encontrado.")
+    pedido = conferir_acesso(usuario, pedido_repository.obter(db, pedido_id, travar=True))
     momento = agora()
 
     if loja_id is not None:
+        if usuario.papel != ADMINISTRADOR:
+            raise SemPermissao("Só o administrador troca a loja de expedição.")
         _trocar_loja(db, pedido, loja_id, usuario, momento)
     elif status is None:
         raise DadosInvalidos("Informe a loja de expedição ou o novo status.")
@@ -220,4 +235,4 @@ def atualizar(
 
     sessao.confirmar(db)
     sessao.descartar_cache(db)  # volta com eventos, transferências e pagamentos atualizados
-    return obter(db, pedido_id)
+    return obter(db, pedido_id, usuario)

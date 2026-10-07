@@ -6,7 +6,6 @@
 - "Esqueci a senha" responde igual exista ou não a conta, e o link vale 30 minutos, uma vez.
 """
 
-import logging
 import secrets
 
 from sqlalchemy.orm import Session
@@ -22,12 +21,12 @@ from src.entities.cliente import (
     somente_digitos_cpf,
 )
 from src.entities.papeis import CLIENTE
+from src.integrations import modelos_email
+from src.integrations.email import enviar as enviar_email
 from src.repositories import cliente_repository, sessao, usuario_repository
 from src.utils.datas import agora
 from src.utils.erros import Conflito, DadosInvalidos, Expirado, NaoAutenticado, SemPermissao
 from src.utils.seguranca import confere_hash, criar_token, gerar_hash
-
-log = logging.getLogger("casalorenzi")
 
 CREDENCIAIS_INVALIDAS = "E-mail ou senha incorretos."
 CONVITE_PENDENTE = "Esta conta ainda não tem senha. Use o link do convite enviado por e-mail para criá-la."
@@ -109,7 +108,8 @@ def solicitar_nova_senha(db: Session, email: str | None) -> str | None:
         return None
     link = criar_link_senha(db, VALIDADE_TOKEN_SENHA, usuario=usuario, cliente=cliente)
     sessao.confirmar(db)
-    log.info("Link de troca de senha para %s: %s", alvo, link)
+    conta = usuario or cliente
+    enviar_email(modelos_email.nova_senha(conta.email, conta.nome, link))
     return link if LINK_SENHA_NA_RESPOSTA else None
 
 

@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import CheckConstraint, Date, DateTime, ForeignKey, Integer, String, func
+from sqlalchemy import CheckConstraint, Date, DateTime, ForeignKey, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.database.connection import Base
@@ -18,7 +18,6 @@ class Cliente(Base):
     __tablename__ = "clientes"
     __table_args__ = (
         CheckConstraint("email = lower(email)", name="ck_clientes_email_minusculo"),
-        CheckConstraint("tentativas_pin >= 0", name="ck_clientes_tentativas_pin"),
         CheckConstraint("cpf IS NULL OR cpf ~ '^[0-9]{11}$'", name="ck_clientes_cpf"),
     )
 
@@ -29,10 +28,6 @@ class Cliente(Base):
     # Conta do cliente: CPF (só dígitos) e hash da senha. Nulos nos clientes antigos, sem conta.
     cpf: Mapped[str | None] = mapped_column(String(11), unique=True)
     senha_hash: Mapped[str | None] = mapped_column(String(255))
-    # Só o hash do PIN de 4 dígitos (bcrypt). Nulo até o cliente criar um PIN.
-    pin_hash: Mapped[str | None] = mapped_column(String(255))
-    tentativas_pin: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
-    bloqueado_ate: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     cliente_desde: Mapped[date] = mapped_column(Date, server_default=func.current_date())
     loja_preferida_id: Mapped[int | None] = mapped_column(ForeignKey("lojas.id"))
     criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

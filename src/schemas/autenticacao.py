@@ -31,7 +31,8 @@ class RedefinirSenhaEntrada(Entrada):
 
 def conta_saida(conta: m.Usuario | m.Cliente) -> dict:
     """Usuário da sessão no formato que o frontend guarda: { id, nome, email, papel, lojaId }.
-    Para o cliente, papel "CLIENTE" e o CPF junto; nunca inclui hash de senha ou PIN."""
+    Para o cliente, papel "CLIENTE" e o CPF junto; nunca inclui o hash da senha."""
     if isinstance(conta, m.Cliente):
-        return {"id": conta.id, "nome": conta.nome, "email": conta.email, "papel": CLIENTE, "lojaId": None, "cpf": conta.cpf}
+        # Para o site, o id do cliente é o CPF (o número interno da tabela não sai da API)
+        return {"id": conta.cpf, "nome": conta.nome, "email": conta.email, "papel": CLIENTE, "lojaId": None, "cpf": conta.cpf}
     return usuario_saida(conta)

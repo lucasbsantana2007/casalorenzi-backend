@@ -73,14 +73,11 @@ def excluir(db: Session, cliente: m.Cliente, *, senha: str) -> None:
     momento = agora()
     for link in cliente_repository.tokens_senha_pendentes(db, cliente_id=cliente.id):
         link.usado_em = momento
-    for link in cliente_repository.tokens_pin_pendentes(db, cliente.id):
-        link.usado_em = momento
     cliente.nome = NOME_EXCLUIDO
     cliente.email = f"excluido-{cliente.id}@contas-excluidas.invalid"  # único e impossível de receber e-mail
     cliente.telefone = None
     cliente.cpf = None
     cliente.senha_hash = None
-    cliente.pin_hash = None
     cliente.loja_preferida_id = None
     cliente.excluido_em = momento
     sessao.confirmar(db)

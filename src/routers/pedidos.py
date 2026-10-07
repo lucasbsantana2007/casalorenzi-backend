@@ -28,19 +28,21 @@ def listar(
     db: Session = Depends(get_db),
     usuario: m.Usuario = Depends(acesso),
 ):
-    """busca: número do pedido, nome ou e-mail do cliente. Mais recentes primeiro."""
-    return [_saida(db, p, usuario) for p in pedidos.listar(db, status=status, loja_id=lojaId, canal=canal, busca=busca)]
+    """busca: número do pedido, nome ou e-mail do cliente. Mais recentes primeiro.
+    Lojista e Operador recebem só os pedidos que a própria loja expede (o lojaId é ignorado)."""
+    return [_saida(db, p, usuario) for p in pedidos.listar(db, usuario, status=status, loja_id=lojaId, canal=canal, busca=busca)]
 
 
 @router.get("/{pedido_id}")
 def obter(pedido_id: int, db: Session = Depends(get_db), usuario: m.Usuario = Depends(acesso)):
-    """O custo do frete só vem para o Administrador."""
-    return _saida(db, pedidos.obter(db, pedido_id), usuario)
+    """O custo do frete só vem para o Administrador. Pedido de outra loja (Lojista e Operador): 404."""
+    return _saida(db, pedidos.obter(db, pedido_id, usuario), usuario)
 
 
 @router.patch("/{pedido_id}")
 def atualizar(pedido_id: int, dados: PedidoAtualizacao, db: Session = Depends(get_db), usuario: m.Usuario = Depends(acesso)):
-    """{ lojaId } troca a loja de expedição (só antes do envio). { status: 'ENVIADO', codigoRastreio }
+    """{ lojaId } troca a loja de expedição (só o Administrador, antes do envio; os demais: 403).
+    { status: 'ENVIADO', codigoRastreio }
     exige todas as peças na loja e baixa o estoque. { status: 'ENTREGUE' } e { status: 'CANCELADO' }
     (estorna o pagamento). Fora do fluxo: 409."""
     pedido = pedidos.atualizar(

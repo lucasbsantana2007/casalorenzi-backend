@@ -1,19 +1,14 @@
-"""Cliente da loja: sem login. Identificado pelo e-mail (único, sempre em minúsculas) e
-liberado em "Meus pedidos" por um PIN de 4 dígitos, guardado só como hash (bcrypt).
+"""Cliente da loja: conta própria com CPF, e-mail (único, sempre em minúsculas) e senha (só o hash).
 
-Erros seguidos de PIN bloqueiam a consulta por um tempo; "esqueci o PIN" gera um link
-(token) de uso único com validade curta."""
+A conta nasce no checkout ou em "Criar conta" e entra pelo mesmo login da equipe. "Esqueci a
+senha" gera um link (token) de uso único com validade curta."""
 
 import re
-from datetime import datetime, timedelta
+from datetime import timedelta
 
-TENTATIVAS_PIN_MAX = 5
-BLOQUEIO_PIN = timedelta(minutes=15)
-VALIDADE_TOKEN_PIN = timedelta(minutes=30)
 VALIDADE_TOKEN_SENHA = timedelta(minutes=30)
 SENHA_MINIMA = 8
 
-_PIN = re.compile(r"^\d{4}$")
 _EMAIL = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
 
 
@@ -25,24 +20,15 @@ def email_valido(email: str | None) -> bool:
     return bool(_EMAIL.match(normalizar_email(email)))
 
 
-def pin_valido(pin: str | None) -> bool:
-    return bool(_PIN.match(pin or ""))
-
-
-def bloqueado(bloqueado_ate: datetime | None, agora: datetime) -> bool:
-    return bloqueado_ate is not None and bloqueado_ate > agora
-
-
-def apos_erro_de_pin(tentativas: int, agora: datetime) -> tuple[int, datetime | None]:
-    """(tentativas, bloqueado_ate) depois de um PIN errado: na 5ª seguida, bloqueia e zera o contador."""
-    tentativas += 1
-    if tentativas >= TENTATIVAS_PIN_MAX:
-        return 0, agora + BLOQUEIO_PIN
-    return tentativas, None
-
-
 def somente_digitos_cpf(cpf: str | None) -> str:
     return re.sub(r"\D", "", cpf or "")[:11]
+
+
+def cpf_do_id(valor: str | int | None) -> str:
+    """O id público do cliente é o CPF (11 dígitos). Aceita com máscara ou como número (zeros à esquerda)."""
+    if isinstance(valor, int):
+        return str(valor).zfill(11)
+    return somente_digitos_cpf(str(valor or ""))
 
 
 def _digito_verificador(base: str) -> int:

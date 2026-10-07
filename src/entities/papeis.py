@@ -28,3 +28,16 @@ ACESSO = {
 
 def pode_acessar(papel: str, modulo: str) -> bool:
     return papel in ACESSO[modulo]
+
+
+def loja_do_escopo(papel: str, loja_id: int | None) -> int | None:
+    """Loja a que o membro da equipe está restrito nos pedidos: Lojista e Operador veem só os pedidos
+    da própria loja; o Administrador vê a rede toda (None). Sem loja cadastrada, não vê nenhum (0)."""
+    if papel == ADMINISTRADOR:
+        return None
+    return loja_id or 0
+
+
+def ve_pedido_da_loja(papel: str, loja_do_usuario: int | None, loja_do_pedido: int) -> bool:
+    escopo = loja_do_escopo(papel, loja_do_usuario)
+    return escopo is None or escopo == loja_do_pedido

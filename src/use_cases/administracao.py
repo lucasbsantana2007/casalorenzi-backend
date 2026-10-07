@@ -8,7 +8,6 @@
 - Toda alteração vai para o log com quem fez (do token) e o que mudou.
 """
 
-import logging
 from datetime import timedelta
 
 from sqlalchemy.orm import Session
@@ -17,6 +16,8 @@ from src import models as m
 from src.config.settings import LINK_SENHA_NA_RESPOSTA
 from src.entities.cliente import email_valido, normalizar_email
 from src.entities.papeis import ADMINISTRADOR, PAPEIS
+from src.integrations import modelos_email
+from src.integrations.email import enviar as enviar_email
 from src.repositories import (
     cadastro_repository,
     cliente_repository,
@@ -30,8 +31,6 @@ from src.use_cases.autenticacao import criar_link_senha
 from src.utils.datas import agora
 from src.utils.erros import Conflito, DadosInvalidos, NaoEncontrado
 from src.utils.texto import chave_texto, corresponde
-
-log = logging.getLogger("casalorenzi")
 
 VALIDADE_CONVITE = timedelta(days=7)
 NOMES_PAPEIS = {"ADMINISTRADOR": "Administrador", "LOJISTA": "Lojista", "OPERADOR": "Operador"}
@@ -90,15 +89,9 @@ def _nome_da_loja(db: Session, loja_id: int | None) -> str:
     return loja.nome if loja else "—"
 
 
-def _convite(db: Session, usuario: m.Usuario) -> str | None:
-    """Gera o link do convite e "envia" o e-mail (por enquanto, no log da API)."""
-    link = criar_link_senha(db, VALIDADE_CONVITE, usuario=usuario)
-    log.info(
-        "Convite para %s (%s no painel da Casa Lorenzi): crie sua senha em %s (vale 7 dias)",
-        usuario.email,
-        NOMES_PAPEIS[usuario.papel],
-        link,
-    )
+def _enviar_convite(usuario: m.Usuario, link: str) -> str | None:
+    """Manda o e-mail do convite (depois de gravar o link). Devolve o link só na demonstração."""
+    enviar_email(modelos_email.convite_funcionario(usuario.email, usuario.nome, NOMES_PAPEIS[usuario.papel], link))
     return link if LINK_SENHA_NA_RESPOSTA else None
 
 
@@ -108,7 +101,7 @@ def criar_funcionario(db: Session, autor: m.Usuario, dados) -> tuple[m.Usuario, 
     usuario = m.Usuario(**campos, senha_hash=None, ativo=True, criado_em=agora())
     sessao.adicionar(db, usuario)
     sessao.gerar_ids(db)
-    link = _convite(db, usuario)
+    link = criar_link_senha(db, VALIDADE_CONVITE, usuario=usuario)
     loja = f" · {_nome_da_loja(db, usuario.loja_id)}" if usuario.loja_id else ""
     log_acoes.registrar(
         db,
@@ -119,7 +112,7 @@ def criar_funcionario(db: Session, autor: m.Usuario, dados) -> tuple[m.Usuario, 
         referencia=("funcionario", usuario.id),
     )
     sessao.confirmar(db, usuario)
-    return usuario, link
+    return usuario, _enviar_convite(usuario, link)
 
 
 def _funcionario(db: Session, usuario_id: int) -> m.Usuario:
@@ -186,7 +179,7 @@ def reenviar_convite(db: Session, autor: m.Usuario, usuario_id: int) -> str | No
         raise DadosInvalidos("Este funcionário já criou a senha.")
     if not usuario.ativo:
         raise DadosInvalidos("Reative o funcionário antes de reenviar o convite.")
-    link = _convite(db, usuario)
+    link = criar_link_senha(db, VALIDADE_CONVITE, usuario=usuario)
     log_acoes.registrar(
         db,
         autor,
@@ -196,7 +189,7 @@ def reenviar_convite(db: Session, autor: m.Usuario, usuario_id: int) -> str | No
         referencia=("funcionario", usuario.id),
     )
     sessao.confirmar(db)
-    return link
+    return _enviar_convite(usuario, link)
 
 
 # ---------- Lojas ----------

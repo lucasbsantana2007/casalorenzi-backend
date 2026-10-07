@@ -1,8 +1,7 @@
 """Atendimento: chamados dos clientes. A equipe (administrador e lojista) trata pelo painel.
 
 O cliente logado (conta com CPF) abre e responde os próprios chamados (`abrir_para_cliente`,
-`responder_como_cliente`); a equipe também abre em nome dele (`abrir`). O fluxo legado de
-"Meus pedidos" (e-mail + PIN) usa as mesmas funções, já com o cliente identificado.
+`responder_como_cliente`); a equipe também abre em nome dele (`abrir`).
 """
 
 import uuid
@@ -12,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from src import models as m
 from src.entities.atendimento import DESCRICAO_MINIMA, EM_ABERTO, protocolo, status_apos_mensagem
+from src.entities.cliente import cpf_do_id
 from src.entities.papeis import EQUIPE
 from src.repositories import (
     atendimento_repository,
@@ -138,14 +138,15 @@ def abrir(
     db: Session,
     usuario: m.Usuario,
     *,
-    cliente_id: int | None,
+    cliente_id: str | int | None,
     tipo_solicitacao_id: int | None,
     pedido_id: int | None,
     descricao: str,
     anexo: AnexoEntrada | None = None,
 ) -> m.Atendimento:
-    """A equipe de atendimento abre o chamado para um cliente ."""
-    cliente = cliente_repository.por_id(db, cliente_id) if cliente_id else None
+    """A equipe de atendimento abre o chamado para um cliente (cliente_id = CPF, o id público)."""
+    cpf = cpf_do_id(cliente_id)
+    cliente = cliente_repository.por_cpf(db, cpf) if cpf else None
     if cliente is None:
         raise DadosInvalidos("Informe um cliente válido.")
     return abrir_para_cliente(
@@ -206,7 +207,7 @@ def enviar_mensagem(
 def responder_como_cliente(
     db: Session, atendimento_id: int, cliente: m.Cliente, conteudo: str, anexo: AnexoEntrada | None = None
 ) -> m.Atendimento:
-    """Resposta do cliente identificado (conta ou e-mail + PIN). Chamado de outro cliente aparece como inexistente."""
+    """Resposta do cliente logado. Chamado de outro cliente aparece como inexistente."""
     atendimento = atendimento_repository.obter(db, atendimento_id)
     if atendimento is None or atendimento.cliente_id != cliente.id:
         raise NaoEncontrado("Solicitação não encontrada.")

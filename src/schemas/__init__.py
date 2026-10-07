@@ -4,5 +4,5 @@
 - funções *_saida: o JSON devolvido, no formato da camada de serviços do frontend
   (camelCase, datas em milissegundos, objetos relacionados embutidos).
 
-Separar entrada e saída evita expor campos internos (hash de senha/PIN, por exemplo).
+Separar entrada e saída evita expor campos internos (hash de senha, por exemplo).
 """

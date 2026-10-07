@@ -14,7 +14,7 @@ def test_cliente_ve_os_proprios_dados(client, mariana):
     r = client.get("/api/conta", headers=mariana)
     assert r.status_code == 200
     assert r.json() == {
-        "id": 101,
+        "id": "15881399803",  # id público = CPF
         "nome": "Mariana Costa",
         "email": MARIANA,
         "cpf": "15881399803",
@@ -88,7 +88,7 @@ def test_trocar_senha(client, mariana):
 def test_excluir_conta_apaga_os_dados_e_encerra_o_acesso(client, mariana, admin):
     errada = client.post("/api/conta/exclusao", headers=mariana, json={"senha": "errada"})
     assert errada.status_code == 422
-    pedidos_antes = [p["numero"] for p in client.get("/api/clientes/101/pedidos", headers=admin).json()]
+    pedidos_antes = [p["numero"] for p in client.get("/api/clientes/15881399803/pedidos", headers=admin).json()]
 
     assert client.post("/api/conta/exclusao", headers=mariana, json={"senha": SENHA}).status_code == 204
     # O token deixa de valer e o login não entra mais
@@ -105,10 +105,11 @@ def test_excluir_conta_apaga_os_dados_e_encerra_o_acesso(client, mariana, admin)
     }
     assert client.post("/api/auth/cadastro", json=nova).status_code == 201
 
-    # Para a equipe: dados pessoais apagados, pedidos mantidos (anônimos) e fora da busca de clientes
-    antiga = client.get("/api/clientes/101", headers=admin).json()
-    assert antiga["nome"] == "Cliente excluído" and antiga["cpf"] is None and antiga["telefone"] is None and antiga["excluido"]
-    pedidos = client.get("/api/clientes/101/pedidos", headers=admin).json()
-    assert [p["numero"] for p in pedidos] == pedidos_antes and pedidos_antes
-    assert {p["contato"]["nome"] for p in pedidos} == {"Cliente excluído"}
+    # O CPF (id público) agora é da conta nova, que começa sem pedidos
+    nova_conta = client.get("/api/clientes/15881399803", headers=admin).json()
+    assert nova_conta["nome"] == "Mariana Costa" and nova_conta["totalPedidos"] == 0
+    # Para a equipe: os pedidos antigos continuam no painel, anônimos e sem cliente (a conta excluída não tem CPF)
+    for numero in pedidos_antes:
+        [pedido] = client.get(f"/api/pedidos?busca={numero}", headers=admin).json()
+        assert pedido["contato"]["nome"] == "Cliente excluído" and pedido["clienteId"] is None
     assert [c["id"] for c in client.get("/api/clientes?busca=Cliente exclu", headers=admin).json()] == []

@@ -1,5 +1,6 @@
 """Busca e ordenação de texto como no frontend (sem diferenciar acentos e maiúsculas)."""
 
+import re
 import unicodedata
 
 
@@ -32,3 +33,9 @@ def moeda(valor) -> str:
     """R$ 1.234,56 (como o formatCurrency do frontend), usado nas descrições do log."""
     texto = f"{float(valor or 0):,.2f}".replace(",", "_").replace(".", ",").replace("_", ".")
     return f"R$ {texto}"
+
+
+def mascarar_cpf(texto: str) -> str:
+    """Esconde CPFs (11 dígitos seguidos) em textos de log, deixando só os 2 últimos dígitos.
+    Ex.: /api/clientes/15881399803/pedidos → /api/clientes/*********03/pedidos."""
+    return re.sub(r"(?<!\d)\d{9}(\d{2})(?!\d)", r"*********\1", texto)

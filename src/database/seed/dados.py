@@ -1,8 +1,6 @@
 """Dados fixos de demonstração: os mesmos de src/data/seed do frontend."""
 
 SENHA_DEMO = "lorenzi2026"
-# PIN de "Meus pedidos" de todos os clientes de demonstração (PIN_DEMO do frontend)
-PIN_DEMO = "1234"
 DIA = 86_400_000
 HISTORICO_DIAS = 75
 

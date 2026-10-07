@@ -4,8 +4,7 @@ Uso:
     python -m src.database.seed            # só popula se o banco estiver vazio
     python -m src.database.seed --recriar  # apaga todos os dados e popula de novo
 
-Todas as contas (equipe e clientes) usam a senha "lorenzi2026"; os clientes também têm o PIN "1234"
-(legado de "Meus pedidos").
+Todas as contas (equipe e clientes) usam a senha "lorenzi2026".
 As datas são relativas ao momento da carga.
 """
 
@@ -24,7 +23,6 @@ from src.database.seed.dados import (
     CUSTO_DEMO,
     DETALHES_PRODUTOS,
     LOJAS,
-    PIN_DEMO,
     PRODUTOS,
     SENHA_DEMO,
     TIPOS_SOLICITACAO,
@@ -91,7 +89,6 @@ def apagar_tudo(db: Session) -> None:
 def popular(db: Session) -> None:
     relogio = Relogio()
     senha = gerar_hash(SENHA_DEMO)
-    pin = gerar_hash(PIN_DEMO)  # um hash só para todos: bcrypt é lento de propósito
     variacoes = montar_variacoes()
     estoques, movimentacoes, transferencias = montar_estoque(relogio, variacoes)
     pedidos = montar_pedidos(relogio, variacoes)
@@ -113,8 +110,6 @@ def popular(db: Session) -> None:
             email=e.lower(),
             telefone=tel,
             senha_hash=senha,
-            pin_hash=pin,
-            tentativas_pin=0,
             cliente_desde=date.fromisoformat(desde),
             loja_preferida_id=loja,
         )
@@ -286,7 +281,7 @@ def main() -> None:
         }
         contagens = ", ".join(f"{db.scalar(select(func.count()).select_from(t))} {nome}" for nome, t in resumo.items())
         print(f"Dados de demonstração carregados: {contagens}.")
-        print(f"Senha de todas as contas (equipe e clientes): {SENHA_DEMO} · PIN legado dos clientes: {PIN_DEMO}")
+        print(f"Senha de todas as contas (equipe e clientes): {SENHA_DEMO}")
 
 
 if __name__ == "__main__":

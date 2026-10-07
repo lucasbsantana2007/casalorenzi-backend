@@ -1,8 +1,8 @@
 """Pagamentos, devoluções (com volta ao estoque), financeiro das devoluções e anexos do atendimento.
 
 Pedidos do seed usados aqui (src/database/seed/gerador.py, mesmos dos mocks do frontend):
-- cliente 101: pedidos ENTREGUE com um item de 1 peça (e-commerce, loja 1);
-- cliente 102: pedido 9, loja física, loja 2, dois itens de 1 peça;
+- cliente 15881399803 (Mariana): pedidos ENTREGUE com um item de 1 peça (e-commerce, loja 1);
+- cliente 69879730917 (Ricardo): pedido 9, loja física, loja 2, dois itens de 1 peça;
 - cliente 103: pedido 18, CANCELADO.
 """
 
@@ -19,7 +19,7 @@ def _pedidos(client, headers, cliente_id):
 
 
 def _pedido_entregue_com_um_item(client, headers):
-    return next(p for p in _pedidos(client, headers, 101) if p["status"] == "ENTREGUE" and len(p["itens"]) == 1)
+    return next(p for p in _pedidos(client, headers, "15881399803") if p["status"] == "ENTREGUE" and len(p["itens"]) == 1)
 
 
 def _estoque(client, headers, loja_id, variacao_id):
@@ -44,7 +44,7 @@ def test_pedido_do_seed_tem_pagamento(client, admin):
 
 
 def test_pedido_cancelado_tem_pagamento_estornado(client, admin):
-    cancelado = next(p for p in _pedidos(client, admin, 103) if p["status"] == "CANCELADO")
+    cancelado = next(p for p in _pedidos(client, admin, "11417075350") if p["status"] == "CANCELADO")
     pagamentos = client.get(f"/api/pedidos/{cancelado['id']}/pagamentos", headers=admin).json()
     assert [p["status"] for p in pagamentos] == ["ESTORNADO"]
 
@@ -105,7 +105,7 @@ def test_nao_deixa_devolver_acima_do_comprado(client, admin):
 
 
 def test_pedido_cancelado_recusa_devolucao(client, admin):
-    cancelado = next(p for p in _pedidos(client, admin, 103) if p["status"] == "CANCELADO")
+    cancelado = next(p for p in _pedidos(client, admin, "11417075350") if p["status"] == "CANCELADO")
     item = cancelado["itens"][0]
     antes = _estoque(client, admin, cancelado["lojaId"], item["variacaoId"])
 
@@ -140,7 +140,7 @@ def test_devolucao_valida_item_quantidade_e_motivo(client, admin):
 
 
 def test_devolucao_total_estorna_pagamento_e_parcial_nao(client, admin):
-    pedido = next(p for p in _pedidos(client, admin, 102) if p["status"] == "ENTREGUE" and len(p["itens"]) == 2)
+    pedido = next(p for p in _pedidos(client, admin, "69879730917") if p["status"] == "ENTREGUE" and len(p["itens"]) == 2)
     primeiro, segundo = pedido["itens"]
 
     assert _devolver(client, admin, pedido["id"], itemPedidoId=primeiro["id"], quantidade=1).status_code == 201
@@ -160,7 +160,7 @@ def test_devolucao_ligada_a_atendimento_do_cliente(client, admin):
         "/api/atendimentos",
         headers=admin,
         json={
-            "clienteId": 102,
+            "clienteId": "69879730917",
             "tipoSolicitacaoId": 6,
             "descricao": "Qual a composição da camisa?",
         },
@@ -173,7 +173,7 @@ def test_devolucao_ligada_a_atendimento_do_cliente(client, admin):
         "/api/atendimentos",
         headers=admin,
         json={
-            "clienteId": 101,
+            "clienteId": "15881399803",
             "tipoSolicitacaoId": 2,
             "pedidoId": pedido["id"],
             "descricao": "Quero devolver a peça, não serviu.",

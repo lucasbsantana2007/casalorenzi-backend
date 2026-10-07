@@ -17,6 +17,8 @@ from src import models as m
 from src.entities.frete import ROTULOS, somente_digitos
 from src.entities.pagamento import METODOS_ECOMMERCE, PARCELAS_MAX
 from src.entities.pedido import proximo_numero
+from src.integrations import modelos_email
+from src.integrations.email import enviar as enviar_email
 from src.repositories import estoque_repository, pedido_repository, produto_repository, sessao
 from src.schemas.pedidos import CheckoutEntrada
 from src.use_cases import frete as frete_config
@@ -117,13 +119,7 @@ def finalizar_compra(db: Session, cliente: m.Cliente, dados: CheckoutEntrada) ->
     planejar_transferencias(db, pedido)
     sessao.confirmar(db, pedido)
 
-    # Ainda não há envio de e-mail: a confirmação fica registrada no log
-    log.info(
-        "Pedido %s confirmado para %s (%s, frete %s)",
-        pedido.numero,
-        cliente.email,
-        f"R$ {pedido.total:.2f}",
-        ROTULOS[dados.frete_tipo],
-    )
+    log.info("Pedido %s confirmado (%s, frete %s)", pedido.numero, f"R$ {pedido.total:.2f}", ROTULOS[dados.frete_tipo])
+    enviar_email(modelos_email.pedido_confirmado(cliente.email, cliente.nome, pedido.numero, pedido.total))
     sessao.descartar_cache(db)
     return pedido_repository.obter(db, pedido.id)

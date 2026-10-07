@@ -89,7 +89,7 @@ def test_pedido_em_andamento_impede_remover_e_o_historico_continua(client, admin
     # O pedido antigo continua com a peça, para o histórico e o financeiro
     depois = client.get(f"/api/pedidos/{pedido['id']}", headers=admin).json()
     assert depois["itens"][0]["variacao"]["produto"]["nome"] == "Camisa Removível"
-    assert numero in [p["numero"] for p in client.get("/api/clientes/101/pedidos", headers=mariana).json()]
+    assert numero in [p["numero"] for p in client.get("/api/clientes/15881399803/pedidos", headers=mariana).json()]
     # E a posição de estoque numa data passada ainda mostra a peça
     posicao = client.get(f"/api/estoque/posicao?data={date.today().isoformat()}&busca=Removível", headers=admin).json()
     assert posicao, "a posição em data reconstrói o passado, inclusive de produtos removidos"

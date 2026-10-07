@@ -23,7 +23,7 @@ class ExclusaoContaEntrada(Entrada):
 def conta_saida(cliente: m.Cliente) -> dict:
     """Dados que o próprio cliente vê e edita (nunca hashes nem controle de tentativas)."""
     return {
-        "id": cliente.id,
+        "id": cliente.cpf,
         "nome": cliente.nome,
         "email": cliente.email,
         "cpf": cliente.cpf,
