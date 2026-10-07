@@ -36,5 +36,8 @@ class Cliente(Base):
     cliente_desde: Mapped[date] = mapped_column(Date, server_default=func.current_date())
     loja_preferida_id: Mapped[int | None] = mapped_column(ForeignKey("lojas.id"))
     criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    # Conta excluída pelo próprio cliente: os dados pessoais são apagados e o histórico de
+    # pedidos e chamados fica anônimo (necessário para o financeiro e o fiscal)
+    excluido_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     loja_preferida: Mapped[Loja | None] = relationship(lazy="joined")

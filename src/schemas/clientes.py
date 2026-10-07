@@ -15,4 +15,5 @@ def cliente_saida(cliente: m.Cliente | None) -> dict | None:
         "cpf": cliente.cpf,
         "temConta": cliente.senha_hash is not None,
         "temPin": cliente.pin_hash is not None,
+        "excluido": cliente.excluido_em is not None,
     }
