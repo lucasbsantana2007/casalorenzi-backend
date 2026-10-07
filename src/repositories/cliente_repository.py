@@ -27,7 +27,7 @@ def por_cpf(db: Session, cpf: str) -> m.Cliente | None:
 
 
 def listar(db: Session, busca: str | None = None, limite: int = 50) -> list[m.Cliente]:
-    consulta = select(m.Cliente).order_by(m.Cliente.nome, m.Cliente.id).limit(limite)
+    consulta = select(m.Cliente).where(m.Cliente.excluido_em.is_(None)).order_by(m.Cliente.nome, m.Cliente.id).limit(limite)
     if busca and busca.strip():
         termo = f"%{busca.strip().lower()}%"
         consulta = consulta.where(or_(m.Cliente.nome.ilike(termo), m.Cliente.email.like(termo), m.Cliente.telefone.like(termo)))
@@ -96,3 +96,7 @@ def tokens_senha_pendentes(db: Session, *, usuario_id: int | None = None, client
     else:
         consulta = consulta.where(m.TokenSenha.cliente_id == cliente_id)
     return list(db.scalars(consulta))
+
+
+def tokens_pin_pendentes(db: Session, cliente_id: int) -> list[m.TokenPin]:
+    return list(db.scalars(select(m.TokenPin).where(m.TokenPin.cliente_id == cliente_id, m.TokenPin.usado_em.is_(None))))

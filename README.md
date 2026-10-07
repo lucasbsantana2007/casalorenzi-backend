@@ -123,6 +123,7 @@ Todas sob o prefixo `/api`. As rotas internas exigem `Authorization: Bearer <tok
 | POST | `/auth/login` · GET `/auth/me` | público · logado (equipe ou cliente) |
 | POST | `/auth/cadastro` (conta do cliente; já devolve a sessão), `/auth/esqueci-senha`, `/auth/redefinir-senha` | público |
 | GET | `/lojas` (com endereço, telefone, horários e `ativa`), `/categorias`, `/tipos-solicitacao` | público |
+| GET, PUT · PUT · POST | `/conta` · `/conta/senha` · `/conta/exclusao` (configurações da conta) | o próprio cliente |
 | GET | `/frete/condicoes` (valores e prazos, sem custo) | público |
 | GET, PUT | `/frete/config` · POST `/frete/simulacao` | administrador |
 | GET, POST | `/admin/funcionarios` · PUT `/admin/funcionarios/{id}` · PATCH `/admin/funcionarios/{id}/status` · POST `/admin/funcionarios/{id}/convite` | administrador |
@@ -156,6 +157,10 @@ Todas sob o prefixo `/api`. As rotas internas exigem `Authorization: Bearer <tok
   recebe 401). Preço e frete são sempre recalculados no servidor. O cliente só vê os próprios
   pedidos e chamados: o id de outro cliente responde 404. CPF ou e-mail já usados (inclusive por
   clientes antigos e pela equipe) dão 409; clientes antigos criam a senha por "Esqueceu a senha?".
+- **Configurações da conta:** o cliente vê e edita nome, e-mail e celular (o CPF não muda),
+  troca a senha e exclui a conta. Trocar o e-mail e excluir pedem a senha; senha errada responde
+  422. A exclusão apaga os dados pessoais (`excluido_em`), o token deixa de valer e os pedidos e
+  chamados ficam anônimos; CPF e e-mail ficam livres para uma conta nova.
 - **Esqueceu a senha:** link de uso único (30 minutos) para `/login/nova-senha?token=...`, que por
   enquanto sai no log da API; com `LINK_SENHA_NA_RESPOSTA=true` (só demonstração) ele volta na
   resposta. A resposta é a mesma exista ou não a conta.
