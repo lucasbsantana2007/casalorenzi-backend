@@ -32,6 +32,11 @@ services:
         sync: false
       - key: URL_FRONTEND
         sync: false
-      # Demonstração: sem envio de e-mail, o link de nova senha e de convite aparece na tela
+      # E-mails pelo Resend (README: "Configurando o Resend"); a chave o Render pede na criação
+      - key: RESEND_API_KEY
+        sync: false
+      - key: EMAIL_REMETENTE
+        value: Casa Lorenzi <nao-responda@mail.casalorenzi.site>
+      # Com o e-mail funcionando, o link de nova senha e de convite não volta na resposta
       - key: LINK_SENHA_NA_RESPOSTA
-        value: "true"
+        value: "false"

@@ -295,13 +295,13 @@ O arquivo `render.yaml` descreve tudo, então o Render cria os dois de uma vez:
    `https://SUA-API.onrender.com/api/health`.
 
 O `render.yaml` já define: `JWT_SECRET` aleatório (gerado pelo Render), `DATABASE_URL` do banco,
-`PYTHON_VERSION` e `LINK_SENHA_NA_RESPOSTA=true`. O link das fotos dos produtos usa sozinho o
-endereço público do serviço (`RENDER_EXTERNAL_URL`).
+`PYTHON_VERSION`, `EMAIL_REMETENTE` (domínio `mail.casalorenzi.site`, verificado no Resend) e
+`LINK_SENHA_NA_RESPOSTA=false`. Na criação, o Render pede também a `RESEND_API_KEY`. O link das
+fotos dos produtos usa sozinho o endereço público do serviço (`RENDER_EXTERNAL_URL`).
 
-Este primeiro deploy é uma **demonstração**: as contas usam a senha de demonstração, não há envio
-de e-mail (o conteúdo vai para o log do Render) e, por isso, os links de nova senha e de convite
-aparecem na tela. Antes de um uso real, troque as senhas, configure o Resend e defina
-`LINK_SENHA_NA_RESPOSTA=false`.
+Os e-mails (nova senha, convite e confirmação do pedido) saem de verdade pelo Resend; os links
+apontam para `URL_FRONTEND`. Os dados ainda são de **demonstração** (contas com a senha de
+demonstração): antes de um uso real, troque as senhas e, no frontend, defina `VITE_MODO_DEMO=false`.
 
 Para recarregar os dados de demonstração do banco do Render (apaga tudo), rode do seu computador
 com a "External Database URL" que o Render mostra na página do banco:
