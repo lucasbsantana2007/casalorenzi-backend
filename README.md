@@ -100,14 +100,17 @@ tests/            testes de API (pytest) num banco separado
 | Módulo | Tabelas |
 | --- | --- |
 | Núcleo | `lojas`, `usuarios` (só a equipe: ADMINISTRADOR, LOJISTA, OPERADOR) |
-| Clientes | `clientes` (e-mail único + PIN de 4 dígitos guardado só como hash), `tokens_pin` |
+| Clientes | `clientes` (CPF e e-mail únicos, senha só como hash; PIN legado), `tokens_senha`, `tokens_pin` |
 | Catálogo | `categorias`, `produtos` (com descrição, composição e cuidados), `variacoes` (SKU) |
 | Estoque | `estoques` (saldo por **loja + SKU**), `movimentacoes` (histórico com sinal), `transferencias` (com `pedido_id` quando atendem um pedido) |
 | Vendas | `pedidos` (com frete e endereço de entrega no e-commerce), `itens_pedido`, `eventos_pedido` (histórico), `pagamentos`, `devolucoes` |
 | Atendimento | `tipos_solicitacao`, `atendimentos` (sempre de um cliente), `mensagens`, `anexos` (foto) |
 
-**Cliente não tem login.** Ele se identifica por e-mail + PIN de 4 dígitos (criado no checkout) para ver
-pedidos e chamados. Só a equipe faz login (JWT).
+**Um login só para equipe e clientes.** O cliente cria a conta no checkout (nome, CPF, e-mail,
+telefone e senha) e entra pelo mesmo `POST /auth/login`; o token traz o papel `CLIENTE`, que só
+abre a área do cliente (nunca as rotas do painel). O `id` do cliente continua sendo o número da
+tabela `clientes`; o CPF é um campo à parte (11 dígitos, único, conferido pelos dígitos verificadores).
+O acesso por e-mail + PIN ("Meus pedidos") ficou como legado.
 
 ## Rotas
 
@@ -116,7 +119,8 @@ Todas sob o prefixo `/api`. As rotas internas exigem `Authorization: Bearer <tok
 
 | Método | Rota | Quem acessa |
 | --- | --- | --- |
-| POST | `/auth/login` · GET `/auth/me` | público · logado |
+| POST | `/auth/login` · GET `/auth/me` | público · logado (equipe ou cliente) |
+| POST | `/auth/cadastro` (conta do cliente; já devolve a sessão), `/auth/esqueci-senha`, `/auth/redefinir-senha` | público |
 | GET | `/lojas`, `/categorias`, `/tipos-solicitacao` | público |
 | GET | `/usuarios?papel=` | equipe |
 | GET | `/produtos?busca&categoria&ativo`, `/produtos/{id}` | público (vitrine) |
@@ -125,27 +129,32 @@ Todas sob o prefixo `/api`. As rotas internas exigem `Authorization: Bearer <tok
 | GET | `/estoque/posicao?data&lojaId&busca` | equipe |
 | GET, POST | `/movimentacoes` (filtros: `estoqueId&lojaId&tipo&de&ate&busca`) | equipe |
 | GET, POST | `/transferencias` · PATCH `/transferencias/{id}` (status) | administrador, operador |
-| POST | `/checkout` (compra sem conta; cria o PIN de "Meus pedidos") | público |
-| POST | `/meus-pedidos` (e-mail + PIN no corpo) | público |
+| POST | `/checkout` (o cliente vem do token) | cliente logado |
+| POST | `/meus-pedidos` (legado: e-mail + PIN no corpo) | público |
 | POST | `/meus-pedidos/esqueci-pin`, `/meus-pedidos/redefinir-pin` | público |
 | POST | `/meus-pedidos/solicitacoes/consulta`, `/meus-pedidos/solicitacoes`, `/meus-pedidos/solicitacoes/{id}/mensagens` | público (e-mail + PIN) |
 | GET | `/pedidos?status&lojaId&canal&busca`, `/pedidos/{id}` | equipe |
 | PATCH | `/pedidos/{id}` (loja de expedição ou status) | equipe |
 | GET | `/pedidos/{id}/pagamentos` | equipe |
 | POST | `/pedidos/{id}/devolucoes` · GET `/devolucoes?de&ate&lojaId` | equipe |
-| GET, POST | `/atendimentos` · GET, PATCH `/atendimentos/{id}` | administrador, lojista |
-| POST | `/atendimentos/{id}/mensagens` (aceita `anexo`) | administrador, lojista |
-| GET | `/clientes?busca`, `/clientes/{id}`, `/clientes/{id}/pedidos`, `/clientes/{id}/atendimentos` | administrador, lojista |
+| GET · GET, PATCH | `/atendimentos` · `/atendimentos/{id}` | administrador, lojista |
+| POST | `/atendimentos` (cliente: abre para si; equipe: em nome do cliente), `/atendimentos/{id}/mensagens` (aceita `anexo`) | administrador, lojista, cliente dono |
+| GET | `/clientes?busca` | administrador, lojista |
+| GET | `/clientes/{id}`, `/clientes/{id}/pedidos`, `/clientes/{id}/pedidos/{numero}`, `/clientes/{id}/atendimentos`, `/clientes/{id}/atendimentos/{aid}` | administrador, lojista, o próprio cliente |
 | GET | `/dashboard/resumo?lojaId` | equipe |
 | GET | `/financeiro/resumo?de&ate&comparar&agrupar&lojas&canais&categorias&generos` | administrador |
 
 ## Regras importantes
 
-- **Checkout e "Meus pedidos":** o cliente não tem conta. O e-mail + PIN de 4 dígitos criado no
-  checkout liberam os pedidos e chamados daquele e-mail (PIN só como hash; 5 erros seguidos
-  bloqueiam por 15 minutos). Preço e frete são sempre recalculados no servidor. As consultas são
-  POST para o PIN não ir na URL. "Esqueci o PIN" gera um link de uso único (30 minutos), que por
-  enquanto sai no log da API; com `PIN_LINK_NA_RESPOSTA=true` (só demonstração) ele volta na resposta.
+- **Conta do cliente e checkout:** só compra quem está logado com conta de cliente (conta da equipe
+  recebe 401). Preço e frete são sempre recalculados no servidor. O cliente só vê os próprios
+  pedidos e chamados: o id de outro cliente responde 404. CPF ou e-mail já usados (inclusive por
+  clientes antigos e pela equipe) dão 409; clientes antigos criam a senha por "Esqueceu a senha?".
+- **Esqueceu a senha:** link de uso único (30 minutos) para `/login/nova-senha?token=...`, que por
+  enquanto sai no log da API; com `LINK_SENHA_NA_RESPOSTA=true` (só demonstração) ele volta na
+  resposta. A resposta é a mesma exista ou não a conta.
+- **"Meus pedidos" (legado):** e-mail + PIN de 4 dígitos (só como hash; 5 erros seguidos bloqueiam
+  por 15 minutos), com `PIN_LINK_NA_RESPOSTA` para o link de "Esqueci o PIN".
 - **Expedição:** cada pedido sai da loja com mais peças da sacola em estoque (empate: a loja do mesmo
   estado do CEP). O que faltar nela vira transferência automática (`SOLICITADA`, ligada ao pedido).
   O envio (`PROCESSANDO → ENVIADO`, com código de rastreio) só é liberado com todas as peças na loja e
@@ -181,8 +190,8 @@ são relativas ao momento da carga. Sem `--recriar`, só popula se o banco estiv
 | Lojista | rafael.monteiro@casalorenzi.com.br | dashboard (só a própria loja), pedidos, estoque, atendimento |
 | Operador | diego.almeida@casalorenzi.com.br | dashboard, pedidos, estoque, transferências |
 
-A senha da equipe e o PIN dos clientes de demonstração estão em `src/database/seed/dados.py`
-(`SENHA_DEMO` e `PIN_DEMO`). Os clientes (ex.: mariana.costa@gmail.com) não têm senha, só PIN.
+A senha da equipe e dos clientes de demonstração e o PIN legado estão em `src/database/seed/dados.py`
+(`SENHA_DEMO` e `PIN_DEMO`). Clientes entram pelo mesmo login (ex.: mariana.costa@gmail.com, CPF 158.813.998-03).
 
 ## Migrações (Alembic)
 
@@ -222,6 +231,6 @@ Exemplo: `feat: registra devoluções com volta ao estoque`.
 
 ## Próximos passos
 
-- Enviar por e-mail o link de "Esqueci o PIN" (hoje sai no log da API).
+- Enviar por e-mail o link de "Esqueceu a senha?" (hoje sai no log da API).
 - Integração real de pagamento (hoje simulado: todo checkout é aprovado).
 - Deploy: Render (API + banco) e Vercel (frontend), como no Plano de Execução.

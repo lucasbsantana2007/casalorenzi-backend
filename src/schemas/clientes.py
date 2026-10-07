@@ -2,7 +2,7 @@ from src import models as m
 
 
 def cliente_saida(cliente: m.Cliente | None) -> dict | None:
-    """Nunca inclui o hash do PIN nem o controle de tentativas: só se o cliente já tem PIN."""
+    """Nunca inclui hash de senha ou PIN nem o controle de tentativas: só se o cliente tem conta e PIN."""
     if cliente is None:
         return None
     return {
@@ -12,5 +12,7 @@ def cliente_saida(cliente: m.Cliente | None) -> dict | None:
         "telefone": cliente.telefone,
         "clienteDesde": cliente.cliente_desde.isoformat() if cliente.cliente_desde else None,
         "lojaPreferidaId": cliente.loja_preferida_id,
+        "cpf": cliente.cpf,
+        "temConta": cliente.senha_hash is not None,
         "temPin": cliente.pin_hash is not None,
     }

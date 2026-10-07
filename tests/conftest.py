@@ -63,6 +63,29 @@ def operador(client):
     return _entrar(client, "diego.almeida@casalorenzi.com.br")
 
 
-# Cliente não tem login: os clientes de demonstração (ids 101 a 108, tabela clientes) são
-# usados pelos testes através das rotas da equipe (ex.: clienteId=101 ao abrir um chamado).
+# Clientes de demonstração: ids 101 a 108 (tabela clientes), com conta (CPF, e-mail e a senha de demonstração)
 CLIENTE_DEMO_ID = 101  # Mariana Costa
+CPF_NOVO = "52998224725"  # CPF válido que não está no seed
+
+
+@pytest.fixture
+def mariana(client):
+    return _entrar(client, "mariana.costa@gmail.com")
+
+
+@pytest.fixture
+def novo_cliente(client):
+    """Cria uma conta de cliente pelo cadastro do checkout: (headers, id)."""
+    r = client.post(
+        "/api/auth/cadastro",
+        json={
+            "nome": "Cliente Novo",
+            "cpf": "529.982.247-25",
+            "email": "novo.cliente@exemplo.com",
+            "telefone": "(11) 99999-0000",
+            "senha": "senha-forte",
+            "senhaConfirmacao": "senha-forte",
+        },
+    )
+    assert r.status_code == 201, r.text
+    return {"Authorization": f"Bearer {r.json()['token']}"}, r.json()["usuario"]["id"]

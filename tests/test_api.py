@@ -43,9 +43,12 @@ def test_permissoes_por_papel(client, lojista, operador):
     assert client.post("/api/produtos", headers=operador, json={}).status_code == 403
 
 
-def test_cliente_nao_tem_login(client):
-    r = client.post("/api/auth/login", json={"email": "mariana.costa@gmail.com", "senha": "lorenzi2026"})
-    assert r.status_code == 401
+def test_cliente_entra_no_mesmo_login_e_nao_acessa_o_painel(client, mariana):
+    eu = client.get("/api/auth/me", headers=mariana).json()
+    assert eu["papel"] == "CLIENTE" and eu["cpf"] == "15881399803"
+    assert client.get("/api/dashboard/resumo", headers=mariana).status_code == 401
+    assert client.get("/api/clientes", headers=mariana).status_code == 401
+    assert client.get("/api/atendimentos", headers=mariana).status_code == 401
 
 
 def test_lojista_ve_dashboard_so_da_propria_loja(client, lojista):

@@ -1,4 +1,4 @@
-"""Área "Meus pedidos" da loja: o cliente não tem login. E-mail + PIN de 4 dígitos (criado no
+"""Área "Meus pedidos" (legado, antes da conta do cliente com CPF e senha). E-mail + PIN de 4 dígitos (criado no
 checkout) liberam os pedidos e os chamados daquele e-mail (regras em src/entities/cliente.py).
 
 - O PIN só existe como hash (bcrypt). Erros seguidos bloqueiam o e-mail por 15 minutos; o

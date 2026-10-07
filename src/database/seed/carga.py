@@ -4,7 +4,8 @@ Uso:
     python -m src.database.seed            # só popula se o banco estiver vazio
     python -m src.database.seed --recriar  # apaga todos os dados e popula de novo
 
-Todas as contas da equipe usam a senha "lorenzi2026" e todos os clientes o PIN "1234".
+Todas as contas (equipe e clientes) usam a senha "lorenzi2026"; os clientes também têm o PIN "1234"
+(legado de "Meus pedidos").
 As datas são relativas ao momento da carga.
 """
 
@@ -80,15 +81,17 @@ def popular(db: Session) -> None:
     db.add_all(
         m.Cliente(
             id=i,
+            cpf=cpf,
             nome=n,
             email=e.lower(),
             telefone=tel,
+            senha_hash=senha,
             pin_hash=pin,
             tentativas_pin=0,
             cliente_desde=date.fromisoformat(desde),
             loja_preferida_id=loja,
         )
-        for i, n, e, tel, desde, loja in CLIENTES
+        for i, cpf, n, e, tel, desde, loja in CLIENTES
     )
     categoria_id = {nome: i for i, nome in enumerate(CATEGORIAS, start=1)}
     db.add_all(
@@ -250,7 +253,7 @@ def main() -> None:
         }
         contagens = ", ".join(f"{db.scalar(select(func.count()).select_from(t))} {nome}" for nome, t in resumo.items())
         print(f"Dados de demonstração carregados: {contagens}.")
-        print(f"Senha de todas as contas da equipe: {SENHA_DEMO} · PIN dos clientes: {PIN_DEMO}")
+        print(f"Senha de todas as contas (equipe e clientes): {SENHA_DEMO} · PIN legado dos clientes: {PIN_DEMO}")
 
 
 if __name__ == "__main__":

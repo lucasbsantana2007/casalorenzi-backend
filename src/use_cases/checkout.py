@@ -1,5 +1,6 @@
-"""Checkout da loja: compra sem conta. O e-mail identifica o cliente e o PIN criado aqui libera
-"Meus pedidos". Já comprou antes? Usa o mesmo PIN.
+"""Checkout da loja: o cliente compra logado na própria conta (criada no checkout, com CPF,
+e-mail e senha, em POST /auth/cadastro). O cliente vem do token; o corpo só traz entrega,
+pagamento e itens.
 
 Numa única transação: confere os dados, recalcula preços e frete no servidor (nada de valor
 vem do navegador), escolhe a loja de expedição, grava pedido, itens e pagamento (aprovado:
@@ -13,18 +14,15 @@ from decimal import Decimal
 from sqlalchemy.orm import Session
 
 from src import models as m
-from src.entities.cliente import email_valido, normalizar_email
 from src.entities.frete import ROTULOS, opcao_de_frete, somente_digitos
 from src.entities.pagamento import METODOS_ECOMMERCE, PARCELAS_MAX
 from src.entities.pedido import proximo_numero
-from src.repositories import cliente_repository, estoque_repository, pedido_repository, produto_repository, sessao
+from src.repositories import estoque_repository, pedido_repository, produto_repository, sessao
 from src.schemas.pedidos import CheckoutEntrada
 from src.use_cases import pagamentos
-from src.use_cases.meus_pedidos import conferir_pin, texto_do_pin, validar_novo_pin
 from src.use_cases.pedidos import escolher_loja_expedicao, planejar_transferencias, registrar_evento
 from src.utils.datas import agora
-from src.utils.erros import Conflito, DadosInvalidos, MuitasTentativas
-from src.utils.seguranca import gerar_hash
+from src.utils.erros import Conflito, DadosInvalidos
 
 log = logging.getLogger("casalorenzi")
 
@@ -40,29 +38,6 @@ def _texto(valor: str | None, maximo: int, mensagem_tamanho: str) -> str:
     if len(texto) > maximo:
         raise DadosInvalidos(mensagem_tamanho)
     return texto
-
-
-def _cliente(db: Session, dados: CheckoutEntrada, email: str) -> m.Cliente:
-    """Cliente do e-mail (criado se for a primeira compra). Quem já tem PIN precisa usar o mesmo."""
-    pin = validar_novo_pin(dados.pin, dados.pin_confirmacao)
-    cliente = cliente_repository.por_email(db, email, travar=True)
-    if cliente is None:
-        return cliente_repository.criar(
-            db, nome=dados.nome, email=email, telefone=_texto(dados.telefone, 30, "Telefone inválido."), pin_hash=gerar_hash(pin)
-        )
-    if cliente.pin_hash is None:
-        # Cliente antigo (loja física ou migrado) ainda sem PIN: o checkout cria
-        cliente.pin_hash = gerar_hash(pin)
-    else:
-        try:
-            confere = conferir_pin(db, cliente, texto_do_pin(pin))
-        except MuitasTentativas:
-            raise MuitasTentativas("Muitas tentativas com um PIN incorreto. Tente de novo em 15 minutos.") from None
-        if not confere:
-            raise Conflito("Este e-mail já tem um PIN. Use o mesmo PIN das suas compras anteriores.")
-    if not cliente.telefone and dados.telefone:
-        cliente.telefone = _texto(dados.telefone, 30, "Telefone inválido.")
-    return cliente
 
 
 def _itens(db: Session, dados: CheckoutEntrada) -> list[tuple[m.Variacao, int, Decimal]]:
@@ -89,17 +64,7 @@ def _itens(db: Session, dados: CheckoutEntrada) -> list[tuple[m.Variacao, int, D
     return itens
 
 
-def finalizar_compra(db: Session, dados: CheckoutEntrada) -> m.Pedido:
-    email = normalizar_email(dados.email)
-    if not email_valido(email):
-        raise DadosInvalidos("Informe um e-mail válido.")
-    if email != normalizar_email(dados.email_confirmacao):
-        raise DadosInvalidos("Os e-mails não conferem.")
-    nome = _texto(dados.nome, 120, "O nome deve ter no máximo 120 caracteres.")
-    if not nome:
-        raise DadosInvalidos("Informe o nome completo.")
-    dados.nome = nome
-
+def finalizar_compra(db: Session, cliente: m.Cliente, dados: CheckoutEntrada) -> m.Pedido:
     endereco = dados.endereco
     cep = somente_digitos(endereco.cep)
     uf = endereco.uf.strip().upper()
@@ -107,7 +72,6 @@ def finalizar_compra(db: Session, dados: CheckoutEntrada) -> m.Pedido:
     if len(cep) != 8 or len(uf) != 2 or any(not campos[campo] for campo, _, obrigatorio in _ENDERECO if obrigatorio):
         raise DadosInvalidos("Preencha o endereço de entrega completo.")
 
-    cliente = _cliente(db, dados, email)
     itens = _itens(db, dados)
 
     subtotal = sum((preco * quantidade for _, quantidade, preco in itens), Decimal("0"))
@@ -152,7 +116,11 @@ def finalizar_compra(db: Session, dados: CheckoutEntrada) -> m.Pedido:
 
     # Ainda não há envio de e-mail: a confirmação fica registrada no log
     log.info(
-        "Pedido %s confirmado para %s (%s, frete %s)", pedido.numero, email, f"R$ {pedido.total:.2f}", ROTULOS[dados.frete_tipo]
+        "Pedido %s confirmado para %s (%s, frete %s)",
+        pedido.numero,
+        cliente.email,
+        f"R$ {pedido.total:.2f}",
+        ROTULOS[dados.frete_tipo],
     )
     sessao.descartar_cache(db)
     return pedido_repository.obter(db, pedido.id)

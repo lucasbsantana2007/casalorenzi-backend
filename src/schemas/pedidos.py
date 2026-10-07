@@ -32,13 +32,8 @@ class ItemCheckoutEntrada(Entrada):
 
 
 class CheckoutEntrada(Entrada):
-    email: str = ""
-    email_confirmacao: str = ""
-    # Texto ou número: "0123" é um PIN válido
-    pin: str | int | None = None
-    pin_confirmacao: str | int | None = None
-    nome: str = ""
-    telefone: str = ""
+    """O cliente vem do token (conta criada no próprio checkout): nada de identificação no corpo."""
+
     endereco: EnderecoEntrada = EnderecoEntrada()
     frete_tipo: Literal["PADRAO", "EXPRESSO"] = "PADRAO"
     pagamento: PagamentoCheckoutEntrada = PagamentoCheckoutEntrada()

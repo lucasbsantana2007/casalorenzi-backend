@@ -337,7 +337,7 @@ def montar_pedidos(relogio: Relogio, variacoes: list[dict]) -> list[dict]:
                 id=i + 1,
                 numero=f"CL-{104820 + i * 7}",
                 cliente_id=cliente[0],
-                loja_id=cliente[5] if canal == "Loja física" else 1,
+                loja_id=cliente[6] if canal == "Loja física" else 1,
                 canal=canal,
                 status=status,
                 criado=criado,
@@ -395,7 +395,7 @@ def montar_atendimentos(relogio: Relogio, pedidos: list[dict], variacoes: list[d
                 tipo_id=roteiro["tipo"],
                 status=roteiro["status"],
                 pedido_id=pedido["id"] if pedido else None,
-                loja_id=pedido["loja_id"] if pedido else cliente[5],
+                loja_id=pedido["loja_id"] if pedido else cliente[6],
                 criado=criado,
                 atualizado=ultima,
             )

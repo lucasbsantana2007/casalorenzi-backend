@@ -1,8 +1,8 @@
 """Atendimento: chamados dos clientes. A equipe (administrador e lojista) trata pelo painel.
 
-O cliente não tem login: a equipe abre chamados em nome dele (`abrir`) e as funções
-`abrir_para_cliente` e `responder_como_cliente` ficam disponíveis para o fluxo público
-de "Meus pedidos" (e-mail + PIN), que já chega com o cliente identificado.
+O cliente logado (conta com CPF) abre e responde os próprios chamados (`abrir_para_cliente`,
+`responder_como_cliente`); a equipe também abre em nome dele (`abrir`). O fluxo legado de
+"Meus pedidos" (e-mail + PIN) usa as mesmas funções, já com o cliente identificado.
 """
 
 import uuid
@@ -144,7 +144,7 @@ def abrir(
     descricao: str,
     anexo: AnexoEntrada | None = None,
 ) -> m.Atendimento:
-    """A equipe de atendimento abre o chamado para um cliente (cliente não tem login)."""
+    """A equipe de atendimento abre o chamado para um cliente ."""
     cliente = cliente_repository.por_id(db, cliente_id) if cliente_id else None
     if cliente is None:
         raise DadosInvalidos("Informe um cliente válido.")
@@ -206,7 +206,7 @@ def enviar_mensagem(
 def responder_como_cliente(
     db: Session, atendimento_id: int, cliente: m.Cliente, conteudo: str, anexo: AnexoEntrada | None = None
 ) -> m.Atendimento:
-    """Resposta do cliente já identificado (e-mail + PIN). Chamado de outro cliente aparece como inexistente."""
+    """Resposta do cliente identificado (conta ou e-mail + PIN). Chamado de outro cliente aparece como inexistente."""
     atendimento = atendimento_repository.obter(db, atendimento_id)
     if atendimento is None or atendimento.cliente_id != cliente.id:
         raise NaoEncontrado("Solicitação não encontrada.")
