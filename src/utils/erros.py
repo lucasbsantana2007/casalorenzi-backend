@@ -32,7 +32,7 @@ class Conflito(ErroDeNegocio):
 
 
 class Expirado(ErroDeNegocio):
-    """O recurso existiu, mas não vale mais (ex.: link de troca de PIN vencido)."""
+    """O recurso existiu, mas não vale mais (ex.: link de troca de senha vencido)."""
 
     status_code = 410
 
