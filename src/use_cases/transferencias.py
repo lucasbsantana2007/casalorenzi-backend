@@ -60,8 +60,11 @@ def criar(
     observacao: str,
     usuario_id: int,
 ) -> m.Transferencia:
-    if not variacao_id or produto_repository.variacao(db, variacao_id) is None:
+    variacao = produto_repository.variacao(db, variacao_id) if variacao_id else None
+    if variacao is None:
         raise DadosInvalidos("Selecione o item a transferir.")
+    if variacao.produto.removido_em is not None:
+        raise Conflito("Este produto foi removido do catálogo.")
     if loja_origem_id == loja_destino_id:
         raise DadosInvalidos("A loja de destino deve ser diferente da origem.")
     origem = estoque_repository.por_loja_e_variacao(db, loja_origem_id, variacao_id)

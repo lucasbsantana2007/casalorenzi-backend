@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+from datetime import datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Boolean, CheckConstraint, ForeignKey, Numeric, String, Text
+from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Numeric, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.database.connection import Base
@@ -35,6 +36,9 @@ class Produto(Base):
     descricao: Mapped[str | None] = mapped_column(Text)
     composicao: Mapped[str | None] = mapped_column(Text)
     cuidados: Mapped[str | None] = mapped_column(Text)
+    # Removido do catálogo pelo Administrador: some da loja, do painel e do estoque, mas continua
+    # no banco porque pedidos, vendas e movimentações antigos apontam para as variações dele
+    removido_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     categoria: Mapped[Categoria] = relationship(lazy="joined")
     variacoes: Mapped[list[Variacao]] = relationship(back_populates="produto", order_by="Variacao.id")
