@@ -34,6 +34,13 @@ def totais_de_estoque(db: Session, produtos: list[m.Produto]) -> dict[int, int]:
     return estoque_repository.totais_por_variacao(db, [v.id for p in produtos for v in p.variacoes])
 
 
+def disponiveis_para_venda(db: Session, produtos: list[m.Produto]) -> dict[int, int]:
+    """O que a vitrine ainda pode vender de cada variação (desconta pedidos não enviados)."""
+    from src.use_cases.pedidos import disponiveis_na_rede  # evita import circular (pedidos usa estoque)
+
+    return disponiveis_na_rede(db, [v.id for p in produtos for v in p.variacoes])
+
+
 def imagem(db: Session, produto_id: int) -> m.ImagemProduto:
     produto = obter(db, produto_id)
     if produto.imagem is None:

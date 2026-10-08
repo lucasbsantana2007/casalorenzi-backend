@@ -17,7 +17,9 @@ def _ve_custo(sessao: Sessao | None) -> bool:
 
 
 def _saida(db: Session, produto: m.Produto, com_custo: bool) -> dict:
-    return produto_saida(produto, produtos.totais_de_estoque(db, [produto]), com_custo)
+    return produto_saida(
+        produto, produtos.totais_de_estoque(db, [produto]), com_custo, produtos.disponiveis_para_venda(db, [produto])
+    )
 
 
 @router.get("")
@@ -28,11 +30,13 @@ def listar(
     db: Session = Depends(get_db),
     sessao: Sessao | None = Depends(sessao_opcional),
 ):
-    """Pública: alimenta também a vitrine da loja. precoCusto das variações só para o Administrador."""
+    """Pública: alimenta também a vitrine da loja. estoqueTotal é o físico; disponivel desconta as peças
+    reservadas por pedidos ainda não enviados. precoCusto das variações só para o Administrador."""
     lista = produtos.listar(db, busca, categoria, ativo)
     totais = produtos.totais_de_estoque(db, lista)
+    disponiveis = produtos.disponiveis_para_venda(db, lista)
     com_custo = _ve_custo(sessao)
-    return [produto_saida(p, totais, com_custo) for p in lista]
+    return [produto_saida(p, totais, com_custo, disponiveis) for p in lista]
 
 
 @router.get("/{produto_id}")
