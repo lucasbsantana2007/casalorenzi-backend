@@ -206,8 +206,15 @@ Todas sob o prefixo `/api`. As rotas internas exigem `Authorization: Bearer <tok
 - **Foto do produto:** JPG, PNG ou WebP de até 2 MB (conferida pelo conteúdo), guardada em
   `imagens_produto` e servida em `/api/produtos/{id}/imagem`. `imagemUrl` é um link absoluto
   (defina `URL_PUBLICA_API` atrás de um proxy); trocar para S3 depois muda só onde o arquivo fica.
-- **Expedição:** cada pedido sai da loja com mais peças da sacola em estoque (empate: a loja do mesmo
-  estado do CEP). O que faltar nela vira transferência automática (`SOLICITADA`, ligada ao pedido).
+- **Reserva no checkout:** a peça vendida fica prometida desde a compra, embora só saia do estoque no
+  envio. O disponível para venda é, por loja, o saldo + o que está a caminho dela (transferências) −
+  as peças de pedidos ainda não enviados que ela expede − as transferências solicitadas que vão sair
+  dela. Somado nas lojas ativas, é o `disponivel` da vitrine (o `estoqueTotal` segue sendo o físico).
+  O checkout trava os saldos das peças da sacola (`SELECT ... FOR UPDATE`): duas compras da última
+  peça ao mesmo tempo passam uma de cada vez, e a segunda recebe 409 ("esgotou").
+- **Expedição:** cada pedido sai da loja com mais peças da sacola livres (empate: a loja do mesmo
+  estado do CEP). O que faltar nela vira transferência automática (`SOLICITADA`, ligada ao pedido),
+  só de peças livres: uma peça prometida a outro pedido não é puxada de novo.
   O envio (`PROCESSANDO → ENVIADO`, com código de rastreio) só é liberado com todas as peças na loja e
   baixa o estoque (`VENDA`). Cancelar (`PROCESSANDO → CANCELADO`) estorna o pagamento e cancela as
   transferências ainda não enviadas.

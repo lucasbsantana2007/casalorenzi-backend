@@ -66,13 +66,17 @@ def variacao_saida(variacao: m.Variacao) -> dict:
     return {**variacao_base(variacao), "produto": produto_resumo(variacao.produto)}
 
 
-def produto_saida(produto: m.Produto, totais: dict[int, int], com_custo: bool = False) -> dict:
-    """totais: estoque somado de todas as lojas por variação (a vitrine não vê o estoque por loja).
+def produto_saida(
+    produto: m.Produto, totais: dict[int, int], com_custo: bool = False, disponiveis: dict[int, int] | None = None
+) -> dict:
+    """totais: estoque físico somado de todas as lojas por variação (a vitrine não vê o estoque por loja).
+    disponiveis: o que ainda pode ser vendido (desconta pedidos não enviados); a vitrine usa este.
     com_custo: só para o Administrador (preço de custo de cada variação)."""
     variacoes = [
         {
             **variacao_base(v),
             "estoqueTotal": totais.get(v.id, 0),
+            "disponivel": (disponiveis if disponiveis is not None else totais).get(v.id, 0),
             **({"precoCusto": float(v.preco_custo) if v.preco_custo is not None else None} if com_custo else {}),
         }
         for v in produto.variacoes
@@ -91,4 +95,5 @@ def produto_saida(produto: m.Produto, totais: dict[int, int], com_custo: bool = 
         "imagemUrl": imagem_url(produto),
         "variacoes": variacoes,
         "estoqueTotal": sum(v["estoqueTotal"] for v in variacoes),
+        "disponivel": sum(v["disponivel"] for v in variacoes),
     }

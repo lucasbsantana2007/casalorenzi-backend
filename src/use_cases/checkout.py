@@ -5,7 +5,8 @@ pagamento e itens.
 Numa única transação: confere os dados, recalcula preços e frete no servidor (nada de valor
 vem do navegador), escolhe a loja de expedição, grava pedido, itens e pagamento (aprovado:
 pagamento simulado na demonstração) e cria as transferências das peças que faltam na loja.
-As peças só saem do estoque no envio (painel de pedidos).
+As peças só saem do estoque no envio (painel de pedidos), mas ficam reservadas desde a compra:
+o disponível para venda desconta os pedidos ainda não enviados.
 """
 
 import logging
@@ -23,7 +24,7 @@ from src.repositories import estoque_repository, pedido_repository, produto_repo
 from src.schemas.pedidos import CheckoutEntrada
 from src.use_cases import frete as frete_config
 from src.use_cases import pagamentos
-from src.use_cases.pedidos import escolher_loja_expedicao, planejar_transferencias, registrar_evento
+from src.use_cases.pedidos import disponiveis_na_rede, escolher_loja_expedicao, planejar_transferencias, registrar_evento
 from src.utils.datas import agora
 from src.utils.erros import Conflito, DadosInvalidos
 
@@ -58,7 +59,10 @@ def _itens(db: Session, dados: CheckoutEntrada) -> list[tuple[m.Variacao, int, D
             raise DadosInvalidos(f"A quantidade de cada item deve ficar entre 1 e {QUANTIDADE_MAX}.")
         pedido_por_variacao[variacao.id] = pedido_por_variacao.get(variacao.id, 0) + item.quantidade
         itens.append((variacao, item.quantidade, variacao.produto.preco_base))
-    disponivel = estoque_repository.totais_por_variacao(db, list(pedido_por_variacao))
+    # Trava os saldos dessas peças até o fim da compra: com duas compras simultâneas da última peça,
+    # a segunda espera a primeira terminar e já a enxerga como prometida
+    estoque_repository.travar_variacoes(db, sorted(pedido_por_variacao))
+    disponivel = disponiveis_na_rede(db, list(pedido_por_variacao))
     for variacao, _, _ in itens:
         if disponivel.get(variacao.id, 0) < pedido_por_variacao[variacao.id]:
             raise Conflito(

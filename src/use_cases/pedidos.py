@@ -54,13 +54,25 @@ def saldo_na_loja(db: Session, loja_id: int, variacao_id: int) -> int:
     return estoque.quantidade if estoque else 0
 
 
+def disponiveis_na_rede(db: Session, variacao_ids: list[int]) -> dict[int, int]:
+    """Quanto de cada peça ainda pode ser vendido: o saldo livre (estoque_repository.livres_por_loja)
+    somado nas lojas ativas. Peça prometida a um pedido não enviado não conta de novo."""
+    ativas = {loja.id for loja in cadastro_repository.lojas(db, somente_ativas=True)}
+    totais: dict[int, int] = {}
+    for (loja_id, variacao_id), livre in estoque_repository.livres_por_loja(db, variacao_ids).items():
+        if loja_id in ativas:
+            totais[variacao_id] = totais.get(variacao_id, 0) + livre
+    return {variacao_id: max(total, 0) for variacao_id, total in totais.items()}
+
+
 def escolher_loja_expedicao(db: Session, itens: list[tuple[int, int]], cep: str) -> m.Loja:
-    """Loja que tem mais itens da sacola em estoque; empate → mesma UF do CEP; depois, a de menor id.
-    itens: (variacao_id, quantidade)."""
+    """Loja que tem mais itens da sacola livres (não prometidos a outro pedido); empate → mesma UF do
+    CEP; depois, a de menor id. itens: (variacao_id, quantidade)."""
     uf = uf_do_cep(cep)
+    livres = estoque_repository.livres_por_loja(db, [variacao_id for variacao_id, _ in itens])
 
     def pontos(loja: m.Loja) -> int:
-        cobertos = sum(1 for variacao_id, quantidade in itens if saldo_na_loja(db, loja.id, variacao_id) >= quantidade)
+        cobertos = sum(1 for variacao_id, quantidade in itens if livres.get((loja.id, variacao_id), 0) >= quantidade)
         return pontuar_loja(cobertos, loja.uf == uf)
 
     lojas = cadastro_repository.lojas(db, somente_ativas=True)  # loja desativada não despacha
@@ -71,22 +83,31 @@ def escolher_loja_expedicao(db: Session, itens: list[tuple[int, int]], cep: str)
 
 def planejar_transferencias(db: Session, pedido: m.Pedido) -> list[m.Transferencia]:
     """Transferências das outras lojas para a de expedição, para cada peça que falta nela (sem confirmar).
-    Pega primeiro das lojas com mais saldo."""
+    Usa só o saldo livre: peça já prometida a outro pedido não é puxada de novo. Pega primeiro das
+    lojas com mais saldo livre."""
     criadas = []
+    usado_no_destino: dict[int, int] = {}  # mesma peça em dois itens do pedido
     for item in pedido.itens:
-        falta = item.quantidade - saldo_na_loja(db, pedido.loja_id, item.variacao_id)
+        # Recalcula a cada item: as transferências criadas acima já contam como "a caminho"
+        livres = estoque_repository.livres_por_loja(db, [item.variacao_id], excluir_pedido_id=pedido.id)
+        no_destino = livres.get((pedido.loja_id, item.variacao_id), 0) - usado_no_destino.get(item.variacao_id, 0)
+        usado_no_destino[item.variacao_id] = usado_no_destino.get(item.variacao_id, 0) + item.quantidade
+        falta = item.quantidade - max(no_destino, 0)
         doadoras = sorted(
             (
-                e
+                (e, livres.get((e.loja_id, item.variacao_id), 0))
                 for e in estoque_repository.da_variacao(db, item.variacao_id)
-                if e.loja_id != pedido.loja_id and e.quantidade > 0 and e.loja.ativa
+                if e.loja_id != pedido.loja_id and e.loja.ativa
             ),
-            key=lambda e: (-e.quantidade, e.loja_id),
+            key=lambda par: (-par[1], par[0].loja_id),
         )
-        for estoque in doadoras:
+        for estoque, livre in doadoras:
             if falta <= 0:
                 break
-            quantidade = min(falta, estoque.quantidade)
+            # Só sai da loja o que está nela agora e não está prometido
+            quantidade = min(falta, livre, estoque.quantidade)
+            if quantidade <= 0:
+                continue
             t = transferencias.nova(
                 db,
                 variacao_id=item.variacao_id,
@@ -162,6 +183,7 @@ def _trocar_loja(db: Session, pedido: m.Pedido, loja_id: int, usuario: m.Usuario
     if not loja.ativa:
         raise DadosInvalidos("Esta loja está desativada e não expede pedidos.")
     anterior = pedido.loja.nome
+    estoque_repository.travar_variacoes(db, sorted({item.variacao_id for item in pedido.itens}))
     _cancelar_transferencias_pendentes(pedido)
     pedido.loja_id = loja.id
     sessao.gerar_ids(db)
