@@ -25,7 +25,7 @@ DATABASE_URL = os.getenv("DATABASE_URL", "postgresql+psycopg://postgres:postgres
 
 # Chave usada para assinar os tokens JWT. Troque em produção.
 JWT_SECRET = os.getenv("JWT_SECRET", "dev-somente-local-troque-esta-chave-em-producao")
-JWT_EXPIRA_HORAS = int(os.getenv("JWT_EXPIRA_HORAS", "12"))
+JWT_EXPIRA_HORAS = int(os.getenv("JWT_EXPIRA_HORAS", "2"))
 
 CORS_ORIGINS = _origens(os.getenv("CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173"))
 
