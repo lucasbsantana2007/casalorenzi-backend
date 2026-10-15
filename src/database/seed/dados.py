@@ -82,6 +82,10 @@ CLIENTES = [
     (108, "97880932054", "Thiago Ribeiro", "thiago.ribeiro@gmail.com", "(41) 99107-8834", "2023-09-12", 4),
 ]
 
+# Saldo Vulto+ de demonstração (id do cliente → pontos), para testar o resgate no checkout:
+# Mariana tem R$ 600 em pontos; Ricardo, R$ 150; Luiza, menos do que o resgate mínimo de 100 pontos
+PONTOS_VULTO_MAIS = {101: 12000, 102: 3000, 105: 80}
+
 # As variações são tamanhos × cores. genero/estacao alimentam a vitrine.
 PRODUTOS = [
     dict(

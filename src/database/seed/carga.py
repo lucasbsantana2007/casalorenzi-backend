@@ -23,6 +23,7 @@ from src.database.seed.dados import (
     CUSTO_DEMO,
     DETALHES_PRODUTOS,
     LOJAS,
+    PONTOS_VULTO_MAIS,
     PRODUTOS,
     SENHA_DEMO,
     TIPOS_SOLICITACAO,
@@ -118,6 +119,13 @@ def popular(db: Session) -> None:
             loja_preferida_id=loja,
         )
         for i, cpf, n, e, tel, desde, loja in CLIENTES
+    )
+    db.flush()
+    db.add_all(
+        m.MovimentoPontos(
+            cliente_id=i, tipo="SALDO_INICIAL", quantidade=pontos, saldo_resultante=pontos, obs="Saldo Vulto+ de demonstração"
+        )
+        for i, pontos in PONTOS_VULTO_MAIS.items()
     )
     categoria_id = {nome: i for i, nome in enumerate(CATEGORIAS, start=1)}
     db.add_all(
