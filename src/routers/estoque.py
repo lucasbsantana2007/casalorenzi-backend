@@ -8,9 +8,7 @@ from sqlalchemy.orm import Session
 from src import models as m
 from src.database.connection import get_db
 from src.middlewares.autenticacao import exigir_modulo
-from src.schemas.comum import loja_saida
 from src.schemas.estoque import MovimentacaoEntrada, estoque_saida, movimentacao_saida
-from src.schemas.produtos import produto_resumo
 from src.use_cases import estoque
 
 router = APIRouter(tags=["Estoque"])
@@ -36,30 +34,12 @@ def posicao_em_data(
     data: str | None = None,
     lojaId: int | None = None,
     busca: str | None = None,
-    marca: Literal["LORENZI", "VULTO"] | None = None,
-    agrupar: Literal["item", "produto"] = "item",
     db: Session = Depends(get_db),
     _: m.Usuario = Depends(acesso),
 ):
-    """Saldo de cada item (loja × variação) ao final do dia informado (aaaa-mm-dd): "quanto tinha na loja X
-    há duas semanas". `agrupar=produto` soma as variações de cada produto por loja. `marca` separa a Casa
-    Lorenzi da Vulto (na Vulto, o histórico antes da contagem de set/26 é reconstruído)."""
-    itens = estoque.posicao_em_data(db, data, lojaId, busca, marca)
-    if agrupar == "item":
-        return {"data": data, "itens": [{**estoque_saida(e), "quantidadeNaData": saldo} for e, saldo in itens]}
-    por_produto: dict[tuple[int, int], dict] = {}
-    for e, saldo in itens:
-        chave = (e.loja_id, e.variacao.produto_id)
-        if chave not in por_produto:
-            por_produto[chave] = {
-                "loja": loja_saida(e.loja),
-                "produto": produto_resumo(e.variacao.produto),
-                "variacoes": 0,
-                "quantidadeNaData": 0,
-            }
-        por_produto[chave]["variacoes"] += 1
-        por_produto[chave]["quantidadeNaData"] += saldo
-    return {"data": data, "agrupar": "produto", "itens": list(por_produto.values())}
+    """Saldo de cada item ao final do dia informado (aaaa-mm-dd)."""
+    itens = estoque.posicao_em_data(db, data, lojaId, busca)
+    return {"data": data, "itens": [{**estoque_saida(e), "quantidadeNaData": saldo} for e, saldo in itens]}
 
 
 @router.get("/estoque/{estoque_id}")

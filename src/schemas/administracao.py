@@ -24,10 +24,6 @@ class LojaEntrada(Entrada):
     telefone: str = ""
     horarios: list[str] = Field(default_factory=list)
     ativa: bool = True
-    # Opcionais: sem eles, a loja nova é LORENZI/FISICA e a edição mantém os atuais.
-    # A marca não muda depois do cadastro (o estoque da loja é de produtos da marca).
-    marca: str | None = None
-    tipo: str | None = None
 
 
 def funcionario_saida(usuario: m.Usuario) -> dict:

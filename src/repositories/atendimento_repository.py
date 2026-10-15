@@ -16,14 +16,8 @@ def listar(
     loja_id: int | None = None,
     responsavel_id: int | None = None,
     sem_responsavel: bool = False,
-    marca: str | None = None,
-    canal: str | None = None,
 ) -> list[m.Atendimento]:
     consulta = select(m.Atendimento).order_by(m.Atendimento.atualizado_em.desc(), m.Atendimento.id)
-    if marca:
-        consulta = consulta.join(m.Loja, m.Loja.id == m.Atendimento.loja_id).where(m.Loja.marca == marca)
-    if canal:
-        consulta = consulta.where(m.Atendimento.canal == canal)
     if tipo_solicitacao_id:
         consulta = consulta.where(m.Atendimento.tipo_solicitacao_id == tipo_solicitacao_id)
     if loja_id:
@@ -54,23 +48,6 @@ def do_cliente(db: Session, cliente_id: int) -> list[m.Atendimento]:
         db.scalars(
             select(m.Atendimento)
             .where(m.Atendimento.cliente_id == cliente_id)
-            .order_by(m.Atendimento.criado_em.desc(), m.Atendimento.id)
-        )
-    )
-
-
-def da_mesma_pessoa(db: Session, atendimento: m.Atendimento) -> list[m.Atendimento]:
-    """Os outros atendimentos do mesmo cliente ou, sem cliente, do mesmo contato. Mais recentes primeiro."""
-    if atendimento.cliente_id is not None:
-        mesma = m.Atendimento.cliente_id == atendimento.cliente_id
-    elif atendimento.contato:
-        mesma = m.Atendimento.contato == atendimento.contato
-    else:
-        return []
-    return list(
-        db.scalars(
-            select(m.Atendimento)
-            .where(mesma, m.Atendimento.id != atendimento.id)
             .order_by(m.Atendimento.criado_em.desc(), m.Atendimento.id)
         )
     )
