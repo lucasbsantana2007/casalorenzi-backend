@@ -117,7 +117,7 @@ Nunca coloque a chave no git; no deploy (Render), cadastre as mesmas variáveis 
 | Clientes | `clientes` (CPF e e-mail únicos, e-mail opcional para clientes vindos da Vulto, pelo menos um de CPF/e-mail/telefone, consentimento de marketing; senha só como hash), `tokens_senha` |
 | Catálogo | `categorias`, `produtos` (com descrição, composição, cuidados, `marca` e `colecao`), `variacoes` (SKU, com `preco_custo` = último custo, `custo_medio` = média ponderada das notas, `ean` e `ativa`), `sku_alias` (outras grafias do SKU, com vigência), `imagens_produto` (foto enviada no cadastro) |
 | Estoque | `estoques` (saldo por **loja + SKU**), `movimentacoes` (histórico com sinal), `transferencias` (com `pedido_id` quando atendem um pedido) |
-| Vendas | `pedidos` (com frete e endereço de entrega no e-commerce), `itens_pedido`, `eventos_pedido` (histórico), `pagamentos`, `devolucoes` |
+| Vendas | `pedidos` (com frete e endereço de entrega no e-commerce, `desconto`, `tipo` VENDA/TROCA e `pedido_externo`; cliente opcional nas vendas da Vulto sem cliente), `itens_pedido`, `eventos_pedido` (histórico), `pagamentos`, `devolucoes` (devolução da Vulto sem venda de origem: só a `variacao_id`) |
 | Atendimento | `tipos_solicitacao`, `atendimentos` (sempre de um cliente), `mensagens`, `anexos` (foto) |
 | Administração | `config_frete` e `frete_regioes` (frete configurável), `log_acoes` (quem fez o quê) |
 | Vulto+ | `contas_pontos` (saldo e categoria por cliente), `movimentos_pontos` (extrato com sinal e validade) |
@@ -163,7 +163,8 @@ Todas sob o prefixo `/api`. As rotas internas exigem `Authorization: Bearer <tok
 | GET, POST | `/movimentacoes` (filtros: `estoqueId&lojaId&tipo&de&ate&busca`) | equipe |
 | GET, POST | `/transferencias` · PATCH `/transferencias/{id}` (status) | administrador, operador |
 | POST | `/checkout` (o cliente vem do token) | cliente logado |
-| GET | `/pedidos?status&lojaId&canal&busca`, `/pedidos/{id}` | equipe |
+| GET | `/pedidos?status&lojaId&canal&busca&marca` (padrão: só a Casa Lorenzi; `VULTO` ou `TODAS`), `/pedidos/{id}` | equipe |
+| GET | `/pedidos/vulto/{referencia}` (venda da Vulto pelo id antigo, pelo número do site/app ou pelo VLT-...) | equipe |
 | PATCH | `/pedidos/{id}` (loja de expedição ou status) | equipe |
 | GET | `/pedidos/{id}/pagamentos` | equipe |
 | POST | `/pedidos/{id}/devolucoes` · GET `/devolucoes?de&ate&lojaId` | equipe |
@@ -174,6 +175,8 @@ Todas sob o prefixo `/api`. As rotas internas exigem `Authorization: Bearer <tok
 | GET | `/clientes/{id}`, `/clientes/{id}/pedidos`, `/clientes/{id}/pedidos/{numero}`, `/clientes/{id}/atendimentos`, `/clientes/{id}/atendimentos/{aid}` | administrador, lojista, o próprio cliente |
 | GET | `/dashboard/resumo?lojaId&marca` | equipe |
 | GET | `/financeiro/resumo?de&ate&comparar&agrupar&lojas&canais&categorias&generos&marcas` (sem `marcas`, soma as duas) | administrador |
+| GET | `/financeiro/faturamento?de&ate&marca` (mês × loja × canal, com e sem frete, devoluções e líquido) | administrador |
+| GET | `/financeiro/faturamento/comparativo-vulto?de&ate` (relatório do sistema da Vulto × nosso número, com a diferença por ajuste) | administrador |
 
 ## Regras importantes
 
@@ -318,6 +321,15 @@ diferentes nunca se juntam), também contra os clientes da Casa Lorenzi, que nun
 "não ligar"; telefone sem DDD fica vazio; quem só aparece nas vendas entra com o nome provisório
 "Cliente Vulto (sem nome)". Cliente com CPF ganha conta Vulto+ com a categoria declarada na planilha.
 Telefones da Vulto ficam em E.164 (`+5511...`); os da Casa Lorenzi continuam como foram cadastrados.
+
+**Vendas** (`--dominio vendas`). As vendas do `vulto.db` viram pedidos `VLT-00001`... (canal pela loja do
+legado; online sai do CD Cajamar, ship from store de Pinheiros), com itens, pagamento e histórico. Total e
+itens em centavos (app) são detectados pelo preço do catálogo; frete embutido e desconto não registrado
+saem da conta da venda; status vazio = pago; troca = pedido `TROCA` (fora da receita); valor negativo =
+devolução, ligada à venda original quando dá. Ficam de fora as vendas de teste (TI/QA) e as duplicatas
+do app. A planilha manual da Batel (março/26) entra menos o que foi relançado no sistema, que volta para
+a data real. Faturamento = vendas não canceladas e com pagamento que não está só pendente, menos as
+devoluções; `/financeiro/faturamento/comparativo-vulto` mostra a diferença para o relatório da Vulto.
 
 Ao final, imprime lidos, carregados, corrigidos e descartados por domínio. Contra o banco do Render,
 rode do seu computador com a "External Database URL": `DATABASE_URL="postgresql+psycopg://..."`.
