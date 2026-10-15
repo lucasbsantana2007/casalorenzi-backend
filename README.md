@@ -287,11 +287,30 @@ Os dados da Vulto entram uma única vez, por um pipeline idempotente (pode rodar
 duplicar) que nunca apaga dados da Casa Lorenzi. O legado (`vulto-legado-back/`) é só leitura.
 Regras e decisões em `CLAUDE.md` e `docs/registro_decisoes.md`.
 
+**Passo a passo** (em produção, do seu computador com a URL externa do banco em `DATABASE_URL`):
+
 ```bash
-python -m src.migracao_vulto --tudo              # staging e todos os domínios, na ordem
-python -m src.migracao_vulto --dominio staging   # só a cópia crua do legado
-python -m src.migracao_vulto --dominio lojas     # um domínio só
+alembic upgrade head                                       # tabelas e colunas da união
+python -m src.migracao_vulto --tudo                        # staging e todos os domínios, na ordem
+python -m src.relatorios.diretoria --saida docs/numeros_diretoria   # os números da diretoria (JSON e CSV)
+python -m src.relatorios.registro_decisoes                 # docs/registro_decisoes.md, das ocorrências
 ```
+
+Para rodar uma parte só:
+
+```bash
+python -m src.migracao_vulto --dominio staging   # só a cópia crua do legado
+python -m src.migracao_vulto --dominio lojas     # um domínio só (lojas, produtos, clientes, usuarios,
+                                                 # vendas, estoque, fidelidade, atendimento)
+```
+
+**O que a união acrescentou.** Tabelas: `sku_alias`, `contas_pontos`, `movimentos_pontos`, `de_para`,
+`migracao_ocorrencias` e o schema `legado_vulto` (staging); colunas de marca, canal e origem nas tabelas
+existentes (veja "Modelo de dados"). Rotas (veja "Rotas"): o filtro `marca` em lojas, produtos, pedidos,
+estoque, dashboard e financeiro; `/produtos/sku/{codigo}`, `/pedidos/vulto/{referencia}`,
+`/clientes/unificado`, `/clientes/{id}/vulto-mais`, `/estoque/posicao?agrupar=produto`,
+`/financeiro/faturamento`, `/financeiro/faturamento/comparativo-vulto`, `/financeiro/vulto-mais/passivo`,
+`/diretoria/numeros` e os filtros `marca` e `canal` em `/atendimentos`.
 
 Os arquivos do legado vêm de `VULTO_DADOS` no `.env` (padrão: `../vulto-legado-back/data`).
 
@@ -372,9 +391,11 @@ rode do seu computador com a "External Database URL": `DATABASE_URL="postgresql+
 **Atenção:** `python -m src.database.seed --recriar` apaga tudo, inclusive o que veio da Vulto;
 depois dele, rode a migração de novo.
 
-**Números da diretoria.** Depois da migração, `python -m src.relatorios.diretoria --saida docs/numeros_diretoria`
+**Números da diretoria e registro de decisões.** Depois da migração, `python -m src.relatorios.diretoria`
 gera o JSON e os CSVs com as três respostas (faturamento com a ponte até o relatório da Vulto, estoque em
-01/10/2026 e passivo de pontos); os gerados com o banco de validação estão em `docs/numeros_diretoria/`.
+01/10/2026 e passivo de pontos), e `python -m src.relatorios.registro_decisoes` gera o
+`docs/registro_decisoes.md` (cada problema, a decisão, o porquê e o impacto, e o apêndice com todas as
+ocorrências). Os gerados com o banco de validação estão em `docs/`.
 
 ## Testes
 
