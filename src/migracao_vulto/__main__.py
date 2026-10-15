@@ -17,7 +17,7 @@ from sqlalchemy.orm import Session
 
 from src.database.connection import SessionLocal
 from src.entities.migracao import DOMINIOS_MIGRACAO
-from src.migracao_vulto import lojas, produtos, staging
+from src.migracao_vulto import clientes, lojas, produtos, staging
 from src.migracao_vulto.relatorio import Resultado, formatar
 
 # Domínios implementados, na ordem de DOMINIOS_MIGRACAO (os outros chegam etapa por etapa)
@@ -25,6 +25,7 @@ MIGRADORES: dict[str, Callable[[Session], Resultado]] = {
     staging.DOMINIO: staging.migrar,
     lojas.DOMINIO: lojas.migrar,
     produtos.DOMINIO: produtos.migrar,
+    clientes.DOMINIO: clientes.migrar,
 }
 
 
