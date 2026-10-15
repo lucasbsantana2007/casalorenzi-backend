@@ -97,7 +97,10 @@ def test_atendimento_da_vulto(staging, client, admin):
     resposta = client.patch(f"/api/admin/funcionarios/{diego.id}/status", json={"ativo": True}, headers=admin)
     assert resposta.status_code == 422 and "e-mail" in resposta.json()["detail"]
 
-    rodar(["usuarios", "atendimento"])  # de novo: refaz igual
+    with SessionLocal() as db:
+        ocorrencias = db.scalar(select(func.count()).where(m.MigracaoOcorrencia.dominio == "atendimento"))
+    rodar(["usuarios", "atendimento"])  # de novo: refaz igual, com as mesmas ocorrências
     with SessionLocal() as db:
         assert db.scalar(select(func.count()).select_from(m.Atendimento)) == total
+        assert db.scalar(select(func.count()).where(m.MigracaoOcorrencia.dominio == "atendimento")) == ocorrencias
         assert db.scalar(select(func.count()).select_from(m.Usuario).where(m.Usuario.id.in_(vindos))) == 21

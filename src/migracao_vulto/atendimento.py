@@ -326,19 +326,19 @@ def _ja_migrado(db: Session, grupo: Grupo) -> m.Atendimento | None:
 
 
 def _tipos(ctx: Contexto) -> dict[str, int]:
-    """Título → id, criando (inativos) os tipos que a Casa Lorenzi não tinha."""
+    """Título → id, criando (inativos) os tipos que a Casa Lorenzi não tinha. A ocorrência entra em toda rodada,
+    tenha o tipo sido criado agora ou numa rodada anterior: o registro sai igual rodando uma vez ou várias."""
     tipos = dict(ctx.db.execute(select(m.TipoSolicitacao.titulo, m.TipoSolicitacao.id)).all())
     ordem = ctx.db.scalar(select(func.coalesce(func.max(m.TipoSolicitacao.ordem_exibicao), 0)))
     for titulo, (categoria, descricao) in TIPOS_NOVOS.items():
-        if titulo in tipos:
-            continue
-        ordem += 1
-        tipo = m.TipoSolicitacao(
-            titulo=titulo, categoria=categoria, descricao=descricao, exige_venda=False, ordem_exibicao=ordem, ativo=False
-        )
-        ctx.db.add(tipo)
-        ctx.db.flush()
-        tipos[titulo] = tipo.id
+        if titulo not in tipos:
+            ordem += 1
+            tipo = m.TipoSolicitacao(
+                titulo=titulo, categoria=categoria, descricao=descricao, exige_venda=False, ordem_exibicao=ordem, ativo=False
+            )
+            ctx.db.add(tipo)
+            ctx.db.flush()
+            tipos[titulo] = tipo.id
         ctx.ocorrencia("TIPO_CRIADO", "Tipo de solicitação que a Casa Lorenzi não tinha: criado inativo (não aparece no site "
                        "até alguém ativar).", "CORRIGIDO", final=titulo)  # fmt: skip
     return tipos

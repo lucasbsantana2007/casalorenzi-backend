@@ -30,8 +30,6 @@ import unicodedata
 from dataclasses import dataclass, field
 from datetime import date, datetime, time
 
-from openpyxl import load_workbook
-from openpyxl.utils import get_column_letter
 from sqlalchemy import Column, Integer, MetaData, Table, Text, text
 from sqlalchemy.orm import Session
 
@@ -254,6 +252,10 @@ def carregar_sqlite(db: Session, caminho: str, tabelas: tuple[str, ...] = TABELA
 
 def carregar_planilha(db: Session, caminho: str, prefixo: str, abas: dict[str, int | None]) -> list[Carga]:
     """Cada aba vira <prefixo>__<aba>. Linhas totalmente vazias não entram (contam em vazias)."""
+    # Importado aqui: quem só usa as constantes do módulo (a API) não carrega o openpyxl
+    from openpyxl import load_workbook
+    from openpyxl.utils import get_column_letter
+
     arquivo = os.path.basename(caminho)
     livro = load_workbook(caminho)  # sem read_only: a formatação das células só vem assim
     novas = set(livro.sheetnames) - set(abas)
