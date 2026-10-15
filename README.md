@@ -113,21 +113,13 @@ Nunca coloque a chave no git; no deploy (Render), cadastre as mesmas variáveis 
 
 | Módulo | Tabelas |
 | --- | --- |
-| Núcleo | `lojas` (endereço, telefone, horários, `ativa`, `marca` e `tipo`), `usuarios` (só a equipe: ADMINISTRADOR, LOJISTA, OPERADOR; sem senha enquanto o convite está pendente; os funcionários da Vulto vieram sem e-mail e ficam inativos até ter um) |
-| Clientes | `clientes` (CPF e e-mail únicos, e-mail opcional para clientes vindos da Vulto, pelo menos um de CPF/e-mail/telefone, consentimento de marketing; senha só como hash), `tokens_senha` |
-| Catálogo | `categorias`, `produtos` (com descrição, composição, cuidados, `marca` e `colecao`), `variacoes` (SKU, com `preco_custo` = último custo, `custo_medio` = média ponderada das notas, `ean` e `ativa`), `sku_alias` (outras grafias do SKU, com vigência), `imagens_produto` (foto enviada no cadastro) |
+| Núcleo | `lojas` (endereço, telefone, horários e `ativa`), `usuarios` (só a equipe: ADMINISTRADOR, LOJISTA, OPERADOR; sem senha enquanto o convite está pendente) |
+| Clientes | `clientes` (CPF e e-mail únicos, senha só como hash), `tokens_senha` |
+| Catálogo | `categorias`, `produtos` (com descrição, composição e cuidados), `variacoes` (SKU, com `preco_custo`), `imagens_produto` (foto enviada no cadastro) |
 | Estoque | `estoques` (saldo por **loja + SKU**), `movimentacoes` (histórico com sinal), `transferencias` (com `pedido_id` quando atendem um pedido) |
-| Vendas | `pedidos` (com frete e endereço de entrega no e-commerce, `desconto`, `tipo` VENDA/TROCA e `pedido_externo`; cliente opcional nas vendas da Vulto sem cliente), `itens_pedido`, `eventos_pedido` (histórico), `pagamentos`, `devolucoes` (devolução da Vulto sem venda de origem: só a `variacao_id`) |
-| Atendimento | `tipos_solicitacao`, `atendimentos` (`canal` SITE/WHATSAPP/INSTAGRAM/EMAIL, `contato` e `contato_nome`; cliente opcional nos da Vulto cujo contato não identifica ninguém), `mensagens`, `anexos` (foto) |
+| Vendas | `pedidos` (com frete e endereço de entrega no e-commerce), `itens_pedido`, `eventos_pedido` (histórico), `pagamentos`, `devolucoes` |
+| Atendimento | `tipos_solicitacao`, `atendimentos` (sempre de um cliente), `mensagens`, `anexos` (foto) |
 | Administração | `config_frete` e `frete_regioes` (frete configurável), `log_acoes` (quem fez o quê) |
-| Vulto+ | `contas_pontos` (saldo e categoria por cliente), `movimentos_pontos` (extrato com sinal e validade) |
-| Migração da Vulto | `de_para` (cada registro migrado aponta para a origem), `migracao_ocorrencias` (problemas nos dados e o que foi feito) |
-
-**Duas marcas, uma plataforma.** Desde a compra da Vulto, `lojas` e `produtos` têm `marca`
-(`LORENZI` ou `VULTO`) e `lojas` tem `tipo` (`FISICA`, `CD` ou `VIRTUAL`); pedidos, estoques e
-atendimentos herdam a marca pela loja ou pelo produto. Cliente não tem marca: a mesma pessoa é um
-registro só. Os canais são `Loja física`, `E-commerce` e `App`. O site (vitrine, página Lojas,
-checkout e expedição) continua só com a Casa Lorenzi; o painel vê as duas marcas.
 
 **Um login só para equipe e clientes.** O cliente cria a conta no checkout (nome, CPF, e-mail,
 telefone e senha) e entra pelo mesmo `POST /auth/login`; o token traz o papel `CLIENTE`, que só
@@ -146,40 +138,32 @@ Todas sob o prefixo `/api`. As rotas internas exigem `Authorization: Bearer <tok
 | --- | --- | --- |
 | POST | `/auth/login` · GET `/auth/me` | público · logado (equipe ou cliente) |
 | POST | `/auth/cadastro` (conta do cliente; já devolve a sessão), `/auth/esqueci-senha`, `/auth/redefinir-senha` | público |
-| GET | `/lojas?marca` (com endereço, telefone, horários, `ativa`, `marca` e `tipo`; visitante e cliente só veem as da Casa Lorenzi), `/categorias`, `/tipos-solicitacao` | público |
+| GET | `/lojas` (com endereço, telefone, horários e `ativa`), `/categorias`, `/tipos-solicitacao` | público |
 | GET, PUT · PUT · POST | `/conta` · `/conta/senha` · `/conta/exclusao` (configurações da conta) | o próprio cliente |
 | GET | `/frete/condicoes` (valores e prazos, sem custo) | público |
 | GET, PUT | `/frete/config` · POST `/frete/simulacao` | administrador |
 | GET, POST | `/admin/funcionarios` · PUT `/admin/funcionarios/{id}` · PATCH `/admin/funcionarios/{id}/status` · POST `/admin/funcionarios/{id}/convite` | administrador |
-| GET, POST | `/admin/lojas` · PUT `/admin/lojas/{id}` (`marca` e `tipo` opcionais; a marca não muda depois do cadastro) | administrador |
+| GET, POST | `/admin/lojas` · PUT `/admin/lojas/{id}` | administrador |
 | GET | `/admin/log?area&usuarioId&busca` | administrador |
 | GET | `/usuarios?papel=` | equipe |
-| GET | `/produtos?busca&categoria&ativo&marca`, `/produtos/{id}` (`precoCusto` e `custoMedio` só para o administrador; visitante e cliente só veem a Casa Lorenzi), `/produtos/{id}/imagem` | público (vitrine) |
-| GET | `/produtos/sku/{codigo}?data` (variação por qualquer grafia de SKU; `data` resolve código reaproveitado) | equipe |
+| GET | `/produtos?busca&categoria&ativo`, `/produtos/{id}` (`precoCusto` só para o administrador), `/produtos/{id}/imagem` | público (vitrine) |
 | POST, PUT | `/produtos`, `/produtos/{id}` (com `genero`, `estacao`, `precoCusto`, `imagem` e `removerImagem`; `genero` obrigatório no cadastro) | administrador |
 | DELETE | `/produtos/{id}` (remove do catálogo; o histórico continua) | administrador |
 | GET | `/estoque?busca&lojaId&categoria&status&variacaoId`, `/estoque/{id}` | equipe |
-| GET | `/estoque/posicao?data&lojaId&busca&marca&agrupar` (saldo em qualquer data, por item ou por produto) | equipe |
+| GET | `/estoque/posicao?data&lojaId&busca` | equipe |
 | GET, POST | `/movimentacoes` (filtros: `estoqueId&lojaId&tipo&de&ate&busca`) | equipe |
 | GET, POST | `/transferencias` · PATCH `/transferencias/{id}` (status) | administrador, operador |
 | POST | `/checkout` (o cliente vem do token) | cliente logado |
-| GET | `/pedidos?status&lojaId&canal&busca&marca` (padrão: só a Casa Lorenzi; `VULTO` ou `TODAS`), `/pedidos/{id}` | equipe |
-| GET | `/pedidos/vulto/{referencia}` (venda da Vulto pelo id antigo, pelo número do site/app ou pelo VLT-...) | equipe |
+| GET | `/pedidos?status&lojaId&canal&busca`, `/pedidos/{id}` | equipe |
 | PATCH | `/pedidos/{id}` (loja de expedição ou status) | equipe |
 | GET | `/pedidos/{id}/pagamentos` | equipe |
 | POST | `/pedidos/{id}/devolucoes` · GET `/devolucoes?de&ate&lojaId` | equipe |
-| GET · GET, PATCH | `/atendimentos?busca&tipoSolicitacaoId&responsavelId&lojaId&marca&canal` · `/atendimentos/{id}` (com `outrosAtendimentos` da mesma pessoa e `pedidosDoCliente`) | administrador, lojista |
+| GET · GET, PATCH | `/atendimentos` · `/atendimentos/{id}` | administrador, lojista |
 | POST | `/atendimentos` (cliente: abre para si; equipe: em nome do cliente), `/atendimentos/{id}/mensagens` (aceita `anexo`) | administrador, lojista, cliente dono |
 | GET | `/clientes?busca` | administrador, lojista |
-| GET | `/clientes/unificado?cpf&email&telefone` (a mesma pessoa nas duas marcas: pedidos da Casa Lorenzi e da Vulto, conta Vulto+) | administrador, lojista |
 | GET | `/clientes/{id}`, `/clientes/{id}/pedidos`, `/clientes/{id}/pedidos/{numero}`, `/clientes/{id}/atendimentos`, `/clientes/{id}/atendimentos/{aid}` | administrador, lojista, o próprio cliente |
-| GET | `/clientes/{id}/vulto-mais` (extrato de pontos do Vulto+: saldo, categoria, a vencer e movimentos) | administrador, lojista, o próprio cliente |
-| GET | `/dashboard/resumo?lojaId&marca` | equipe |
-| GET | `/financeiro/resumo?de&ate&comparar&agrupar&lojas&canais&categorias&generos&marcas` (sem `marcas`, soma as duas) | administrador |
-| GET | `/financeiro/faturamento?de&ate&marca` (mês × loja × canal, com e sem frete, devoluções e líquido) | administrador |
-| GET | `/financeiro/faturamento/comparativo-vulto?de&ate` (relatório do sistema da Vulto × nosso número, com a diferença por ajuste) | administrador |
-| GET | `/diretoria/numeros` (faturamento, estoque e passivo da Vulto, com explicação, decisões e margem) · `/diretoria/numeros/{secao}.csv` (`faturamento`, `ponte`, `estoque-lojas`, `estoque-produtos`, `passivo`; Excel em português) | administrador |
-| GET | `/financeiro/vulto-mais/passivo?data` (pontos válidos do Vulto+ em R$, cenários Ouro 12/18 meses e a faixa mínima/máxima; padrão 01/10/2026) | administrador |
+| GET | `/dashboard/resumo?lojaId` | equipe |
+| GET | `/financeiro/resumo?de&ate&comparar&agrupar&lojas&canais&categorias&generos` | administrador |
 
 ## Regras importantes
 
@@ -281,122 +265,6 @@ Outros comandos: `alembic current`, `alembic history`, `alembic downgrade -1`.
 **A migration vai no mesmo commit do código que depende dela**, para o time aplicar com `alembic upgrade head`.
 Nunca mude o banco à mão.
 
-## Migração dos dados da Vulto
-
-Os dados da Vulto entram uma única vez, por um pipeline idempotente (pode rodar de novo sem
-duplicar) que nunca apaga dados da Casa Lorenzi. O legado (`vulto-legado-back/`) é só leitura.
-Regras e decisões em `CLAUDE.md` e `docs/registro_decisoes.md`.
-
-**Passo a passo** (em produção, do seu computador com a URL externa do banco em `DATABASE_URL`):
-
-```bash
-alembic upgrade head                                       # tabelas e colunas da união
-python -m src.migracao_vulto --tudo                        # staging e todos os domínios, na ordem
-python -m src.relatorios.diretoria --saida docs/numeros_diretoria   # os números da diretoria (JSON e CSV)
-python -m src.relatorios.registro_decisoes                 # docs/registro_decisoes.md, das ocorrências
-```
-
-Para rodar uma parte só:
-
-```bash
-python -m src.migracao_vulto --dominio staging   # só a cópia crua do legado
-python -m src.migracao_vulto --dominio lojas     # um domínio só (lojas, produtos, clientes, usuarios,
-                                                 # vendas, estoque, fidelidade, atendimento)
-```
-
-**O que a união acrescentou.** Tabelas: `sku_alias`, `contas_pontos`, `movimentos_pontos`, `de_para`,
-`migracao_ocorrencias` e o schema `legado_vulto` (staging); colunas de marca, canal e origem nas tabelas
-existentes (veja "Modelo de dados"). Rotas (veja "Rotas"): o filtro `marca` em lojas, produtos, pedidos,
-estoque, dashboard e financeiro; `/produtos/sku/{codigo}`, `/pedidos/vulto/{referencia}`,
-`/clientes/unificado`, `/clientes/{id}/vulto-mais`, `/estoque/posicao?agrupar=produto`,
-`/financeiro/faturamento`, `/financeiro/faturamento/comparativo-vulto`, `/financeiro/vulto-mais/passivo`,
-`/diretoria/numeros` e os filtros `marca` e `canal` em `/atendimentos`.
-
-Os arquivos do legado vêm de `VULTO_DADOS` no `.env` (padrão: `../vulto-legado-back/data`).
-
-**Staging (schema `legado_vulto`).** Primeira camada: cada tabela do `vulto.db`, cada aba das
-planilhas e o export do atendimento viram uma tabela crua (`db__vendas`, `catalogo__verao_26`,
-`clientes__clientes`, `atendimentos`...), com todas as colunas em texto, sem limpeza, e com
-`_arquivo`, `_aba` e `_linha` (a linha como aparece no Excel; no `vulto.db`, o rowid). Das planilhas
-vêm também `_tipos` (o tipo que o Excel deu à célula, ex.: data) e a formatação da linha
-(`_tachado`, `_cor_fonte`, `_cor_fundo`). `legado_vulto._cargas` lista cada tabela com a origem, a
-linha do cabeçalho, os nomes originais das colunas e as contagens. As senhas em texto puro dos
-funcionários não são copiadas e a `senha_master` entra mascarada. Cada carga recria o schema.
-
-**Padronização** (`src/migracao_vulto/normalizacao.py`): funções puras e testadas usadas por todos os
-domínios (dinheiro, datas com fuso, CPF, e-mail, telefone E.164, SKU, EAN, cor, tamanho, categoria,
-canal, status). Valor que não converte com segurança não é chutado: vira ocorrência.
-
-**Produtos** (`--dominio produtos`). Cada modelo do catálogo vira um produto `VULTO` e cada cor +
-tamanho uma variação com o SKU canônico `VLT-CAT-NNN-COR-TAM`; todas as outras grafias (código curto
-do CD, digitação do fiscal, vendas, entradas, contagem) vão para `sku_alias`. Código reaproveitado por
-outra peça vira outro produto (SKU com `-2024`) e as grafias em comum ganham vigência por data.
-Preço: o mais frequente da aba; entre coleções, `REGRA_PRECO` em `produtos.py` (padrão `MENOR`,
-Operações/Financeiro; `MAIS_NOVA` é a regra de Compras). Linha tachada ou vermelha = variação
-inativa. A categoria vem do prefixo do SKU (Calças, Bermudas e Shorts e Não catalogado são novas;
-o resto usa as da Casa Lorenzi).
-
-**Clientes** (`--dominio clientes`). Aba Clientes, clientes antigos, `cliente_ref` das vendas e das
-compras e os contatos do atendimento viram um cliente por pessoa (CPF → e-mail → telefone; CPFs
-diferentes nunca se juntam), também contra os clientes da Casa Lorenzi, que nunca são sobrescritos
-(só os campos vazios são completados). Consentimento de mensagens só com "sim" explícito e sem
-"não ligar"; telefone sem DDD fica vazio; quem só aparece nas vendas entra com o nome provisório
-"Cliente Vulto (sem nome)". Cliente com CPF ganha conta Vulto+ com a categoria declarada na planilha.
-Telefones da Vulto ficam em E.164 (`+5511...`); os da Casa Lorenzi continuam como foram cadastrados.
-
-**Vendas** (`--dominio vendas`). As vendas do `vulto.db` viram pedidos `VLT-00001`... (canal pela loja do
-legado; online sai do CD Cajamar, ship from store de Pinheiros), com itens, pagamento e histórico. Total e
-itens em centavos (app) são detectados pelo preço do catálogo; frete embutido e desconto não registrado
-saem da conta da venda; status vazio = pago; troca = pedido `TROCA` (fora da receita); valor negativo =
-devolução, ligada à venda original quando dá. Ficam de fora as vendas de teste (TI/QA) e as duplicatas
-do app. A planilha manual da Batel (março/26) entra menos o que foi relançado no sistema, que volta para
-a data real. Faturamento = vendas não canceladas e com pagamento que não está só pendente, menos as
-devoluções; `/financeiro/faturamento/comparativo-vulto` mostra a diferença para o relatório da Vulto.
-
-**Estoque** (`--dominio estoque`). A tabela `estoque` da Vulto (sem histórico, com saldos negativos) só
-serve de comparação: o histórico é reconstruído em `movimentacoes` a partir das notas de entrada, das
-transferências (envio e recebimento da mesma peça contam uma vez), das vendas e das devoluções migradas.
-A contagem de set/26 é a âncora (ajuste no dia da contagem; Eldorado, Savassi e Batel sem data na
-planilha: 30/09, estimado; a Savassi contou por modelo e foi rateada) e o saldo de abertura (01/01/2025),
-desconhecido, é o menor que deixa o histórico sem saldo negativo. Antes da contagem, o histórico é
-derivado; o saldo em 01/10/2026 é o contado mais os movimentos depois dele.
-
-**Funcionários** (`--dominio usuarios`). Os funcionários da Vulto viram usuários **inativos, sem e-mail
-e sem senha** (as senhas do legado estão em texto puro e não migram, nem a `senha_master`). Vendedor e
-gerente viram LOJISTA da loja; o operador do CD, OPERADOR; Diego, Paula e Marina, ADMINISTRADOR. Contas de
-teste e genéricas ficam de fora. Os atendentes do SAC (Marcos, Júlia, Renata) viram LOJISTA do CD. Para dar
-acesso: na Central administrativa, cadastre o e-mail, reative e reenvie o convite.
-
-**Fidelidade** (`--dominio fidelidade`). O Vulto+ vira `contas_pontos` + `movimentos_pontos` (pontos só
-com CPF). Saldo inicial: a coluna Pontos da planilha, congelada em 01/01/2025 ("2.203" = 2203; "2,7k",
-estimado; duplicados somam). Depois, os movimentos do `vulto.db` corrigidos: o crédito inflado pelo bug do
-app v3.4 (pontos sobre centavos) volta ao valor certo e os ajustes manuais dessa correção saem; venda
-aguardando pagamento, de teste ou duplicada não pontua; venda cancelada sem estorno é estornada. Resgates
-anotados só na planilha (2025 em diante) são debitados. Regras em `src/entities/fidelidade.py`: categoria
-pelos pontos do ano, validade FIFO de 12 meses (Ouro 18, o combinado, é o gravado), saldo nunca negativo.
-O passivo (`/financeiro/vulto-mais/passivo`) recalcula a validade nos dois cenários do Ouro e mostra a
-faixa: R$ 0,05 por ponto (vigente desde mar/2025) a R$ 0,10 (o que o sistema da Vulto seguiu dando), com o
-dobro do online e o bônus Ouro que o sistema nunca aplicou no máximo.
-
-**Atendimento** (`--dominio atendimento`). Cada linha do CSV já é um atendimento inteiro: a conversa
-embutida ("[Atendente]: ...", "[Bot]: ...") vira `mensagens`; linhas repetidas e spam ficam de fora; linhas
-do mesmo contato e tipo a até 72 h viram um atendimento só. O cliente vem do contato (telefone ou e-mail) ou,
-se o contato não identifica ninguém (@ do Instagram, telefone sem DDD), do pedido citado; sem nenhum dos
-dois, o atendimento fica sem cliente, com o contato guardado. O pedido vem da coluna `pedido` (número no
-site/app ou id da venda) ou do texto. Tipos que faltavam (Pontos Vulto+, Pagamento, Cancelamento, Elogio,
-Informações da loja) são criados inativos, para não aparecerem no site da Casa Lorenzi sem decisão.
-
-Ao final, imprime lidos, carregados, corrigidos e descartados por domínio. Contra o banco do Render,
-rode do seu computador com a "External Database URL": `DATABASE_URL="postgresql+psycopg://..."`.
-**Atenção:** `python -m src.database.seed --recriar` apaga tudo, inclusive o que veio da Vulto;
-depois dele, rode a migração de novo.
-
-**Números da diretoria e registro de decisões.** Depois da migração, `python -m src.relatorios.diretoria`
-gera o JSON e os CSVs com as três respostas (faturamento com a ponte até o relatório da Vulto, estoque em
-01/10/2026 e passivo de pontos), e `python -m src.relatorios.registro_decisoes` gera o
-`docs/registro_decisoes.md` (cada problema, a decisão, o porquê e o impacto, e o apêndice com todas as
-ocorrências). Os gerados com o banco de validação estão em `docs/`.
-
 ## Testes
 
 Rodam num banco separado (`TEST_DATABASE_URL` no `.env`), recriado a partir do seed a cada teste:
@@ -454,5 +322,3 @@ No plano grátis, a API "dorme" sem uso e o primeiro acesso seguinte demora pert
 ## Próximos passos
 
 - Integração real de pagamento (hoje simulado: todo checkout é aprovado).
-- Vulto+ na plataforma: creditar e resgatar pontos nas vendas novas e rodar os vencimentos depois de
-  01/10/2026 (hoje o saldo das contas é o da virada).

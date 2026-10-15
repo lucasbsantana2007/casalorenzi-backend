@@ -1,17 +1,13 @@
 """Visão financeira: receita, pedidos, ticket médio, estoque valorizado, pós-venda e devoluções.
 
 devolucoesValor/devolucoesValorAnterior somam o valor reembolsado (valor_devolvido) no período e
-no período de comparação. A receita continua bruta: quem quiser a líquida subtrai as devoluções.
-
-Soma as duas marcas (Casa Lorenzi e Vulto); o filtro `marcas` separa uma da outra pela loja do pedido."""
+no período de comparação. A receita continua bruta: quem quiser a líquida subtrai as devoluções."""
 
 from datetime import datetime, timedelta
 
 from sqlalchemy.orm import Session
 
 from src import models as m
-from src.entities.marca import MARCAS
-from src.entities.pedido import TIPOS_SEM_RECEITA
 from src.repositories import (
     atendimento_repository,
     cadastro_repository,
@@ -66,9 +62,8 @@ def resumo(
     canais: str | None,
     categorias: str | None,
     generos: str | None,
-    marcas: str | None = None,
 ) -> dict:
-    """Filtros em listas separadas por vírgula (ex.: lojas=1,3&canais=E-commerce&marcas=VULTO)."""
+    """Filtros em listas separadas por vírgula (ex.: lojas=1,3&canais=E-commerce)."""
     dia_inicial = ler_data(de, "de") or hoje() - timedelta(days=29)
     dia_final = ler_data(ate, "ate") or hoje()
     if dia_final < dia_inicial:
@@ -83,16 +78,6 @@ def resumo(
     filtro_canais = lista_csv(canais)
     filtro_categorias = lista_csv(categorias)
     filtro_generos = lista_csv(generos)
-    filtro_marcas = lista_csv(marcas)
-    if any(marca not in MARCAS for marca in filtro_marcas):
-        raise DadosInvalidos("Lista de marcas inválida.")
-    marca_da_loja = {loja.id: loja.marca for loja in cadastro_repository.lojas(db)}
-
-    def loja_valida(loja_id: int) -> bool:
-        return (not filtro_lojas or loja_id in filtro_lojas) and (
-            not filtro_marcas or marca_da_loja.get(loja_id) in filtro_marcas
-        )
-
     filtra_produto = bool(filtro_categorias or filtro_generos)
 
     def produto_valido(produto: m.Produto) -> bool:
@@ -100,31 +85,27 @@ def resumo(
             not filtro_generos or produto.genero in filtro_generos
         )
 
-    # Pedido recortado pelos filtros: com filtro de produto, só os itens que batem entram na receita.
-    # Troca não é receita (a venda original já contou); o desconto da venda sai proporcionalmente dos itens.
+    # Pedido recortado pelos filtros: com filtro de produto, só os itens que batem entram na receita
     def recortar(pedido: m.Pedido) -> dict | None:
-        if pedido.tipo in TIPOS_SEM_RECEITA or not loja_valida(pedido.loja_id):
+        if filtro_lojas and pedido.loja_id not in filtro_lojas:
             return None
         if filtro_canais and pedido.canal not in filtro_canais:
             return None
         itens = [i for i in pedido.itens if not filtra_produto or produto_valido(i.variacao.produto)]
         if not itens:
             return None
-        fator = 1 - float(pedido.desconto or 0) / float(pedido.subtotal) if pedido.subtotal else 1
         return {
             "loja_id": pedido.loja_id,
             "status": pedido.status,
-            # Venda com pagamento só pendente (aguardando, na Vulto) ainda não é receita
-            "pendente": bool(pedido.pagamentos) and all(p.status == "PENDENTE" for p in pedido.pagamentos),
             "criado_em": pedido.criado_em,
             "itens": itens,
-            "total": sum(float(i.preco_unitario) * i.quantidade for i in itens) * fator,
+            "total": sum(float(i.preco_unitario) * i.quantidade for i in itens),
         }
 
     pedidos = pedido_repository.todos(db)
     por_id = {p.id: p for p in pedidos}
     recortados = [r for r in map(recortar, pedidos) if r]
-    validos = [p for p in recortados if p["status"] != "CANCELADO" and not p["pendente"]]
+    validos = [p for p in recortados if p["status"] != "CANCELADO"]
 
     def entre(colecao, a, b):
         return [p for p in colecao if a <= p["criado_em"] < b]
@@ -140,14 +121,18 @@ def resumo(
     anterior = entre(validos, *comp) if comp else []
 
     # Estoque é uma foto do momento: respeita loja, categoria e gênero, mas não o período
-    estoques = [e for e in estoque_repository.listar(db) if loja_valida(e.loja_id) and produto_valido(e.variacao.produto)]
+    estoques = [
+        e
+        for e in estoque_repository.listar(db)
+        if (not filtro_lojas or e.loja_id in filtro_lojas) and produto_valido(e.variacao.produto)
+    ]
 
     def valor_estoque(lista) -> float:
         return sum(e.quantidade * float(e.variacao.produto.preco_base) for e in lista)
 
     por_loja = []
     for loja in cadastro_repository.lojas(db):
-        if not loja_valida(loja.id):
+        if filtro_lojas and loja.id not in filtro_lojas:
             continue
         da_loja = [p for p in atual if p["loja_id"] == loja.id]
         por_loja.append(
@@ -198,7 +183,7 @@ def resumo(
         tipo = a.tipo_solicitacao.conta_pos_venda
         if tipo not in TIPOS_POS_VENDA:
             continue
-        if not loja_valida(a.loja_id):
+        if filtro_lojas and a.loja_id not in filtro_lojas:
             continue
         if filtro_canais or filtra_produto:
             pedido = por_id.get(a.pedido_id) if a.pedido_id else None
@@ -231,7 +216,7 @@ def resumo(
         pedido = por_id.get(d.pedido_id)
         if pedido is None:
             return False
-        if not loja_valida(pedido.loja_id):
+        if filtro_lojas and pedido.loja_id not in filtro_lojas:
             return False
         if filtro_canais and pedido.canal not in filtro_canais:
             return False

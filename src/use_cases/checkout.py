@@ -16,7 +16,6 @@ from sqlalchemy.orm import Session
 
 from src import models as m
 from src.entities.frete import ROTULOS, somente_digitos
-from src.entities.marca import MARCA_DO_SITE
 from src.entities.pagamento import METODOS_ECOMMERCE, PARCELAS_MAX
 from src.entities.pedido import proximo_numero
 from src.integrations import modelos_email
@@ -54,7 +53,7 @@ def _itens(db: Session, dados: CheckoutEntrada) -> list[tuple[m.Variacao, int, D
     itens, pedido_por_variacao = [], {}
     for item in dados.itens:
         variacao = produto_repository.variacao(db, item.variacao_id)
-        if variacao is None or not variacao.produto.ativo or variacao.produto.marca != MARCA_DO_SITE:
+        if variacao is None or not variacao.produto.ativo:
             raise DadosInvalidos("Um dos itens da sacola não está mais disponível.")
         if not 1 <= item.quantidade <= QUANTIDADE_MAX:
             raise DadosInvalidos(f"A quantidade de cada item deve ficar entre 1 e {QUANTIDADE_MAX}.")

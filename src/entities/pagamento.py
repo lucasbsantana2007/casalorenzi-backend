@@ -19,7 +19,7 @@ TRANSICOES = {
 }
 
 # Usado para pedidos antigos, que não registravam a forma de pagamento (migration e carga)
-METODO_PADRAO_POR_CANAL = {"E-commerce": "CARTAO", "App": "CARTAO", "Loja física": "DEBITO"}
+METODO_PADRAO_POR_CANAL = {"E-commerce": "CARTAO", "Loja física": "DEBITO"}
 
 
 def pode_mudar(de: str, para: str) -> bool:

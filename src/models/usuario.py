@@ -16,18 +16,14 @@ if TYPE_CHECKING:
 
 class Usuario(Base):
     """Equipe com login no painel (ADMINISTRADOR, LOJISTA, OPERADOR). Clientes ficam em `clientes`.
-    Funcionário novo nasce sem senha e a cria pelo convite enviado por e-mail. Os funcionários da Vulto
-    vieram sem e-mail: ficam inativos até um administrador cadastrar o e-mail e mandar o convite."""
+    Funcionário novo nasce sem senha e a cria pelo convite enviado por e-mail."""
 
     __tablename__ = "usuarios"
-    __table_args__ = (
-        CheckConstraint(valor_em("papel", PAPEIS), name="ck_usuarios_papel"),
-        CheckConstraint("email IS NOT NULL OR NOT ativo", name="ck_usuarios_email_ativo"),
-    )
+    __table_args__ = (CheckConstraint(valor_em("papel", PAPEIS), name="ck_usuarios_papel"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
     nome: Mapped[str] = mapped_column(String(120))
-    email: Mapped[str | None] = mapped_column(String(255), unique=True, index=True)
+    email: Mapped[str] = mapped_column(String(255), unique=True, index=True)
     # Nulo enquanto o funcionário não cria a senha pelo convite (convite pendente)
     senha_hash: Mapped[str | None] = mapped_column(String(255))
     papel: Mapped[str] = mapped_column(String(20))

@@ -72,11 +72,8 @@ def listar(
     tipo_solicitacao_id: int | None = None,
     responsavel_id: str | None = None,
     loja_id: int | None = None,
-    marca: str | None = None,
-    canal: str | None = None,
 ) -> list[m.Atendimento]:
-    """responsavel_id='nenhum' lista os atendimentos sem responsável. A busca também acha pelo contato
-    (telefone, e-mail ou @ do Instagram) dos atendimentos da Vulto."""
+    """responsavel_id='nenhum' lista os atendimentos sem responsável."""
     if responsavel_id and responsavel_id != "nenhum" and not responsavel_id.isdigit():
         raise DadosInvalidos("Responsável inválido.")
     atendimentos = atendimento_repository.listar(
@@ -85,21 +82,9 @@ def listar(
         loja_id=loja_id,
         sem_responsavel=responsavel_id == "nenhum",
         responsavel_id=int(responsavel_id) if responsavel_id and responsavel_id.isdigit() else None,
-        marca=marca,
-        canal=canal,
     )
     return [
-        a
-        for a in atendimentos
-        if corresponde(
-            busca,
-            a.protocolo,
-            a.cliente.nome if a.cliente else None,
-            a.cliente.email if a.cliente else None,
-            a.contato,
-            a.contato_nome,
-            a.tipo_solicitacao.titulo,
-        )
+        a for a in atendimentos if corresponde(busca, a.protocolo, a.cliente.nome, a.cliente.email, a.tipo_solicitacao.titulo)
     ]
 
 
@@ -236,19 +221,6 @@ def responder_como_cliente(
     return atendimento
 
 
-def totais_do_cliente(db: Session, cliente_id: int | None) -> tuple[int, int]:
+def totais_do_cliente(db: Session, cliente_id: int) -> tuple[int, int]:
     """(pedidos, atendimentos) do cliente, mostrados no detalhe do atendimento."""
-    if cliente_id is None:
-        return 0, 0
     return pedido_repository.contar_do_cliente(db, cliente_id), atendimento_repository.contar_do_cliente(db, cliente_id)
-
-
-def historico(db: Session, atendimento: m.Atendimento) -> tuple[list[m.Atendimento], list[m.Pedido]]:
-    """O que a equipe precisa ver para não perguntar de novo: os outros atendimentos da mesma pessoa e os
-    pedidos dela (nas duas marcas). Se o pedido do atendimento está em outro cadastro (na Vulto, a mesma
-    pessoa pode ter um cadastro pelo WhatsApp e outro pelo e-mail da compra), entram os pedidos dos dois."""
-    donos = {atendimento.cliente_id, atendimento.pedido.cliente_id if atendimento.pedido else None} - {None}
-    pedidos = sorted(
-        (p for dono in donos for p in pedido_repository.do_cliente(db, dono)), key=lambda p: (p.criado_em, p.id), reverse=True
-    )
-    return atendimento_repository.da_mesma_pessoa(db, atendimento), pedidos

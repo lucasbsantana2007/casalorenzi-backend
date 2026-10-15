@@ -6,7 +6,6 @@ from sqlalchemy.orm import Session
 
 from src import models as m
 from src.entities.estoque import ORDEM_STATUS, SINAL_POR_TIPO_MANUAL, quantidade_valida_para_tipo, status_estoque
-from src.entities.marca import MARCA_PADRAO
 from src.repositories import cadastro_repository, estoque_repository, sessao
 from src.use_cases import log_acoes
 from src.utils.datas import agora, fim_do_dia, inicio_do_dia, ler_data
@@ -47,10 +46,8 @@ def aplicar_movimentacao(
 
 
 def criar_estoques_zerados(db: Session, variacao: m.Variacao) -> None:
-    """Toda variação nova passa a existir, com saldo zero, em todas as lojas da marca do produto."""
-    # Produto ainda não gravado: o default da coluna só vale no INSERT
-    marca = variacao.produto.marca or MARCA_PADRAO
-    for loja in cadastro_repository.lojas(db, marca=marca):
+    """Toda variação nova passa a existir, com saldo zero, em todas as lojas."""
+    for loja in cadastro_repository.lojas(db):
         sessao.adicionar(db, m.Estoque(loja_id=loja.id, variacao=variacao, quantidade=0, quantidade_min=2, atualizado_em=agora()))
 
 
@@ -96,17 +93,14 @@ def obter(db: Session, estoque_id: int) -> m.Estoque:
 
 
 def posicao_em_data(
-    db: Session, data: str | None, loja_id: int | None = None, busca: str | None = None, marca: str | None = None
+    db: Session, data: str | None, loja_id: int | None = None, busca: str | None = None
 ) -> list[tuple[m.Estoque, int]]:
-    """Reconstrói o saldo de cada item ao final do dia informado, a partir do histórico (na Vulto, o
-    histórico reconstruído na migração: antes da contagem de set/26 ele é derivado)."""
+    """Reconstrói o saldo de cada item ao final do dia informado, a partir do histórico."""
     dia = ler_data(data)
     if dia is None:
         raise DadosInvalidos("Informe a data de referência.")
     saldos = estoque_repository.saldos_ate(db, fim_do_dia(dia))
     itens = _filtrar(estoque_repository.listar(db, loja_id=loja_id, incluir_removidos=True), busca, None)
-    if marca:
-        itens = [e for e in itens if e.loja.marca == marca]
     itens.sort(key=lambda e: (not e.variacao.produto.ativo, chave_texto(e.variacao.produto.nome), e.loja_id))
     return [(e, int(saldos.get(e.id) or 0)) for e in itens]
 

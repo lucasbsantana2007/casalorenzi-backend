@@ -12,10 +12,9 @@ from src import models as m
 from src.database.connection import get_db
 from src.middlewares.autenticacao import Sessao, exigir_cliente_ou_modulo, exigir_modulo
 from src.routers.atendimentos import detalhe_saida, lista_saida
-from src.schemas.clientes import cliente_saida, cliente_unificado_saida
-from src.schemas.fidelidade import extrato_saida
+from src.schemas.clientes import cliente_saida
 from src.schemas.pedidos import pedido_saida
-from src.use_cases import clientes, fidelidade
+from src.use_cases import clientes
 from src.utils.erros import NaoEncontrado
 
 router = APIRouter(prefix="/clientes", tags=["Clientes"])
@@ -35,21 +34,6 @@ def _cliente(db: Session, sessao: Sessao, cpf: str) -> m.Cliente:
 def listar(busca: str | None = None, db: Session = Depends(get_db), _: m.Usuario = Depends(acesso_painel)):
     """Busca por nome, e-mail, telefone (até 50 resultados). Só a equipe. Usada para abrir chamado em nome do cliente."""
     return [cliente_saida(c) for c in clientes.listar(db, busca)]
-
-
-@router.get("/unificado")
-def unificado(
-    cpf: str | None = None,
-    email: str | None = None,
-    telefone: str | None = None,
-    db: Session = Depends(get_db),
-    _: m.Usuario = Depends(acesso_painel),
-):
-    """Equipe: a mesma pessoa nas duas marcas. Busca por CPF, e-mail e/ou telefone (com DDD, qualquer
-    máscara) e devolve cada cliente encontrado com os pedidos da Casa Lorenzi e da Vulto
-    (`marca` em cada pedido, `totaisPorMarca`) e a conta Vulto+. Clientes da Vulto podem não ter CPF
-    (`id` nulo). Sem resultado: lista vazia; sem nenhum parâmetro ou com valor inválido: 422."""
-    return [cliente_unificado_saida(c, pedidos, conta) for c, pedidos, conta in clientes.unificado(db, cpf, email, telefone)]
 
 
 @router.get("/{cliente_id}")
@@ -83,12 +67,3 @@ def obter_atendimento(cliente_id: str, atendimento_id: int, db: Session = Depend
     """Chamado com a conversa e as fotos. Chamado de outro cliente: 404."""
     cliente = _cliente(db, sessao, cliente_id)
     return detalhe_saida(db, clientes.atendimento(db, cliente.id, atendimento_id))
-
-
-@router.get("/{cliente_id}/vulto-mais")
-def extrato_vulto_mais(cliente_id: str, db: Session = Depends(get_db), sessao: Sessao = Depends(acesso)):
-    """Extrato de pontos do Vulto+: saldo (em pontos e em reais, a R$ 0,05), categoria pela regra e a
-    declarada na planilha da Vulto, o saldo por data de vencimento e os movimentos (mais recente primeiro).
-    Saldo na virada (01/10/2026). Cliente sem conta Vulto+: 404."""
-    conta, a_vencer = fidelidade.extrato(db, _cliente(db, sessao, cliente_id))
-    return extrato_saida(conta, a_vencer)

@@ -9,8 +9,6 @@ from src.models.anexo import Anexo
 from src.models.atendimento import Atendimento
 from src.models.categoria import Categoria
 from src.models.cliente import Cliente
-from src.models.conta_pontos import ContaPontos
-from src.models.de_para import DePara
 from src.models.devolucao import Devolucao
 from src.models.estoque import Estoque
 from src.models.evento_pedido import EventoPedido
@@ -20,13 +18,10 @@ from src.models.item_pedido import ItemPedido
 from src.models.log_acao import LogAcao
 from src.models.loja import Loja
 from src.models.mensagem import Mensagem
-from src.models.migracao_ocorrencia import MigracaoOcorrencia
 from src.models.movimentacao import Movimentacao
-from src.models.movimento_pontos import MovimentoPontos
 from src.models.pagamento import Pagamento
 from src.models.pedido import Pedido
 from src.models.produto import Produto
-from src.models.sku_alias import SkuAlias
 from src.models.tipo_solicitacao import TipoSolicitacao
 from src.models.token_senha import TokenSenha
 from src.models.transferencia import Transferencia
@@ -57,10 +52,4 @@ __all__ = [
     "ConfigFrete",
     "FreteRegiao",
     "LogAcao",
-    # União com a Vulto: grafias de SKU, rastreio da migração e Vulto+
-    "SkuAlias",
-    "DePara",
-    "MigracaoOcorrencia",
-    "ContaPontos",
-    "MovimentoPontos",
 ]

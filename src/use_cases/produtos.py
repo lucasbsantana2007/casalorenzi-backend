@@ -3,43 +3,31 @@ from decimal import Decimal
 from sqlalchemy.orm import Session
 
 from src import models as m
-from src.entities.produto import ESTACAO_PADRAO, ESTACOES, GENEROS, alias_normalizado
+from src.entities.produto import ESTACAO_PADRAO, ESTACOES, GENEROS
 from src.repositories import cadastro_repository, estoque_repository, produto_repository, sessao
 from src.schemas.produtos import ProdutoEntrada
 from src.use_cases import anexos, log_acoes
 from src.use_cases.estoque import criar_estoques_zerados
-from src.utils.datas import agora, ler_data
+from src.utils.datas import agora
 from src.utils.erros import Conflito, DadosInvalidos, NaoEncontrado
 from src.utils.texto import chave_texto, corresponde, moeda
 
 
-def listar(
-    db: Session, busca: str | None = None, categoria: str | None = None, ativo: bool | None = None, marca: str | None = None
-) -> list[m.Produto]:
+def listar(db: Session, busca: str | None = None, categoria: str | None = None, ativo: bool | None = None) -> list[m.Produto]:
     produtos = [
         p
-        for p in produto_repository.listar(db, categoria=categoria, ativo=ativo, marca=marca)
+        for p in produto_repository.listar(db, categoria=categoria, ativo=ativo)
         if corresponde(busca, p.nome, p.categoria.nome, *(v.sku for v in p.variacoes))
     ]
     produtos.sort(key=lambda p: chave_texto(p.nome))
     return produtos
 
 
-def obter(db: Session, produto_id: int, marca: str | None = None) -> m.Produto:
-    """marca: só aceita produto dessa marca (a vitrine só mostra a da marca do site)."""
+def obter(db: Session, produto_id: int) -> m.Produto:
     produto = produto_repository.obter(db, produto_id)
-    if produto is None or produto.removido_em is not None or (marca and produto.marca != marca):
+    if produto is None or produto.removido_em is not None:
         raise NaoEncontrado("Produto não encontrado.")
     return produto
-
-
-def por_grafia(db: Session, codigo: str, data: str | None = None) -> tuple[m.Variacao, m.SkuAlias | None]:
-    """Variação de qualquer grafia de SKU (canônica, código curto do CD, digitação do fiscal...). Com
-    data (aaaa-mm-dd), resolve o código reaproveitado: a mesma grafia pode ser outra peça em outra época."""
-    achado = produto_repository.variacao_por_grafia(db, alias_normalizado(codigo), ler_data(data, "data"))
-    if achado is None:
-        raise NaoEncontrado("Nenhuma variação com esse código.")
-    return achado
 
 
 def totais_de_estoque(db: Session, produtos: list[m.Produto]) -> dict[int, int]:

@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from src import models as m
@@ -20,18 +20,6 @@ def por_email(db: Session, email: str) -> m.Cliente | None:
 
 def por_cpf(db: Session, cpf: str) -> m.Cliente | None:
     return db.scalar(select(m.Cliente).where(m.Cliente.cpf == cpf))
-
-
-def por_telefone(db: Session, e164: str) -> list[m.Cliente]:
-    """Clientes com esse telefone (E.164), qualquer que seja a máscara gravada: os da Casa Lorenzi vêm
-    como "(11) 98422-1937"; os da Vulto, como "+5511984221937"."""
-    nacional = e164.removeprefix("+55")
-    digitos = func.regexp_replace(m.Cliente.telefone, r"\D", "", "g")
-    return list(db.scalars(select(m.Cliente).where(digitos.in_((nacional, f"55{nacional}"))).order_by(m.Cliente.id)))
-
-
-def conta_pontos(db: Session, cliente_id: int) -> m.ContaPontos | None:
-    return db.scalar(select(m.ContaPontos).where(m.ContaPontos.cliente_id == cliente_id))
 
 
 def listar(db: Session, busca: str | None = None, limite: int = 50) -> list[m.Cliente]:
