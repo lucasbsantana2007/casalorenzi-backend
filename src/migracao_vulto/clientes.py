@@ -89,6 +89,7 @@ class Contexto:
         self.db = db
         self.resultado = Resultado(DOMINIO)
         self.corrigidos: set[tuple[str, str]] = set()
+        self.por_email: dict[str, m.Cliente] = {}  # e-mail → cliente, como está agora (mudanças desta rodada incluídas)
 
     def ocorrencia(self, codigo, origem, descricao, acao, *, id_origem=None, original=None, final=None):
         migracao_repository.registrar_ocorrencia(
@@ -344,8 +345,8 @@ def _criados_pela_migracao(db: Session) -> set[int]:
     )
 
 
-def _clientes_da_lorenzi(db: Session, criados: set[int]) -> list[m.Cliente]:
-    return [c for c in db.scalars(select(m.Cliente).where(m.Cliente.excluido_em.is_(None))) if c.id not in criados]
+def _clientes_da_lorenzi(todos: list[m.Cliente], criados: set[int]) -> list[m.Cliente]:
+    return [c for c in todos if c.excluido_em is None and c.id not in criados]
 
 
 def _ja_migrado(db: Session, grupo: Grupo) -> m.Cliente | None:
@@ -381,31 +382,43 @@ def migrar(db: Session) -> Resultado:
     _distribuir_emails(ctx, grupos)
 
     criados = _criados_pela_migracao(db)
-    lorenzi = _clientes_da_lorenzi(db, criados)
+    # Todos carregados e guardados numa variável (a sessão só guarda referência fraca): sem isso, cada cliente de
+    # uma rodada anterior voltaria do banco um por um
+    todos = list(db.scalars(select(m.Cliente)))
+    lorenzi = _clientes_da_lorenzi(todos, criados)
     # Telefone da Casa Lorenzi vem com máscara ("(11) 98422-1937"): compara pela forma E.164
     indices = {campo: {getattr(c, campo): c for c in lorenzi if getattr(c, campo)} for campo in ("cpf", "email")}
     indices["telefone"] = {telefone_e164(c.telefone): c for c in lorenzi if telefone_e164(c.telefone)}
     lojas = {i: lojas_vulto.loja_da_vulto(db, i) for i in lojas_vulto.LOJAS}
+    # Carregados uma vez (uma consulta por cliente seriam milhares de idas ao banco)
+    ctx.por_email = {c.email: c for c in db.scalars(select(m.Cliente).where(m.Cliente.email.is_not(None)))}
+    contas_existentes = {c.cliente_id: c for c in db.scalars(select(m.ContaPontos))}
     contas = sem_nome = mesclados = 0
     usados: set[int] = set()
+    # 1) Cada grupo vira (ou atualiza) um cliente, com a conta Vulto+; os ids saem num flush só
+    clientes: list[tuple[Grupo, m.Cliente, bool]] = []
     for grupo in sorted(grupos, key=lambda g: min((r.origem, r.id_origem) for r in g.registros)):
         cliente = _ja_migrado(db, grupo) or _da_lorenzi(indices, grupo)
-        if cliente is not None and cliente.id not in criados:
+        criado = cliente is None or cliente.id in criados
+        if not criado:
             mesclados += 1
             _completar_lorenzi(ctx, cliente, grupo)
         else:
             cliente = _gravar_vulto(ctx, cliente, grupo, lojas)
-            db.flush()
+            sem_nome += cliente.nome == NOME_PROVISORIO
+        if cliente.cpf:
+            contas += _conta_pontos(db, contas_existentes, cliente, grupo)
+        clientes.append((grupo, cliente, criado))
+    db.flush()
+    # 2) Os vínculos e as ocorrências que citam o cliente, na mesma ordem
+    for grupo, cliente, criado in clientes:
+        if criado:
             migracao_repository.vincular(db, ORIGEM_CRIADO, _id_grupo(grupo), "clientes", cliente.id)
             criados.add(cliente.id)
-            sem_nome += cliente.nome == NOME_PROVISORIO
-        db.flush()
         usados.add(cliente.id)
         for r in grupo.registros:
             migracao_repository.vincular(db, r.origem, r.id_origem, "clientes", cliente.id)
         _registrar_fusao(ctx, grupo, cliente)
-        if cliente.cpf:
-            contas += _conta_pontos(db, cliente, grupo)
 
     db.flush()
     _remover_obsoletos(ctx, criados - usados)
@@ -499,11 +512,7 @@ def _gravar_vulto(ctx: Contexto, cliente: m.Cliente | None, grupo: Grupo, lojas:
         )
     emails = grupo.valores("email")
     email = grupo.mais_recente("email")
-    if (
-        email
-        and (outro := db.scalar(select(m.Cliente).where(m.Cliente.email == email)))
-        and (cliente is None or outro.id != cliente.id)
-    ):
+    if email and (outro := ctx.por_email.get(email)) is not None and outro is not cliente:
         ctx.ocorrencia(
             "EMAIL_JA_USADO",
             ORIGEM_CLIENTES,
@@ -531,6 +540,10 @@ def _gravar_vulto(ctx: Contexto, cliente: m.Cliente | None, grupo: Grupo, lojas:
     loja = grupo.mais_recente("loja_legado")
     cliente.nome = _nome(ctx, grupo)
     cliente.cpf = next(iter(grupo.valores("cpf")), None)
+    if cliente.email and ctx.por_email.get(cliente.email) is cliente:
+        del ctx.por_email[cliente.email]
+    if email:
+        ctx.por_email[email] = cliente
     cliente.email = email
     cliente.telefone = grupo.mais_recente("telefone")
     cliente.cliente_desde = min(datas) if datas else date.today()
@@ -593,10 +606,10 @@ def _registrar_fusao(ctx: Contexto, grupo: Grupo, cliente: m.Cliente) -> None:
         )
 
 
-def _conta_pontos(db: Session, cliente: m.Cliente, grupo: Grupo) -> int:
-    conta = db.scalar(select(m.ContaPontos).where(m.ContaPontos.cliente_id == cliente.id))
+def _conta_pontos(db: Session, existentes: dict[int, m.ContaPontos], cliente: m.Cliente, grupo: Grupo) -> int:
+    conta = existentes.get(cliente.id) if cliente.id else None
     if conta is None:
-        conta = m.ContaPontos(cliente_id=cliente.id, saldo=0)
+        conta = m.ContaPontos(cliente=cliente, saldo=0)  # pelo relacionamento: o cliente novo ainda não tem id
         db.add(conta)
     conta.categoria_declarada = grupo.mais_recente("categoria_declarada")
     return 1
@@ -621,5 +634,6 @@ def _remover_obsoletos(ctx: Contexto, obsoletos: set[int]) -> None:
         contas = select(m.ContaPontos.id).where(m.ContaPontos.cliente_id == cliente_id)
         db.execute(m.MovimentoPontos.__table__.delete().where(m.MovimentoPontos.conta_id.in_(contas)))
         db.execute(m.ContaPontos.__table__.delete().where(m.ContaPontos.cliente_id == cliente_id))
+        migracao_repository.esquecer_vinculos(db)
         db.execute(m.DePara.__table__.delete().where(m.DePara.tabela_destino == "clientes", m.DePara.id_destino == cliente_id))
         db.execute(m.Cliente.__table__.delete().where(m.Cliente.id == cliente_id))
