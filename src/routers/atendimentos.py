@@ -1,6 +1,8 @@
 """Atendimento: painel interno (administrador e lojista) e o cliente logado, que abre e responde
 os próprios chamados. A equipe também abre chamados em nome do cliente."""
 
+from typing import Literal
+
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
@@ -28,7 +30,9 @@ def lista_saida(db: Session, lista: list[m.Atendimento]) -> list[dict]:
 
 
 def detalhe_saida(db: Session, a: m.Atendimento) -> dict:
-    return atendimento_detalhado_saida(a, *atendimentos.totais_do_cliente(db, a.cliente_id))
+    total_pedidos, total_atendimentos = atendimentos.totais_do_cliente(db, a.cliente_id)
+    outros, pedidos = atendimentos.historico(db, a)
+    return atendimento_detalhado_saida(a, total_pedidos, total_atendimentos or len(outros) + 1, outros, pedidos)
 
 
 @router.get("")
@@ -37,12 +41,21 @@ def listar(
     tipoSolicitacaoId: int | None = None,
     responsavelId: str | None = None,
     lojaId: int | None = None,
+    marca: Literal["LORENZI", "VULTO"] | None = None,
+    canal: Literal["SITE", "WHATSAPP", "INSTAGRAM", "EMAIL"] | None = None,
     db: Session = Depends(get_db),
     _: m.Usuario = Depends(acesso_painel),
 ):
-    """responsavelId='nenhum' lista os atendimentos sem responsável."""
+    """responsavelId='nenhum' lista os atendimentos sem responsável. `marca` e `canal` filtram (os da Vulto
+    vieram de WhatsApp, Instagram e e-mail); a busca também acha pelo contato (telefone, e-mail, @)."""
     lista = atendimentos.listar(
-        db, busca=busca, tipo_solicitacao_id=tipoSolicitacaoId, responsavel_id=responsavelId, loja_id=lojaId
+        db,
+        busca=busca,
+        tipo_solicitacao_id=tipoSolicitacaoId,
+        responsavel_id=responsavelId,
+        loja_id=lojaId,
+        marca=marca,
+        canal=canal,
     )
     return lista_saida(db, lista)
 
@@ -66,6 +79,9 @@ def abrir(dados: SolicitacaoEntrada, db: Session = Depends(get_db), sessao: Sess
 
 @router.get("/{atendimento_id}")
 def obter(atendimento_id: int, db: Session = Depends(get_db), _: m.Usuario = Depends(acesso_painel)):
+    """Com o cliente e o pedido do atendimento, os outros atendimentos da mesma pessoa (`outrosAtendimentos`,
+    pelo cliente ou pelo contato) e os pedidos dela nas duas marcas (`pedidosDoCliente`). Atendimento da Vulto
+    sem cliente identificado: `cliente.identificado` falso, com o nome e o contato que a pessoa deu."""
     return detalhe_saida(db, atendimentos.carregar(db, atendimento_id))
 
 

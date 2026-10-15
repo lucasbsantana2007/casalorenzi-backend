@@ -163,6 +163,8 @@ def alterar_status_funcionario(db: Session, autor: m.Usuario, usuario_id: int, a
         raise DadosInvalidos(MINIMO_DE_ADMIN)
     if usuario.ativo == ativo:
         return usuario
+    if ativo and not usuario.email:
+        raise DadosInvalidos(f"Cadastre o e-mail de {usuario.nome} antes de reativar o acesso.")
     usuario.ativo = ativo
     log_acoes.registrar(
         db,
