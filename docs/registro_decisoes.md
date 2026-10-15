@@ -96,7 +96,7 @@ O que não dá para recuperar com os dados entregues e como isso afeta os númer
 
 ## Apêndice: todas as ocorrências da migração
 
-108 tipos de ocorrência, 16.182 registros. Ação: CORRIGIDO (entrou com valor ajustado), DESCARTADO (não entrou), ESTIMADO (entrou com estimativa), MANTIDO (entrou como veio, com o aviso), PENDENTE (precisa de alguém).
+109 tipos de ocorrência, 16.187 registros. Ação: CORRIGIDO (entrou com valor ajustado), DESCARTADO (não entrou), ESTIMADO (entrou com estimativa), MANTIDO (entrou como veio, com o aviso), PENDENTE (precisa de alguém).
 
 ### atendimento
 
@@ -113,6 +113,7 @@ O que não dá para recuperar com os dados entregues e como isso afeta os númer
 | `ATENDIMENTO_REPETIDO` · | DESCARTADO | 17 | — | atendimentos.csv | Linha repetida na exportação (mesmo contato, hora e mensagem): entra uma vez. |
 | `ASSUNTO_SEM_TIPO` · | CORRIGIDO | 12 | — | atendimentos.csv | Sem assunto nem tag reconhecida: entra como dúvida sobre produto. |
 | `ATENDIMENTO_SPAM` | DESCARTADO | 10 | — | atendimentos.csv | Spam ou mensagem de teste: fora do atendimento. |
+| `TIPO_CRIADO` · | CORRIGIDO | 5 | — | atendimentos.csv | Tipo de solicitação que a Casa Lorenzi não tinha: criado inativo (não aparece no site até alguém ativar). |
 | `CONTATO_AMBIGUO` | PENDENTE | 1 | — | atendimentos.csv | O contato é de mais de um cliente: fica sem cliente (ou o do pedido). |
 
 ### clientes
