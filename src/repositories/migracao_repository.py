@@ -73,3 +73,25 @@ def ocorrencias_por_acao(db: Session, dominio: str) -> dict[str, int]:
         .group_by(m.MigracaoOcorrencia.acao_tomada)
     )
     return {acao: int(n) for acao, n in linhas}
+
+
+def origem(db: Session, tabela_destino: str, id_destino: int, origem_: str) -> str | None:
+    """id na origem do registro da plataforma (o caminho inverso do de_para)."""
+    return db.scalar(
+        select(m.DePara.id_origem).where(
+            m.DePara.tabela_destino == tabela_destino, m.DePara.id_destino == id_destino, m.DePara.origem == origem_
+        )
+    )
+
+
+def motivo_da_venda(db: Session, venda_id: str) -> str | None:
+    """Por que uma venda da Vulto não virou pedido (teste, duplicata ou devolução)."""
+    if db.scalar(select(m.DePara.id).where(m.DePara.origem == "vulto.db:vendas", m.DePara.id_origem.like(f"{venda_id}:%"))):
+        return "é uma devolução (valor negativo); está nas devoluções do pedido de origem."
+    return db.scalar(
+        select(m.MigracaoOcorrencia.descricao).where(
+            m.MigracaoOcorrencia.dominio == "vendas",
+            m.MigracaoOcorrencia.id_origem == venda_id,
+            m.MigracaoOcorrencia.acao_tomada == "DESCARTADO",
+        )
+    )

@@ -150,15 +150,22 @@ def listar(
     loja_id: int | None = None,
     canal: str | None = None,
     busca: str | None = None,
+    marca: str | None = MARCA_DO_SITE,
 ) -> list[m.Pedido]:
-    """Lojista e Operador recebem só os pedidos da própria loja, qualquer que seja o lojaId pedido."""
+    """Lojista e Operador recebem só os pedidos da própria loja, qualquer que seja o lojaId pedido.
+    marca: por padrão, só os da Casa Lorenzi (os ~18 mil pedidos históricos da Vulto deixariam a lista
+    lenta demais para o painel); None traz as duas marcas."""
     if status and status not in STATUS_PEDIDO:
         raise DadosInvalidos("Status de pedido inválido.")
     escopo = loja_do_escopo(usuario.papel, usuario.loja_id)
     if escopo is not None:
         loja_id = escopo
-    pedidos = pedido_repository.listar(db, status=status, loja_id=loja_id, canal=canal)
-    return [p for p in pedidos if corresponde(busca, p.numero, p.cliente.nome, p.cliente.email)]
+    pedidos = pedido_repository.listar(db, status=status, loja_id=loja_id, canal=canal, marca=marca)
+    return [
+        p
+        for p in pedidos
+        if corresponde(busca, p.numero, p.pedido_externo, *((p.cliente.nome, p.cliente.email) if p.cliente else ()))
+    ]
 
 
 def obter(db: Session, pedido_id: int, usuario: m.Usuario) -> m.Pedido:
