@@ -51,5 +51,8 @@ def sku_em_uso(db: Session, skus: list[str], exceto_produto_id: int | None = Non
     return db.scalar(consulta)
 
 
-def todas_variacoes(db: Session) -> list[m.Variacao]:
-    return list(db.scalars(select(m.Variacao).order_by(m.Variacao.id)))
+def todas_variacoes(db: Session, marca: str | None = None) -> list[m.Variacao]:
+    consulta = select(m.Variacao).order_by(m.Variacao.id)
+    if marca:
+        consulta = consulta.join(m.Variacao.produto).where(m.Produto.marca == marca)
+    return list(db.scalars(consulta))

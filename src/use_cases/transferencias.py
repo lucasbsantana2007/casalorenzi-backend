@@ -67,6 +67,9 @@ def criar(
         raise Conflito("Este produto foi removido do catálogo.")
     if loja_origem_id == loja_destino_id:
         raise DadosInvalidos("A loja de destino deve ser diferente da origem.")
+    lojas = [cadastro_repository.loja(db, loja_id) for loja_id in (loja_origem_id, loja_destino_id)]
+    if any(loja is not None and loja.marca != variacao.produto.marca for loja in lojas):
+        raise DadosInvalidos("A transferência só pode ser entre lojas da mesma marca do produto.")
     origem = estoque_repository.por_loja_e_variacao(db, loja_origem_id, variacao_id)
     if origem is None:
         raise NaoEncontrado("Item não encontrado na loja de origem.")
