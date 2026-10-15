@@ -38,6 +38,8 @@ class CheckoutEntrada(Entrada):
     frete_tipo: Literal["PADRAO", "EXPRESSO"] = "PADRAO"
     pagamento: PagamentoCheckoutEntrada = PagamentoCheckoutEntrada()
     itens: list[ItemCheckoutEntrada] = []
+    # Pontos Vulto+ usados como desconto (0 = não usa)
+    pontos: int = 0
 
 
 class PedidoAtualizacao(Entrada):
@@ -104,6 +106,7 @@ def pedido_saida(pedido: m.Pedido | None) -> dict | None:
         "criadoEm": ms(pedido.criado_em),
         "codigoRastreio": pedido.codigo_rastreio,
         "subtotal": float(pedido.subtotal),
+        "desconto": float(pedido.desconto or 0),
         "total": float(pedido.total),
         "frete": _frete(pedido),
         "endereco": _endereco(pedido),
@@ -165,6 +168,7 @@ def pedido_publico_saida(pedido: m.Pedido) -> dict:
         "frete": _frete(pedido),
         "pagamento": _pagamento(pedido),
         "subtotal": float(pedido.subtotal),
+        "desconto": float(pedido.desconto or 0),
         "total": float(pedido.total),
         "itens": [
             {

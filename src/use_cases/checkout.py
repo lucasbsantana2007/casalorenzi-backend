@@ -1,6 +1,7 @@
 """Checkout da loja: o cliente compra logado na própria conta (criada no checkout, com CPF,
 e-mail e senha, em POST /auth/cadastro). O cliente vem do token; o corpo só traz entrega,
-pagamento e itens.
+pagamento, itens e os pontos Vulto+ que o cliente quer usar como desconto (regras do resgate em
+src/use_cases/fidelidade.py: compra mínima de R$ 500 em produtos, sem o frete).
 
 Numa única transação: confere os dados, recalcula preços e frete no servidor (nada de valor
 vem do navegador), escolhe a loja de expedição, grava pedido, itens e pagamento (aprovado:
@@ -22,8 +23,8 @@ from src.integrations import modelos_email
 from src.integrations.email import enviar as enviar_email
 from src.repositories import estoque_repository, pedido_repository, produto_repository, sessao
 from src.schemas.pedidos import CheckoutEntrada
+from src.use_cases import fidelidade, pagamentos
 from src.use_cases import frete as frete_config
-from src.use_cases import pagamentos
 from src.use_cases.pedidos import disponiveis_na_rede, escolher_loja_expedicao, planejar_transferencias, registrar_evento
 from src.utils.datas import agora
 from src.utils.erros import Conflito, DadosInvalidos
@@ -91,6 +92,7 @@ def finalizar_compra(db: Session, cliente: m.Cliente, dados: CheckoutEntrada) ->
     if metodo not in METODOS_ECOMMERCE:
         raise DadosInvalidos("Escolha a forma de pagamento.")
     parcelas = min(max(dados.pagamento.parcelas or 1, 1), PARCELAS_MAX) if metodo == "CARTAO" else 1
+    desconto = fidelidade.conferir_resgate(db, cliente, subtotal, dados.pontos)
 
     loja = escolher_loja_expedicao(db, [(v.id, q) for v, q, _ in itens], cep)
     momento = agora()
@@ -101,7 +103,8 @@ def finalizar_compra(db: Session, cliente: m.Cliente, dados: CheckoutEntrada) ->
         canal="E-commerce",
         status="PROCESSANDO",
         subtotal=subtotal,
-        total=subtotal + frete_valor,
+        desconto=desconto,
+        total=subtotal - desconto + frete_valor,
         frete_tipo=dados.frete_tipo,
         frete_valor=frete_valor,
         frete_prazo_dias=prazo,
@@ -117,6 +120,8 @@ def finalizar_compra(db: Session, cliente: m.Cliente, dados: CheckoutEntrada) ->
         itens=[m.ItemPedido(variacao_id=v.id, quantidade=q, preco_unitario=preco) for v, q, preco in itens],
     )
     sessao.adicionar(db, pedido)
+    if desconto:
+        fidelidade.registrar_resgate(db, cliente, pedido, dados.pontos, momento)
     pagamentos.novo(db, pedido, metodo=metodo, valor=pedido.total, parcelas=parcelas, quando=momento)
     registrar_evento(db, pedido, "PROCESSANDO", observacao=f"Pagamento aprovado · expedição: {loja.nome}", quando=momento)
     sessao.gerar_ids(db)

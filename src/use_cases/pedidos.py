@@ -19,7 +19,7 @@ from src.entities.papeis import ADMINISTRADOR, loja_do_escopo, ve_pedido_da_loja
 from src.entities.pedido import STATUS_PEDIDO, pode_mudar, pontuar_loja
 from src.entities.transferencia import pode_mudar as transferencia_pode_mudar
 from src.repositories import cadastro_repository, estoque_repository, pedido_repository, sessao
-from src.use_cases import log_acoes, transferencias
+from src.use_cases import fidelidade, log_acoes, transferencias
 from src.use_cases.estoque import aplicar_movimentacao
 from src.use_cases.pagamentos import estornar_aprovados
 from src.utils.datas import agora
@@ -251,8 +251,10 @@ def atualizar(
     else:  # CANCELADO
         _cancelar_transferencias_pendentes(pedido)
         estornar_aprovados(db, pedido, momento)
+        pontos = fidelidade.devolver_resgate(db, pedido, momento)
         pedido.status = status
-        registrar_evento(db, pedido, status, usuario_id=usuario.id, observacao="Pagamento estornado", quando=momento)
+        observacao = "Pagamento estornado" + (f" e {pontos} pontos Vulto+ devolvidos" if pontos else "")
+        registrar_evento(db, pedido, status, usuario_id=usuario.id, observacao=observacao, quando=momento)
         _log(db, usuario, pedido, f"Cancelou o pedido {pedido.numero} e estornou o pagamento")
 
     sessao.confirmar(db)

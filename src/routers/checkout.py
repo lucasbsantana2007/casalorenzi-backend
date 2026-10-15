@@ -15,5 +15,6 @@ router = APIRouter(tags=["Loja"])
 @router.post("/checkout", status_code=201)
 def finalizar_compra(dados: CheckoutEntrada, db: Session = Depends(get_db), cliente: m.Cliente = Depends(cliente_atual)):
     """Cria o pedido do cliente logado (pagamento simulado, aprovado). Preços e frete são recalculados
-    aqui. Sem sessão de cliente: 401. Item esgotado: 409."""
+    aqui. `pontos` usa o saldo Vulto+ como desconto (múltiplos de 100, compra de pelo menos R$ 500 em
+    produtos, sem o frete; fora disso: 422). Sem sessão de cliente: 401. Item esgotado: 409."""
     return pedido_publico_saida(checkout.finalizar_compra(db, cliente, dados))
