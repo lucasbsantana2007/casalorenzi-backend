@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 
 
 class Pedido(Base):
-    """Venda da loja física ou do e-commerce. total = subtotal (itens) + frete_valor."""
+    """Venda da loja física ou do e-commerce. total = subtotal (itens) − desconto + frete_valor."""
 
     __tablename__ = "pedidos"
     __table_args__ = (
@@ -29,6 +29,7 @@ class Pedido(Base):
         CheckConstraint(valor_em("canal", CANAIS), name="ck_pedidos_canal"),
         # Nulo na loja física; o IN do SQL aceita NULL
         CheckConstraint(valor_em("frete_tipo", TIPOS_FRETE), name="ck_pedidos_frete_tipo"),
+        CheckConstraint("desconto >= 0 AND desconto <= subtotal", name="ck_pedidos_desconto"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -41,6 +42,8 @@ class Pedido(Base):
     codigo_rastreio: Mapped[str | None] = mapped_column(String(40))
     subtotal: Mapped[Decimal] = mapped_column(Numeric(12, 2))
     total: Mapped[Decimal] = mapped_column(Numeric(12, 2))
+    # Desconto do resgate de pontos Vulto+ (zero quando o cliente não usa pontos)
+    desconto: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0, server_default="0")
     # Frete e endereço de entrega: só e-commerce (nulos na loja física)
     frete_tipo: Mapped[str | None] = mapped_column(String(20))
     frete_valor: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))

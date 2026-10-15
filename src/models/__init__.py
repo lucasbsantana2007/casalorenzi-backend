@@ -19,6 +19,7 @@ from src.models.log_acao import LogAcao
 from src.models.loja import Loja
 from src.models.mensagem import Mensagem
 from src.models.movimentacao import Movimentacao
+from src.models.movimento_pontos import MovimentoPontos
 from src.models.pagamento import Pagamento
 from src.models.pedido import Pedido
 from src.models.produto import Produto
@@ -52,4 +53,5 @@ __all__ = [
     "ConfigFrete",
     "FreteRegiao",
     "LogAcao",
+    "MovimentoPontos",
 ]
