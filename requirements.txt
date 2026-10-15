@@ -8,3 +8,5 @@ pyjwt~=2.15.1
 bcrypt~=5.0.0
 httpx~=0.28.1
 truststore~=0.10.4
+# Migração da Vulto: leitura das planilhas (valores, tipos e formatação das células)
+openpyxl~=3.1.5
