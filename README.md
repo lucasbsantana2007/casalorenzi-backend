@@ -178,6 +178,7 @@ Todas sob o prefixo `/api`. As rotas internas exigem `Authorization: Bearer <tok
 | GET | `/financeiro/resumo?de&ate&comparar&agrupar&lojas&canais&categorias&generos&marcas` (sem `marcas`, soma as duas) | administrador |
 | GET | `/financeiro/faturamento?de&ate&marca` (mês × loja × canal, com e sem frete, devoluções e líquido) | administrador |
 | GET | `/financeiro/faturamento/comparativo-vulto?de&ate` (relatório do sistema da Vulto × nosso número, com a diferença por ajuste) | administrador |
+| GET | `/diretoria/numeros` (faturamento, estoque e passivo da Vulto, com explicação, decisões e margem) · `/diretoria/numeros/{secao}.csv` (`faturamento`, `ponte`, `estoque-lojas`, `estoque-produtos`, `passivo`; Excel em português) | administrador |
 | GET | `/financeiro/vulto-mais/passivo?data` (pontos válidos do Vulto+ em R$, cenários Ouro 12/18 meses e a faixa mínima/máxima; padrão 01/10/2026) | administrador |
 
 ## Regras importantes
@@ -370,6 +371,10 @@ Ao final, imprime lidos, carregados, corrigidos e descartados por domínio. Cont
 rode do seu computador com a "External Database URL": `DATABASE_URL="postgresql+psycopg://..."`.
 **Atenção:** `python -m src.database.seed --recriar` apaga tudo, inclusive o que veio da Vulto;
 depois dele, rode a migração de novo.
+
+**Números da diretoria.** Depois da migração, `python -m src.relatorios.diretoria --saida docs/numeros_diretoria`
+gera o JSON e os CSVs com as três respostas (faturamento com a ponte até o relatório da Vulto, estoque em
+01/10/2026 e passivo de pontos); os gerados com o banco de validação estão em `docs/numeros_diretoria/`.
 
 ## Testes
 

@@ -1,0 +1,6 @@
+﻿loja;tipo;abertura;entradas;transferencias;vendas;devolucoes;ajusteContagem;outros;saldo;data_contagem;data_estimada
+CD Cajamar;CD;15981;21077;-19638;-12357;48;1443;0;6554;2026-09-28;não
+Vulto Batel;FISICA;922;13;4163;-3779;32;530;0;1881;2026-09-30;sim
+Vulto Pinheiros;FISICA;1509;8;6114;-6229;39;965;0;2406;2026-09-20;não
+Vulto Savassi;FISICA;1213;29;4095;-4134;37;874;0;2114;2026-09-30;sim
+Vulto Shopping Eldorado;FISICA;1286;12;5266;-5294;45;978;0;2293;2026-09-30;sim
