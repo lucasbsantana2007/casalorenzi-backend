@@ -113,12 +113,12 @@ Nunca coloque a chave no git; no deploy (Render), cadastre as mesmas variáveis 
 
 | Módulo | Tabelas |
 | --- | --- |
-| Núcleo | `lojas` (endereço, telefone, horários, `ativa`, `marca` e `tipo`), `usuarios` (só a equipe: ADMINISTRADOR, LOJISTA, OPERADOR; sem senha enquanto o convite está pendente) |
+| Núcleo | `lojas` (endereço, telefone, horários, `ativa`, `marca` e `tipo`), `usuarios` (só a equipe: ADMINISTRADOR, LOJISTA, OPERADOR; sem senha enquanto o convite está pendente; os funcionários da Vulto vieram sem e-mail e ficam inativos até ter um) |
 | Clientes | `clientes` (CPF e e-mail únicos, e-mail opcional para clientes vindos da Vulto, pelo menos um de CPF/e-mail/telefone, consentimento de marketing; senha só como hash), `tokens_senha` |
 | Catálogo | `categorias`, `produtos` (com descrição, composição, cuidados, `marca` e `colecao`), `variacoes` (SKU, com `preco_custo` = último custo, `custo_medio` = média ponderada das notas, `ean` e `ativa`), `sku_alias` (outras grafias do SKU, com vigência), `imagens_produto` (foto enviada no cadastro) |
 | Estoque | `estoques` (saldo por **loja + SKU**), `movimentacoes` (histórico com sinal), `transferencias` (com `pedido_id` quando atendem um pedido) |
 | Vendas | `pedidos` (com frete e endereço de entrega no e-commerce, `desconto`, `tipo` VENDA/TROCA e `pedido_externo`; cliente opcional nas vendas da Vulto sem cliente), `itens_pedido`, `eventos_pedido` (histórico), `pagamentos`, `devolucoes` (devolução da Vulto sem venda de origem: só a `variacao_id`) |
-| Atendimento | `tipos_solicitacao`, `atendimentos` (sempre de um cliente), `mensagens`, `anexos` (foto) |
+| Atendimento | `tipos_solicitacao`, `atendimentos` (`canal` SITE/WHATSAPP/INSTAGRAM/EMAIL, `contato` e `contato_nome`; cliente opcional nos da Vulto cujo contato não identifica ninguém), `mensagens`, `anexos` (foto) |
 | Administração | `config_frete` e `frete_regioes` (frete configurável), `log_acoes` (quem fez o quê) |
 | Vulto+ | `contas_pontos` (saldo e categoria por cliente), `movimentos_pontos` (extrato com sinal e validade) |
 | Migração da Vulto | `de_para` (cada registro migrado aponta para a origem), `migracao_ocorrencias` (problemas nos dados e o que foi feito) |
@@ -168,7 +168,7 @@ Todas sob o prefixo `/api`. As rotas internas exigem `Authorization: Bearer <tok
 | PATCH | `/pedidos/{id}` (loja de expedição ou status) | equipe |
 | GET | `/pedidos/{id}/pagamentos` | equipe |
 | POST | `/pedidos/{id}/devolucoes` · GET `/devolucoes?de&ate&lojaId` | equipe |
-| GET · GET, PATCH | `/atendimentos` · `/atendimentos/{id}` | administrador, lojista |
+| GET · GET, PATCH | `/atendimentos?busca&tipoSolicitacaoId&responsavelId&lojaId&marca&canal` · `/atendimentos/{id}` (com `outrosAtendimentos` da mesma pessoa e `pedidosDoCliente`) | administrador, lojista |
 | POST | `/atendimentos` (cliente: abre para si; equipe: em nome do cliente), `/atendimentos/{id}/mensagens` (aceita `anexo`) | administrador, lojista, cliente dono |
 | GET | `/clientes?busca` | administrador, lojista |
 | GET | `/clientes/unificado?cpf&email&telefone` (a mesma pessoa nas duas marcas: pedidos da Casa Lorenzi e da Vulto, conta Vulto+) | administrador, lojista |
@@ -341,6 +341,12 @@ planilha: 30/09, estimado; a Savassi contou por modelo e foi rateada) e o saldo 
 desconhecido, é o menor que deixa o histórico sem saldo negativo. Antes da contagem, o histórico é
 derivado; o saldo em 01/10/2026 é o contado mais os movimentos depois dele.
 
+**Funcionários** (`--dominio usuarios`). Os funcionários da Vulto viram usuários **inativos, sem e-mail
+e sem senha** (as senhas do legado estão em texto puro e não migram, nem a `senha_master`). Vendedor e
+gerente viram LOJISTA da loja; o operador do CD, OPERADOR; Diego, Paula e Marina, ADMINISTRADOR. Contas de
+teste e genéricas ficam de fora. Os atendentes do SAC (Marcos, Júlia, Renata) viram LOJISTA do CD. Para dar
+acesso: na Central administrativa, cadastre o e-mail, reative e reenvie o convite.
+
 **Fidelidade** (`--dominio fidelidade`). O Vulto+ vira `contas_pontos` + `movimentos_pontos` (pontos só
 com CPF). Saldo inicial: a coluna Pontos da planilha, congelada em 01/01/2025 ("2.203" = 2203; "2,7k",
 estimado; duplicados somam). Depois, os movimentos do `vulto.db` corrigidos: o crédito inflado pelo bug do
@@ -351,6 +357,14 @@ pelos pontos do ano, validade FIFO de 12 meses (Ouro 18, o combinado, é o grava
 O passivo (`/financeiro/vulto-mais/passivo`) recalcula a validade nos dois cenários do Ouro e mostra a
 faixa: R$ 0,05 por ponto (vigente desde mar/2025) a R$ 0,10 (o que o sistema da Vulto seguiu dando), com o
 dobro do online e o bônus Ouro que o sistema nunca aplicou no máximo.
+
+**Atendimento** (`--dominio atendimento`). Cada linha do CSV já é um atendimento inteiro: a conversa
+embutida ("[Atendente]: ...", "[Bot]: ...") vira `mensagens`; linhas repetidas e spam ficam de fora; linhas
+do mesmo contato e tipo a até 72 h viram um atendimento só. O cliente vem do contato (telefone ou e-mail) ou,
+se o contato não identifica ninguém (@ do Instagram, telefone sem DDD), do pedido citado; sem nenhum dos
+dois, o atendimento fica sem cliente, com o contato guardado. O pedido vem da coluna `pedido` (número no
+site/app ou id da venda) ou do texto. Tipos que faltavam (Pontos Vulto+, Pagamento, Cancelamento, Elogio,
+Informações da loja) são criados inativos, para não aparecerem no site da Casa Lorenzi sem decisão.
 
 Ao final, imprime lidos, carregados, corrigidos e descartados por domínio. Contra o banco do Render,
 rode do seu computador com a "External Database URL": `DATABASE_URL="postgresql+psycopg://..."`.
