@@ -318,10 +318,10 @@ def _pedido(ctx: Contexto, vinculos: Vinculos, grupo: Grupo) -> int | None:
 # ---------- Carga ----------
 
 
-def _ja_migrado(db: Session, grupo: Grupo) -> m.Atendimento | None:
+def _ja_migrado(db: Session, grupo: Grupo, anteriores: dict[int, m.Atendimento]) -> m.Atendimento | None:
     for linha in grupo.linhas:
         if destino := migracao_repository.destino(db, ORIGEM, linha.id, "atendimentos"):
-            return db.get(m.Atendimento, destino)
+            return anteriores.get(destino) or db.get(m.Atendimento, destino)
     return None
 
 
@@ -354,16 +354,26 @@ def migrar(db: Session) -> Resultado:
     cd = lojas.loja_da_vulto(db, lojas.ID_LEGADO_CD)
     usados: set[int] = set()
     contagem = defaultdict(int)
+    # Carregados em lote (um por grupo seriam milhares de idas ao banco): os pedidos citados e os atendimentos
+    # de rodadas anteriores, cujas mensagens são refeitas
+    pedido_do_grupo = [_pedido(ctx, vinculos, grupo) for grupo in grupos]
+    pedidos = {p.id: p for p in db.scalars(select(m.Pedido).where(m.Pedido.id.in_({i for i in pedido_do_grupo if i})))}
+    ids_anteriores = migracao_repository.destinos(db, ORIGEM, "atendimentos")
+    anteriores = (
+        {a.id: a for a in db.scalars(select(m.Atendimento).where(m.Atendimento.id.in_(ids_anteriores)))} if ids_anteriores else {}
+    )
+    if anteriores:
+        db.execute(delete(m.Mensagem).where(m.Mensagem.atendimento_id.in_(ids_anteriores)))
 
-    for grupo in grupos:
+    gravados: list[tuple[Grupo, m.Atendimento]] = []
+    for grupo, pedido_id in zip(grupos, pedido_do_grupo, strict=True):
         primeira, ultima = grupo.linhas[0], grupo.ultima
         if len(grupo.linhas) > 1:
             contagem["juntados"] += len(grupo.linhas) - 1
             ctx.ocorrencia("LINHAS_JUNTADAS", f"{len(grupo.linhas)} linhas do mesmo contato e assunto a menos de 72 h: um "
                            "atendimento só.", "CORRIGIDO", id_origem=primeira.id,
                            original=", ".join(li.id for li in grupo.linhas))  # fmt: skip
-        pedido_id = _pedido(ctx, vinculos, grupo)
-        pedido = db.get(m.Pedido, pedido_id) if pedido_id else None
+        pedido = pedidos.get(pedido_id)
         cliente_id, ambiguo = vinculos.cliente(primeira.chave)
         if ambiguo:
             ctx.ocorrencia("CONTATO_AMBIGUO", "O contato é de mais de um cliente: fica sem cliente (ou o do pedido).", "PENDENTE",
@@ -391,13 +401,11 @@ def migrar(db: Session) -> Resultado:
             ctx.ocorrencia("ATENDENTE_DESCONHECIDO", "Atendente que não é do SAC: sem responsável.", "MANTIDO",
                            id_origem=ultima.id, original=ultima.atendente)  # fmt: skip
 
-        atendimento = _ja_migrado(db, grupo)
+        atendimento = _ja_migrado(db, grupo, anteriores)
         if atendimento is None:
             atendimento = m.Atendimento(protocolo=f"VLT-TMP-{primeira.id}")
             db.add(atendimento)
             ctx.resultado.carregados += 1
-        else:
-            db.execute(delete(m.Mensagem).where(m.Mensagem.atendimento_id == atendimento.id))
         atendimento.cliente_id = cliente_id
         atendimento.contato = primeira.contato
         atendimento.contato_nome = next((li.nome for li in reversed(grupo.linhas) if li.nome), None)
@@ -408,25 +416,29 @@ def migrar(db: Session) -> Resultado:
         atendimento.loja_id = pedido.loja_id if pedido else cd.id
         atendimento.responsavel_id = responsavel
         atendimento.criado_em = primeira.momento
-        db.flush()
-        atendimento.protocolo = protocolo(atendimento.id)
         quando = primeira.momento
         for linha in grupo.linhas:
             quando = max(quando, linha.momento)
             for i, (autor, conteudo) in enumerate(mensagens(linha.mensagem)):
                 db.add(
                     m.Mensagem(
-                        atendimento_id=atendimento.id, autor_tipo=autor,
+                        atendimento=atendimento, autor_tipo=autor,
                         autor_id=responsavel if autor == "ATENDENTE" else None,
                         conteudo=conteudo, enviado_em=linha.momento + timedelta(seconds=i),
                     )
                 )  # fmt: skip
                 quando = max(quando, linha.momento + timedelta(seconds=i))
-            migracao_repository.vincular(db, ORIGEM, linha.id, "atendimentos", atendimento.id)
         atendimento.atualizado_em = quando
+        gravados.append((grupo, atendimento))
+    db.flush()  # os ids de todos os atendimentos de uma vez
+    for grupo, atendimento in gravados:
+        atendimento.protocolo = protocolo(atendimento.id)
+        for linha in grupo.linhas:
+            migracao_repository.vincular(db, ORIGEM, linha.id, "atendimentos", atendimento.id)
         usados.add(atendimento.id)
 
     # Atendimento migrado antes que não existe mais (o agrupamento mudou): sai
+    db.flush()  # os vínculos gravados nesta rodada também contam
     antigos = {
         int(destino)
         for (destino,) in db.execute(
@@ -435,6 +447,7 @@ def migrar(db: Session) -> Resultado:
     } - usados
     if antigos:
         db.execute(delete(m.Mensagem).where(m.Mensagem.atendimento_id.in_(antigos)))
+        migracao_repository.esquecer_vinculos(db)
         db.execute(delete(m.DePara).where(m.DePara.origem == ORIGEM, m.DePara.id_destino.in_(antigos)))
         db.execute(delete(m.Atendimento).where(m.Atendimento.id.in_(antigos)))
     db.flush()
