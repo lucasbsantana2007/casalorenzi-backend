@@ -586,9 +586,11 @@ def _garantir_categorias(db: Session) -> dict[str, m.Categoria]:
     return categorias
 
 
-def _produto(db: Session, id_origem: str) -> m.Produto | None:
+def _produto(db: Session, id_origem: str, carregados: dict[int, m.Produto] | None = None) -> m.Produto | None:
     produto_id = migracao_repository.destino(db, f"{ARQUIVO}:modelo", id_origem, "produtos")
-    return db.get(m.Produto, produto_id) if produto_id else None
+    if not produto_id:
+        return None
+    return (carregados or {}).get(produto_id) or db.get(m.Produto, produto_id)
 
 
 def migrar(db: Session) -> Resultado:
@@ -720,6 +722,11 @@ def _gravar(ctx: Contexto, categorias, pecas: list[Peca], planos: list[VariacaoP
 
     variacoes_por_sku: dict[str, VariacaoPlano] = {}
     criados = 0
+    # Carregados de uma vez, depois de zerar os EANs (carregar antes deixaria o EAN antigo na memória); uma
+    # consulta e um flush por peça seriam milhares de idas ao banco
+    produtos_vulto = {p.id: p for p in db.scalars(select(m.Produto).where(m.Produto.marca == VULTO))}
+    existentes = {v.sku: v for v in db.scalars(select(m.Variacao).where(m.Variacao.sku.in_({p.sku for p in planos})))}
+    gravados: list[tuple[Peca, m.Produto, list[tuple[VariacaoPlano, m.Variacao]]]] = []
     for peca in pecas:
         doPeca = planos_por_peca[id(peca)]
         recente = max(peca.linhas, key=lambda linha: (linha.colecao.valida, linha.colecao.ordem, linha.numero))
@@ -748,7 +755,7 @@ def _gravar(ctx: Contexto, categorias, pecas: list[Peca], planos: list[VariacaoP
                 final=_moeda(preco),
             )
 
-        produto = _produto(db, peca.id_origem)
+        produto = _produto(db, peca.id_origem, produtos_vulto)
         if produto is None:
             produto = m.Produto(marca=VULTO)
             db.add(produto)
@@ -760,9 +767,8 @@ def _gravar(ctx: Contexto, categorias, pecas: list[Peca], planos: list[VariacaoP
         produto.colecao = recente.colecao.nome
         produto.estacao = recente.colecao.estacao
         produto.genero = None
-        db.flush()
-        migracao_repository.vincular(db, f"{ARQUIVO}:modelo", peca.id_origem, "produtos", produto.id)
 
+        variacoes: list[tuple[VariacaoPlano, m.Variacao]] = []
         for plano in doPeca:
             plano.custo_medio = notas.custo_medio(plano.sku)
             if plano.preco_custo is None:
@@ -776,7 +782,7 @@ def _gravar(ctx: Contexto, categorias, pecas: list[Peca], planos: list[VariacaoP
                         id_origem=plano.sku,
                         final=_moeda(plano.preco_custo),
                     )
-            variacao = db.scalar(select(m.Variacao).where(m.Variacao.sku == plano.sku))
+            variacao = existentes.get(plano.sku)
             if variacao is None:
                 variacao = m.Variacao(sku=plano.sku)
                 db.add(variacao)
@@ -787,12 +793,17 @@ def _gravar(ctx: Contexto, categorias, pecas: list[Peca], planos: list[VariacaoP
             variacao.ativa = plano.ativa
             variacao.preco_custo = plano.preco_custo
             variacao.custo_medio = plano.custo_medio
-            db.flush()
+            variacoes.append((plano, variacao))
+        produto.ativo = any(p.ativa for p in doPeca) and not sem_preco
+        gravados.append((peca, produto, variacoes))
+    db.flush()  # os ids de todos os produtos e variações de uma vez
+    for peca, produto, variacoes in gravados:
+        migracao_repository.vincular(db, f"{ARQUIVO}:modelo", peca.id_origem, "produtos", produto.id)
+        for plano, variacao in variacoes:
             for linha in plano.linhas:
                 migracao_repository.vincular(db, linha.origem, linha.id_origem, "variacoes", variacao.id)
             variacoes_por_sku[plano.sku] = plano
             plano.variacao_id = variacao.id
-        produto.ativo = any(p.ativa for p in doPeca) and not sem_preco
     db.flush()
     return criados, variacoes_por_sku
 
