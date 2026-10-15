@@ -139,8 +139,11 @@ def listar_movimentacoes(
     desde: datetime | None = None,
     ate: datetime | None = None,
     limite: int | None = None,
+    marca: str | None = None,
 ) -> list[m.Movimentacao]:
     consulta = select(m.Movimentacao).join(m.Movimentacao.estoque).order_by(m.Movimentacao.criado_em.desc(), m.Movimentacao.id)
+    if marca:
+        consulta = consulta.join(m.Estoque.loja).where(m.Loja.marca == marca)
     if estoque_id:
         consulta = consulta.where(m.Movimentacao.estoque_id == estoque_id)
     if loja_id:
@@ -156,14 +159,16 @@ def listar_movimentacoes(
     return list(db.scalars(consulta))
 
 
-def pecas_vendidas_desde(db: Session, momento: datetime, loja_id: int | None = None) -> int:
+def pecas_vendidas_desde(db: Session, momento: datetime, loja_id: int | None = None, marca: str | None = None) -> int:
     total = db.scalar(
         select(func.coalesce(func.sum(-m.Movimentacao.quantidade), 0))
         .join(m.Movimentacao.estoque)
+        .join(m.Estoque.loja)
         .where(
             m.Movimentacao.tipo == "VENDA",
             m.Movimentacao.criado_em >= momento,
             m.Estoque.loja_id == loja_id if loja_id else true(),
+            m.Loja.marca == marca if marca else true(),
         )
     )
     return int(total)
