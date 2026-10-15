@@ -1,7 +1,15 @@
-"""Pedido de venda (loja física ou e-commerce)."""
+"""Pedido de venda (loja física, e-commerce ou app)."""
 
 STATUS_PEDIDO = ("PROCESSANDO", "ENVIADO", "ENTREGUE", "CANCELADO")
-CANAIS = ("Loja física", "E-commerce")
+
+# O banco e a API guardam o rótulo do canal (o frontend filtra por ele). O código canônico serve
+# aos relatórios e à migração da Vulto, onde o canal vem da loja do legado (1–4 loja, 5 site, 6 app).
+CANAL_LOJA = "Loja física"
+CANAL_SITE = "E-commerce"
+CANAL_APP = "App"
+CANAIS = (CANAL_LOJA, CANAL_SITE, CANAL_APP)
+CANAL_POR_CODIGO = {"LOJA": CANAL_LOJA, "SITE": CANAL_SITE, "APP": CANAL_APP}
+CANAIS_ONLINE = (CANAL_SITE, CANAL_APP)
 # Frete e endereço de entrega só existem no e-commerce (ficam nulos na loja física)
 TIPOS_FRETE = ("PADRAO", "EXPRESSO")
 

@@ -13,10 +13,13 @@ if TYPE_CHECKING:
 
 
 class Variacao(Base):
-    """SKU: combinação de produto + tamanho + cor."""
+    """SKU: combinação de produto + tamanho + cor. Outras grafias do mesmo SKU ficam em sku_alias."""
 
     __tablename__ = "variacoes"
-    __table_args__ = (CheckConstraint("preco_custo IS NULL OR preco_custo >= 0", name="ck_variacoes_preco_custo"),)
+    __table_args__ = (
+        CheckConstraint("preco_custo IS NULL OR preco_custo >= 0", name="ck_variacoes_preco_custo"),
+        CheckConstraint("ean IS NULL OR ean ~ '^[0-9]{13}$'", name="ck_variacoes_ean"),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     produto_id: Mapped[int] = mapped_column(ForeignKey("produtos.id"), index=True)
@@ -25,5 +28,7 @@ class Variacao(Base):
     cor: Mapped[str] = mapped_column(String(40))
     # Quanto a peça custa para a loja. Só o Administrador vê (margem no cadastro e no financeiro)
     preco_custo: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))
+    # Código de barras (EAN-13): identifica a peça (tamanho e cor) e desempata grafias de SKU
+    ean: Mapped[str | None] = mapped_column(String(13), unique=True)
 
     produto: Mapped[Produto] = relationship(back_populates="variacoes")

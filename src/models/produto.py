@@ -8,6 +8,7 @@ from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Numeric, 
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.database.connection import Base
+from src.entities.marca import MARCA_PADRAO, MARCAS
 from src.entities.produto import ESTACOES, GENEROS
 from src.models._restricoes import valor_em
 
@@ -22,6 +23,7 @@ class Produto(Base):
     __table_args__ = (
         CheckConstraint(f"genero IS NULL OR {valor_em('genero', GENEROS)}", name="ck_produtos_genero"),
         CheckConstraint(f"estacao IS NULL OR {valor_em('estacao', ESTACOES)}", name="ck_produtos_estacao"),
+        CheckConstraint(valor_em("marca", MARCAS), name="ck_produtos_marca"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -39,6 +41,10 @@ class Produto(Base):
     # Removido do catálogo pelo Administrador: some da loja, do painel e do estoque, mas continua
     # no banco porque pedidos, vendas e movimentações antigos apontam para as variações dele
     removido_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    marca: Mapped[str] = mapped_column(String(10), default=MARCA_PADRAO, server_default=MARCA_PADRAO, index=True)
+    # Coleção de lançamento mais recente do modelo (ex.: "Verão 26"); o preço é por produto, por isso
+    # a coleção também. Nulo nos produtos da Casa Lorenzi (que usam genero e estacao na vitrine)
+    colecao: Mapped[str | None] = mapped_column(String(40))
 
     categoria: Mapped[Categoria] = relationship(lazy="joined")
     variacoes: Mapped[list[Variacao]] = relationship(back_populates="produto", order_by="Variacao.id")
