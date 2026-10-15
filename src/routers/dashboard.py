@@ -1,3 +1,5 @@
+from typing import Literal
+
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
@@ -11,7 +13,11 @@ router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
 
 @router.get("/resumo")
 def obter_resumo(
-    lojaId: int | None = None, db: Session = Depends(get_db), usuario: m.Usuario = Depends(exigir_modulo("dashboard"))
+    lojaId: int | None = None,
+    marca: Literal["LORENZI", "VULTO"] | None = None,
+    db: Session = Depends(get_db),
+    usuario: m.Usuario = Depends(exigir_modulo("dashboard")),
 ):
-    """Indicadores da tela inicial do painel. Lojistas veem sempre a própria loja."""
-    return dashboard.resumo(db, usuario, lojaId)
+    """Indicadores da tela inicial do painel. Somam as duas marcas; `marca` mostra só uma.
+    Lojistas veem sempre a própria loja."""
+    return dashboard.resumo(db, usuario, lojaId, marca)

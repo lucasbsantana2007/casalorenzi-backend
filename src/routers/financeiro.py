@@ -21,10 +21,21 @@ def obter_resumo(
     canais: str | None = None,
     categorias: str | None = None,
     generos: str | None = None,
+    marcas: str | None = None,
     db: Session = Depends(get_db),
     _: m.Usuario = Depends(exigir_modulo("financeiro")),
 ):
-    """Filtros em listas separadas por vírgula (ex.: lojas=1,3&canais=E-commerce)."""
+    """Filtros em listas separadas por vírgula (ex.: lojas=1,3&canais=E-commerce&marcas=VULTO).
+    Sem `marcas`, soma a Casa Lorenzi e a Vulto; `marcas=LORENZI` ou `marcas=VULTO` separa uma da outra."""
     return financeiro.resumo(
-        db, de=de, ate=ate, comparar=comparar, agrupar=agrupar, lojas=lojas, canais=canais, categorias=categorias, generos=generos
+        db,
+        de=de,
+        ate=ate,
+        comparar=comparar,
+        agrupar=agrupar,
+        lojas=lojas,
+        canais=canais,
+        categorias=categorias,
+        generos=generos,
+        marcas=marcas,
     )

@@ -1,4 +1,4 @@
-"""Indicadores da tela inicial do painel."""
+"""Indicadores da tela inicial do painel. Somam as duas marcas; `marca` mostra só uma delas."""
 
 from datetime import timedelta
 
@@ -24,22 +24,28 @@ MOVIMENTACOES_RECENTES = 8
 ATENDIMENTOS_RECENTES = 5
 
 
-def resumo(db: Session, usuario: m.Usuario, loja_id: int | None) -> dict:
+def resumo(db: Session, usuario: m.Usuario, loja_id: int | None, marca: str | None = None) -> dict:
     """Lojistas veem sempre a própria loja, qualquer que seja o filtro pedido."""
     if usuario.papel == LOJISTA and usuario.loja_id:
         loja_id = usuario.loja_id
 
-    estoques = estoque_repository.listar(db, loja_id=loja_id)
+    def da_marca(loja: m.Loja) -> bool:
+        return not marca or loja.marca == marca
+
+    estoques = [e for e in estoque_repository.listar(db, loja_id=loja_id) if da_marca(e.loja)]
     ativos = [e for e in estoques if e.variacao.produto.ativo]
     status = {e.id: status_estoque(e.quantidade, e.quantidade_min) for e in ativos}
-    abertos = atendimento_repository.em_aberto(db, loja_id)
-    em_transito = sorted(transferencia_repository.listar(db, status="EM_TRANSITO", loja_id=loja_id), key=lambda t: t.id)
-    pendentes = transferencia_repository.listar(db, status="SOLICITADA", loja_id=loja_id)
+    abertos = [a for a in atendimento_repository.em_aberto(db, loja_id) if da_marca(a.loja)]
+    em_transito = sorted(
+        (t for t in transferencia_repository.listar(db, status="EM_TRANSITO", loja_id=loja_id) if da_marca(t.loja_origem)),
+        key=lambda t: t.id,
+    )
+    pendentes = [t for t in transferencia_repository.listar(db, status="SOLICITADA", loja_id=loja_id) if da_marca(t.loja_origem)]
     momento = agora()
 
     indicadores = {
         "estoqueTotal": sum(e.quantidade for e in ativos),
-        "produtosAtivos": len(produto_repository.listar(db, ativo=True)),
+        "produtosAtivos": sum(1 for p in produto_repository.listar(db, ativo=True) if not marca or p.marca == marca),
         "variacoesAtivas": len({e.variacao_id for e in ativos}),
         "itensEstoqueBaixo": sum(1 for e in ativos if status[e.id] == "BAIXO"),
         "itensSemEstoque": sum(1 for e in ativos if status[e.id] == "SEM_ESTOQUE"),
@@ -47,10 +53,10 @@ def resumo(db: Session, usuario: m.Usuario, loja_id: int | None) -> dict:
         "atendimentosSemResponsavel": sum(1 for a in abertos if a.responsavel_id is None),
         "transferenciasEmTransito": len(em_transito),
         "transferenciasPendentes": len(pendentes),
-        "vendas7d": estoque_repository.pecas_vendidas_desde(db, momento - timedelta(days=7), loja_id),
+        "vendas7d": estoque_repository.pecas_vendidas_desde(db, momento - timedelta(days=7), loja_id, marca),
     }
 
-    lojas = [loja for loja in cadastro_repository.lojas(db) if not loja_id or loja.id == loja_id]
+    lojas = [loja for loja in cadastro_repository.lojas(db, marca=marca) if not loja_id or loja.id == loja_id]
     resumo_por_loja = []
     for loja in lojas:
         itens = [e for e in ativos if e.loja_id == loja.id]
@@ -104,7 +110,7 @@ def resumo(db: Session, usuario: m.Usuario, loja_id: int | None) -> dict:
         "alertas": alertas,
         "movimentacoesRecentes": [
             movimentacao_saida(mov)
-            for mov in estoque_repository.listar_movimentacoes(db, loja_id=loja_id, limite=MOVIMENTACOES_RECENTES)
+            for mov in estoque_repository.listar_movimentacoes(db, loja_id=loja_id, limite=MOVIMENTACOES_RECENTES, marca=marca)
         ],
         "atendimentosRecentes": [atendimento_saida(a, ultimas.get(a.id)) for a in recentes],
     }
