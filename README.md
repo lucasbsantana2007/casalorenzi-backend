@@ -115,7 +115,7 @@ Nunca coloque a chave no git; no deploy (Render), cadastre as mesmas variáveis 
 | --- | --- |
 | Núcleo | `lojas` (endereço, telefone, horários, `ativa`, `marca` e `tipo`), `usuarios` (só a equipe: ADMINISTRADOR, LOJISTA, OPERADOR; sem senha enquanto o convite está pendente) |
 | Clientes | `clientes` (CPF e e-mail únicos, e-mail opcional para clientes vindos da Vulto, pelo menos um de CPF/e-mail/telefone, consentimento de marketing; senha só como hash), `tokens_senha` |
-| Catálogo | `categorias`, `produtos` (com descrição, composição, cuidados, `marca` e `colecao`), `variacoes` (SKU, com `preco_custo` e `ean`), `sku_alias` (outras grafias do SKU, com vigência), `imagens_produto` (foto enviada no cadastro) |
+| Catálogo | `categorias`, `produtos` (com descrição, composição, cuidados, `marca` e `colecao`), `variacoes` (SKU, com `preco_custo` = último custo, `custo_medio` = média ponderada das notas, `ean` e `ativa`), `sku_alias` (outras grafias do SKU, com vigência), `imagens_produto` (foto enviada no cadastro) |
 | Estoque | `estoques` (saldo por **loja + SKU**), `movimentacoes` (histórico com sinal), `transferencias` (com `pedido_id` quando atendem um pedido) |
 | Vendas | `pedidos` (com frete e endereço de entrega no e-commerce), `itens_pedido`, `eventos_pedido` (histórico), `pagamentos`, `devolucoes` |
 | Atendimento | `tipos_solicitacao`, `atendimentos` (sempre de um cliente), `mensagens`, `anexos` (foto) |
@@ -154,7 +154,8 @@ Todas sob o prefixo `/api`. As rotas internas exigem `Authorization: Bearer <tok
 | GET, POST | `/admin/lojas` · PUT `/admin/lojas/{id}` (`marca` e `tipo` opcionais; a marca não muda depois do cadastro) | administrador |
 | GET | `/admin/log?area&usuarioId&busca` | administrador |
 | GET | `/usuarios?papel=` | equipe |
-| GET | `/produtos?busca&categoria&ativo`, `/produtos/{id}` (`precoCusto` só para o administrador), `/produtos/{id}/imagem` | público (vitrine) |
+| GET | `/produtos?busca&categoria&ativo&marca`, `/produtos/{id}` (`precoCusto` e `custoMedio` só para o administrador; visitante e cliente só veem a Casa Lorenzi), `/produtos/{id}/imagem` | público (vitrine) |
+| GET | `/produtos/sku/{codigo}?data` (variação por qualquer grafia de SKU; `data` resolve código reaproveitado) | equipe |
 | POST, PUT | `/produtos`, `/produtos/{id}` (com `genero`, `estacao`, `precoCusto`, `imagem` e `removerImagem`; `genero` obrigatório no cadastro) | administrador |
 | DELETE | `/produtos/{id}` (remove do catálogo; o histórico continua) | administrador |
 | GET | `/estoque?busca&lojaId&categoria&status&variacaoId`, `/estoque/{id}` | equipe |
@@ -295,6 +296,19 @@ vêm também `_tipos` (o tipo que o Excel deu à célula, ex.: data) e a formata
 (`_tachado`, `_cor_fonte`, `_cor_fundo`). `legado_vulto._cargas` lista cada tabela com a origem, a
 linha do cabeçalho, os nomes originais das colunas e as contagens. As senhas em texto puro dos
 funcionários não são copiadas e a `senha_master` entra mascarada. Cada carga recria o schema.
+
+**Padronização** (`src/migracao_vulto/normalizacao.py`): funções puras e testadas usadas por todos os
+domínios (dinheiro, datas com fuso, CPF, e-mail, telefone E.164, SKU, EAN, cor, tamanho, categoria,
+canal, status). Valor que não converte com segurança não é chutado: vira ocorrência.
+
+**Produtos** (`--dominio produtos`). Cada modelo do catálogo vira um produto `VULTO` e cada cor +
+tamanho uma variação com o SKU canônico `VLT-CAT-NNN-COR-TAM`; todas as outras grafias (código curto
+do CD, digitação do fiscal, vendas, entradas, contagem) vão para `sku_alias`. Código reaproveitado por
+outra peça vira outro produto (SKU com `-2024`) e as grafias em comum ganham vigência por data.
+Preço: o mais frequente da aba; entre coleções, `REGRA_PRECO` em `produtos.py` (padrão `MENOR`,
+Operações/Financeiro; `MAIS_NOVA` é a regra de Compras). Linha tachada ou vermelha = variação
+inativa. A categoria vem do prefixo do SKU (Calças, Bermudas e Shorts e Não catalogado são novas;
+o resto usa as da Casa Lorenzi).
 
 Ao final, imprime lidos, carregados, corrigidos e descartados por domínio. Contra o banco do Render,
 rode do seu computador com a "External Database URL": `DATABASE_URL="postgresql+psycopg://..."`.
