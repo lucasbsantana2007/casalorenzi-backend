@@ -296,6 +296,10 @@ python -m src.relatorios.diretoria --saida docs/numeros_diretoria   # os número
 python -m src.relatorios.registro_decisoes                 # docs/registro_decisoes.md, das ocorrências
 ```
 
+Contra o Render, a carga inteira leva poucos minutos: a migração grava em lote (menos de mil comandos SQL,
+cada um uma ida e volta pela internet). Cada domínio é uma transação; se a conexão cair, rode de novo (é
+idempotente) a partir do domínio que falhou, com `--dominio`.
+
 Para rodar uma parte só:
 
 ```bash
