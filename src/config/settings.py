@@ -52,3 +52,9 @@ URL_FRONTEND = os.getenv("URL_FRONTEND", "http://localhost:5173").rstrip("/")
 # "Esqueci a senha" e convite de funcionário: true devolve o link também na resposta da API, para
 # testar o fluxo na demonstração. Nunca true em produção.
 LINK_SENHA_NA_RESPOSTA = os.getenv("LINK_SENHA_NA_RESPOSTA", "false").lower() == "true"
+
+# Migração da Vulto: pasta com os dados do legado (vulto.db, planilhas e o export do atendimento).
+# Só leitura. Padrão: o repositório vulto-legado-back ao lado deste.
+VULTO_DADOS = os.getenv("VULTO_DADOS") or os.path.normpath(
+    os.path.join(os.path.dirname(__file__), "..", "..", "..", "vulto-legado-back", "data")
+)
