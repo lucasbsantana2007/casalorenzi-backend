@@ -8,7 +8,8 @@ from src import models as m
 from src.database.connection import get_db
 from src.middlewares.autenticacao import cliente_atual
 from src.schemas.conta import DadosContaEntrada, ExclusaoContaEntrada, TrocaSenhaEntrada, conta_saida
-from src.use_cases import conta
+from src.schemas.fidelidade import extrato_saida
+from src.use_cases import conta, fidelidade
 
 router = APIRouter(prefix="/conta", tags=["Conta do cliente"])
 
@@ -17,6 +18,12 @@ router = APIRouter(prefix="/conta", tags=["Conta do cliente"])
 def obter(cliente: m.Cliente = Depends(cliente_atual)):
     """{ id, nome, email, cpf, telefone, clienteDesde }."""
     return conta_saida(cliente)
+
+
+@router.get("/pontos")
+def pontos(db: Session = Depends(get_db), cliente: m.Cliente = Depends(cliente_atual)):
+    """Vulto+: { saldo, saldoEmReais, resgate: { compraMinima, multiplo, valorPonto }, movimentos } (mais recente primeiro)."""
+    return extrato_saida(*fidelidade.extrato(db, cliente))
 
 
 @router.put("")
