@@ -810,6 +810,7 @@ def _limpar(db: Session) -> None:
     db.execute(delete(m.Devolucao).where(m.Devolucao.pedido_id.in_(vulto) | m.Devolucao.usuario_id.is_(None)))
     for modelo in (m.Pagamento, m.EventoPedido, m.ItemPedido):
         db.execute(delete(modelo).where(modelo.pedido_id.in_(vulto)))
+    migracao_repository.esquecer_vinculos(db)
     db.execute(
         delete(m.DePara).where(
             m.DePara.origem.in_((ORIGEM_VENDAS, ORIGEM_COMPRAS, ORIGEM_BATEL)),
