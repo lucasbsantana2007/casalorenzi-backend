@@ -159,7 +159,7 @@ Todas sob o prefixo `/api`. As rotas internas exigem `Authorization: Bearer <tok
 | POST, PUT | `/produtos`, `/produtos/{id}` (com `genero`, `estacao`, `precoCusto`, `imagem` e `removerImagem`; `genero` obrigatório no cadastro) | administrador |
 | DELETE | `/produtos/{id}` (remove do catálogo; o histórico continua) | administrador |
 | GET | `/estoque?busca&lojaId&categoria&status&variacaoId`, `/estoque/{id}` | equipe |
-| GET | `/estoque/posicao?data&lojaId&busca` | equipe |
+| GET | `/estoque/posicao?data&lojaId&busca&marca&agrupar` (saldo em qualquer data, por item ou por produto) | equipe |
 | GET, POST | `/movimentacoes` (filtros: `estoqueId&lojaId&tipo&de&ate&busca`) | equipe |
 | GET, POST | `/transferencias` · PATCH `/transferencias/{id}` (status) | administrador, operador |
 | POST | `/checkout` (o cliente vem do token) | cliente logado |
@@ -330,6 +330,14 @@ devolução, ligada à venda original quando dá. Ficam de fora as vendas de tes
 do app. A planilha manual da Batel (março/26) entra menos o que foi relançado no sistema, que volta para
 a data real. Faturamento = vendas não canceladas e com pagamento que não está só pendente, menos as
 devoluções; `/financeiro/faturamento/comparativo-vulto` mostra a diferença para o relatório da Vulto.
+
+**Estoque** (`--dominio estoque`). A tabela `estoque` da Vulto (sem histórico, com saldos negativos) só
+serve de comparação: o histórico é reconstruído em `movimentacoes` a partir das notas de entrada, das
+transferências (envio e recebimento da mesma peça contam uma vez), das vendas e das devoluções migradas.
+A contagem de set/26 é a âncora (ajuste no dia da contagem; Eldorado, Savassi e Batel sem data na
+planilha: 30/09, estimado; a Savassi contou por modelo e foi rateada) e o saldo de abertura (01/01/2025),
+desconhecido, é o menor que deixa o histórico sem saldo negativo. Antes da contagem, o histórico é
+derivado; o saldo em 01/10/2026 é o contado mais os movimentos depois dele.
 
 Ao final, imprime lidos, carregados, corrigidos e descartados por domínio. Contra o banco do Render,
 rode do seu computador com a "External Database URL": `DATABASE_URL="postgresql+psycopg://..."`.
