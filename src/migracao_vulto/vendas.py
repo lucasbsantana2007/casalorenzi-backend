@@ -27,7 +27,7 @@ from decimal import Decimal
 from difflib import get_close_matches
 
 from sqlalchemy import delete, select, text, update
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from src import models as m
 from src.entities.pagamento import METODO_PADRAO_POR_CANAL
@@ -850,7 +850,16 @@ def migrar(db: Session) -> Resultado:
     batel = planejar_batel(ctx, planos, catalogo, lojas, clientes)
 
     pedidos = [p for p in planos.values() if p.destino == "PEDIDO"] + batel
-    existentes = {p.numero: p for p in db.scalars(select(m.Pedido).where(m.Pedido.numero.like(f"{PREFIXO}%")))}
+    # Itens e histórico em lote (vazios: _limpar já apagou os antigos); trocar a coleção de cada pedido carregaria
+    # uma por uma
+    existentes = {
+        p.numero: p
+        for p in db.scalars(
+            select(m.Pedido)
+            .where(m.Pedido.numero.like(f"{PREFIXO}%"))
+            .options(selectinload(m.Pedido.itens), selectinload(m.Pedido.eventos))
+        )
+    }
     usados = set()
     for plano in pedidos:
         numero = _numero(plano)
