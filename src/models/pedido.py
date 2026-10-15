@@ -8,7 +8,7 @@ from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Integer, Numeric, 
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.database.connection import Base
-from src.entities.pedido import CANAIS, STATUS_PEDIDO, TIPOS_FRETE
+from src.entities.pedido import CANAIS, STATUS_PEDIDO, TIPOS_FRETE, TIPOS_PEDIDO
 from src.models._restricoes import valor_em
 
 if TYPE_CHECKING:
@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 
 
 class Pedido(Base):
-    """Venda da loja física ou do e-commerce. total = subtotal (itens) + frete_valor."""
+    """Venda da loja física, do e-commerce ou do app. total = subtotal (itens) − desconto + frete_valor."""
 
     __tablename__ = "pedidos"
     __table_args__ = (
@@ -29,11 +29,14 @@ class Pedido(Base):
         CheckConstraint(valor_em("canal", CANAIS), name="ck_pedidos_canal"),
         # Nulo na loja física; o IN do SQL aceita NULL
         CheckConstraint(valor_em("frete_tipo", TIPOS_FRETE), name="ck_pedidos_frete_tipo"),
+        CheckConstraint(valor_em("tipo", TIPOS_PEDIDO), name="ck_pedidos_tipo"),
+        CheckConstraint("desconto >= 0", name="ck_pedidos_desconto"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     numero: Mapped[str] = mapped_column(String(30), unique=True)
-    cliente_id: Mapped[int] = mapped_column(ForeignKey("clientes.id"), index=True)
+    # Nulo só em vendas da Vulto sem cliente identificável ("consumidor", "NAO INFORMADO")
+    cliente_id: Mapped[int | None] = mapped_column(ForeignKey("clientes.id"), index=True)
     # Loja que vendeu (loja física) ou que expede (e-commerce)
     loja_id: Mapped[int] = mapped_column(ForeignKey("lojas.id"))
     canal: Mapped[str] = mapped_column(String(20))
@@ -41,6 +44,11 @@ class Pedido(Base):
     codigo_rastreio: Mapped[str | None] = mapped_column(String(40))
     subtotal: Mapped[Decimal] = mapped_column(Numeric(12, 2))
     total: Mapped[Decimal] = mapped_column(Numeric(12, 2))
+    # Desconto dado na venda (a Casa Lorenzi não dá desconto: zero)
+    desconto: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0, server_default="0")
+    tipo: Mapped[str] = mapped_column(String(10), default="VENDA", server_default="VENDA")
+    # Número do pedido no site ou no app da Vulto (S100234, APP-7001205)
+    pedido_externo: Mapped[str | None] = mapped_column(String(40), index=True)
     # Frete e endereço de entrega: só e-commerce (nulos na loja física)
     frete_tipo: Mapped[str | None] = mapped_column(String(20))
     frete_valor: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))
@@ -56,7 +64,7 @@ class Pedido(Base):
     entrega_uf: Mapped[str | None] = mapped_column(String(2))
     criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)
 
-    cliente: Mapped[Cliente] = relationship(lazy="joined")
+    cliente: Mapped[Cliente | None] = relationship(lazy="joined")
     loja: Mapped[Loja] = relationship(lazy="joined")
     itens: Mapped[list[ItemPedido]] = relationship(back_populates="pedido", order_by="ItemPedido.id")
     pagamentos: Mapped[list[Pagamento]] = relationship(back_populates="pedido", order_by="Pagamento.id", lazy="selectin")

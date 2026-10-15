@@ -10,6 +10,11 @@ CANAL_APP = "App"
 CANAIS = (CANAL_LOJA, CANAL_SITE, CANAL_APP)
 CANAL_POR_CODIGO = {"LOJA": CANAL_LOJA, "SITE": CANAL_SITE, "APP": CANAL_APP}
 CANAIS_ONLINE = (CANAL_SITE, CANAL_APP)
+
+# Troca lançada como pedido (a Vulto registrava a troca como venda nova, pelo preço cheio, para baixar o
+# estoque da peça nova): movimenta o estoque mas não é receita — a venda original já contou (aprovado).
+TIPOS_PEDIDO = ("VENDA", "TROCA")
+TIPOS_SEM_RECEITA = ("TROCA",)
 # Frete e endereço de entrega só existem no e-commerce (ficam nulos na loja física)
 TIPOS_FRETE = ("PADRAO", "EXPRESSO")
 
