@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 
 from src import models as m
 from src.entities.frete import uf_do_cep
+from src.entities.marca import MARCA_DO_SITE
 from src.entities.papeis import ADMINISTRADOR, loja_do_escopo, ve_pedido_da_loja
 from src.entities.pedido import STATUS_PEDIDO, pode_mudar, pontuar_loja
 from src.entities.transferencia import pode_mudar as transferencia_pode_mudar
@@ -66,8 +67,8 @@ def disponiveis_na_rede(db: Session, variacao_ids: list[int]) -> dict[int, int]:
 
 
 def escolher_loja_expedicao(db: Session, itens: list[tuple[int, int]], cep: str) -> m.Loja:
-    """Loja que tem mais itens da sacola livres (não prometidos a outro pedido); empate → mesma UF do
-    CEP; depois, a de menor id. itens: (variacao_id, quantidade)."""
+    """Loja da marca do site que tem mais itens da sacola livres (não prometidos a outro pedido);
+    empate → mesma UF do CEP; depois, a de menor id. itens: (variacao_id, quantidade)."""
     uf = uf_do_cep(cep)
     livres = estoque_repository.livres_por_loja(db, [variacao_id for variacao_id, _ in itens])
 
@@ -75,16 +76,17 @@ def escolher_loja_expedicao(db: Session, itens: list[tuple[int, int]], cep: str)
         cobertos = sum(1 for variacao_id, quantidade in itens if livres.get((loja.id, variacao_id), 0) >= quantidade)
         return pontuar_loja(cobertos, loja.uf == uf)
 
-    lojas = cadastro_repository.lojas(db, somente_ativas=True)  # loja desativada não despacha
+    lojas = cadastro_repository.lojas(db, somente_ativas=True, marca=MARCA_DO_SITE)  # loja desativada não despacha
     if not lojas:
         raise Conflito("Nenhuma loja disponível para expedir o pedido.")
     return max(lojas, key=lambda loja: (pontos(loja), -loja.id))
 
 
 def planejar_transferencias(db: Session, pedido: m.Pedido) -> list[m.Transferencia]:
-    """Transferências das outras lojas para a de expedição, para cada peça que falta nela (sem confirmar).
-    Usa só o saldo livre: peça já prometida a outro pedido não é puxada de novo. Pega primeiro das
-    lojas com mais saldo livre."""
+    """Transferências das outras lojas da mesma marca para a de expedição, para cada peça que falta
+    nela (sem confirmar). Usa só o saldo livre: peça já prometida a outro pedido não é puxada de novo.
+    Pega primeiro das lojas com mais saldo livre."""
+    marca = cadastro_repository.loja(db, pedido.loja_id).marca
     criadas = []
     usado_no_destino: dict[int, int] = {}  # mesma peça em dois itens do pedido
     for item in pedido.itens:
@@ -97,7 +99,7 @@ def planejar_transferencias(db: Session, pedido: m.Pedido) -> list[m.Transferenc
             (
                 (e, livres.get((e.loja_id, item.variacao_id), 0))
                 for e in estoque_repository.da_variacao(db, item.variacao_id)
-                if e.loja_id != pedido.loja_id and e.loja.ativa
+                if e.loja_id != pedido.loja_id and e.loja.ativa and e.loja.marca == marca
             ),
             key=lambda par: (-par[1], par[0].loja_id),
         )
@@ -182,6 +184,8 @@ def _trocar_loja(db: Session, pedido: m.Pedido, loja_id: int, usuario: m.Usuario
         return
     if not loja.ativa:
         raise DadosInvalidos("Esta loja está desativada e não expede pedidos.")
+    if loja.marca != pedido.loja.marca:
+        raise DadosInvalidos("A expedição só pode passar para uma loja da mesma marca.")
     anterior = pedido.loja.nome
     estoque_repository.travar_variacoes(db, sorted({item.variacao_id for item in pedido.itens}))
     _cancelar_transferencias_pendentes(pedido)

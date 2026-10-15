@@ -7,8 +7,9 @@ from sqlalchemy.orm import Session
 
 from src import models as m
 from src.database.connection import get_db
+from src.entities.marca import marca_visivel
 from src.entities.papeis import EQUIPE
-from src.middlewares.autenticacao import exigir_papel
+from src.middlewares.autenticacao import Sessao, exigir_papel, sessao_opcional
 from src.repositories import cadastro_repository
 from src.schemas.cadastros import loja_saida, tipo_solicitacao_saida, usuario_saida
 
@@ -16,8 +17,15 @@ router = APIRouter(tags=["Cadastros"])
 
 
 @router.get("/lojas")
-def listar_lojas(db: Session = Depends(get_db)):
-    return [loja_saida(loja) for loja in cadastro_repository.lojas(db)]
+def listar_lojas(
+    marca: Literal["LORENZI", "VULTO"] | None = None,
+    db: Session = Depends(get_db),
+    sessao: Sessao | None = Depends(sessao_opcional),
+):
+    """Equipe logada: lojas de todas as marcas (ou só a de `marca`), com `marca` e `tipo`.
+    Visitante e cliente (a página Lojas do site): só as lojas da Casa Lorenzi."""
+    equipe = sessao is not None and sessao.usuario is not None
+    return [loja_saida(loja) for loja in cadastro_repository.lojas(db, marca=marca_visivel(marca, equipe))]
 
 
 @router.get("/categorias")

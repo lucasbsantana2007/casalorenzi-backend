@@ -4,7 +4,8 @@
   criá-la. Antes disso não entra. Por enquanto o e-mail sai no log da API; com
   LINK_SENHA_NA_RESPOSTA=true (demonstração) o link volta na resposta.
 - Sempre fica pelo menos um Administrador ativo, e ninguém desativa a própria conta.
-- Loja nova nasce com estoque zerado de todas as variações; loja inativa sai do site e da expedição.
+- Loja nova nasce com estoque zerado de todas as variações da marca dela; loja inativa sai do site e
+  da expedição. A marca da loja não muda depois do cadastro.
 - Toda alteração vai para o log com quem fez (do token) e o que mudou.
 """
 
@@ -15,6 +16,8 @@ from sqlalchemy.orm import Session
 from src import models as m
 from src.config.settings import LINK_SENHA_NA_RESPOSTA
 from src.entities.cliente import email_valido, normalizar_email
+from src.entities.loja import TIPO_LOJA_PADRAO, TIPOS_LOJA
+from src.entities.marca import MARCA_PADRAO, MARCAS
 from src.entities.papeis import ADMINISTRADOR, PAPEIS
 from src.integrations import modelos_email
 from src.integrations.email import enviar as enviar_email
@@ -201,14 +204,15 @@ def listar_lojas(db: Session) -> tuple[list[m.Loja], dict[int, int], dict[int, i
     return lojas, usuario_repository.ativos_por_loja(db), estoque_repository.pecas_por_loja(db)
 
 
-def _validar_loja(db: Session, dados, loja_id: int | None = None) -> dict:
+def _validar_loja(db: Session, dados, loja: m.Loja | None = None) -> dict:
+    """Campos da loja validados. Na edição (loja informada), a marca não entra: ela não muda."""
     nome = (dados.nome or "").strip()
     if not nome:
         raise DadosInvalidos("Informe o nome da loja.")
     if len(nome) > 120:
         raise DadosInvalidos("O nome da loja deve ter no máximo 120 caracteres.")
     outra = cadastro_repository.loja_por_nome(db, nome)
-    if outra is not None and outra.id != loja_id:
+    if outra is not None and (loja is None or outra.id != loja.id):
         raise Conflito("Já existe uma loja com este nome.")
     cidade = (dados.cidade or "").strip()
     if not cidade:
@@ -226,7 +230,15 @@ def _validar_loja(db: Session, dados, loja_id: int | None = None) -> dict:
         or any(len(h) > 120 for h in horarios)
     ):
         raise DadosInvalidos("Algum campo da loja passou do tamanho permitido.")
-    return {
+    tipo = dados.tipo or (loja.tipo if loja else TIPO_LOJA_PADRAO)
+    if tipo not in TIPOS_LOJA:
+        raise DadosInvalidos("Tipo de loja inválido.")
+    marca = dados.marca or (loja.marca if loja else MARCA_PADRAO)
+    if marca not in MARCAS:
+        raise DadosInvalidos("Marca inválida.")
+    if loja is not None and marca != loja.marca:
+        raise DadosInvalidos("A marca da loja não muda depois do cadastro.")
+    campos = {
         "nome": nome,
         "cidade": cidade,
         "uf": dados.uf,
@@ -234,7 +246,11 @@ def _validar_loja(db: Session, dados, loja_id: int | None = None) -> dict:
         "telefone": telefone,
         "horarios": horarios,
         "ativa": dados.ativa is not False,
+        "tipo": tipo,
     }
+    if loja is None:
+        campos["marca"] = marca
+    return campos
 
 
 _ROTULOS_LOJA = {
@@ -245,6 +261,7 @@ _ROTULOS_LOJA = {
     "telefone": "Telefone",
     "horarios": "Horários",
     "ativa": "Ativa",
+    "tipo": "Tipo",
 }
 _FORMATOS_LOJA = {"ativa": lambda v: "Sim" if v else "Não"}
 
@@ -253,9 +270,9 @@ def criar_loja(db: Session, autor: m.Usuario, dados) -> m.Loja:
     loja = m.Loja(**_validar_loja(db, dados))
     sessao.adicionar(db, loja)
     sessao.gerar_ids(db)
-    # Estoque zerado de todas as variações, para a loja já poder receber transferências
+    # Estoque zerado das variações da marca, para a loja já poder receber transferências
     momento = agora()
-    for variacao in produto_repository.todas_variacoes(db):
+    for variacao in produto_repository.todas_variacoes(db, marca=loja.marca):
         sessao.adicionar(
             db, m.Estoque(loja_id=loja.id, variacao_id=variacao.id, quantidade=0, quantidade_min=2, atualizado_em=momento)
         )
@@ -270,7 +287,7 @@ def atualizar_loja(db: Session, autor: m.Usuario, loja_id: int, dados) -> m.Loja
     loja = cadastro_repository.loja(db, loja_id)
     if loja is None:
         raise NaoEncontrado("Loja não encontrada.")
-    campos = _validar_loja(db, dados, loja.id)
+    campos = _validar_loja(db, dados, loja)
     antes = {campo: getattr(loja, campo) for campo in _ROTULOS_LOJA}
     antes["horarios"] = list(antes["horarios"] or [])
     alteracoes = log_acoes.mudancas(antes, campos, _ROTULOS_LOJA, _FORMATOS_LOJA)
