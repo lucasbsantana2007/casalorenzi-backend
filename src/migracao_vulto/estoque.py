@@ -25,7 +25,7 @@ from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 
 from sqlalchemy import delete, select, text, update
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from src import models as m
 from src.entities.marca import VULTO
@@ -245,7 +245,12 @@ def casar_transferencias(ctx: Contexto, catalogo: Catalogo, envios: list[Ponta],
 
 def ler_vendas_e_devolucoes(db: Session, legado_por_loja: dict[int, int]) -> list[Mov]:
     movs = []
-    pedidos = db.scalars(select(m.Pedido).join(m.Loja, m.Loja.id == m.Pedido.loja_id).where(m.Loja.marca == VULTO))
+    pedidos = db.scalars(
+        select(m.Pedido)
+        .join(m.Loja, m.Loja.id == m.Pedido.loja_id)
+        .where(m.Loja.marca == VULTO)
+        .options(selectinload(m.Pedido.itens))  # em lotes: um pedido por vez seriam 2 consultas × 17 mil
+    )
     for pedido in pedidos:
         so_pendente = pedido.pagamentos and all(p.status == "PENDENTE" for p in pedido.pagamentos)
         if pedido.status == "CANCELADO" or so_pendente:
@@ -586,8 +591,8 @@ def migrar(db: Session) -> Resultado:
         estoque.quantidade = saldo
         estoque.atualizado_em = lista[-1].quando if lista else datetime.combine(CONTAGENS[loja][1], FIM_DO_DIA, n.FUSO_ORIGEM)
     db.flush()
-    for movimentacao, devolucao_id in devolucoes:
-        db.execute(update(m.Devolucao).where(m.Devolucao.id == devolucao_id).values(movimentacao_id=movimentacao.id))
+    if devolucoes:  # em lote, pela chave
+        db.execute(update(m.Devolucao), [{"id": dev, "movimentacao_id": mov.id} for mov, dev in devolucoes])
     _comparar_com_o_legado(ctx, catalogo, reconstruido)
 
     ctx.resultado.carregados = total_movs
