@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from src import models as m
 from src.entities.marca import MARCAS
+from src.entities.pedido import TIPOS_SEM_RECEITA
 from src.repositories import (
     atendimento_repository,
     cadastro_repository,
@@ -99,27 +100,31 @@ def resumo(
             not filtro_generos or produto.genero in filtro_generos
         )
 
-    # Pedido recortado pelos filtros: com filtro de produto, só os itens que batem entram na receita
+    # Pedido recortado pelos filtros: com filtro de produto, só os itens que batem entram na receita.
+    # Troca não é receita (a venda original já contou); o desconto da venda sai proporcionalmente dos itens.
     def recortar(pedido: m.Pedido) -> dict | None:
-        if not loja_valida(pedido.loja_id):
+        if pedido.tipo in TIPOS_SEM_RECEITA or not loja_valida(pedido.loja_id):
             return None
         if filtro_canais and pedido.canal not in filtro_canais:
             return None
         itens = [i for i in pedido.itens if not filtra_produto or produto_valido(i.variacao.produto)]
         if not itens:
             return None
+        fator = 1 - float(pedido.desconto or 0) / float(pedido.subtotal) if pedido.subtotal else 1
         return {
             "loja_id": pedido.loja_id,
             "status": pedido.status,
+            # Venda com pagamento só pendente (aguardando, na Vulto) ainda não é receita
+            "pendente": bool(pedido.pagamentos) and all(p.status == "PENDENTE" for p in pedido.pagamentos),
             "criado_em": pedido.criado_em,
             "itens": itens,
-            "total": sum(float(i.preco_unitario) * i.quantidade for i in itens),
+            "total": sum(float(i.preco_unitario) * i.quantidade for i in itens) * fator,
         }
 
     pedidos = pedido_repository.todos(db)
     por_id = {p.id: p for p in pedidos}
     recortados = [r for r in map(recortar, pedidos) if r]
-    validos = [p for p in recortados if p["status"] != "CANCELADO"]
+    validos = [p for p in recortados if p["status"] != "CANCELADO" and not p["pendente"]]
 
     def entre(colecao, a, b):
         return [p for p in colecao if a <= p["criado_em"] < b]

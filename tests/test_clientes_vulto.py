@@ -73,8 +73,10 @@ def test_clientes_reais_deduplicados_com_consentimento_conservador(staging):
     resultado = {r.dominio: r for r in rodar(["lojas", "clientes"])}["clientes"]
     with SessionLocal() as db:
         vulto = m.Cliente.id.in_(select(m.DePara.id_destino).where(m.DePara.origem == clientes.ORIGEM_CRIADO))
-        assert _contar(db, m.Cliente, vulto) == resultado.carregados == 4854
-        assert _contar(db, m.ContaPontos) == 3071  # um por cliente com CPF
+        # Sem as identidades de teste da TI/QA (CPF 123.456.789-09 e dois e-mails), que não viram cliente
+        assert _contar(db, m.Cliente, vulto) == resultado.carregados == 4851
+        assert _contar(db, m.ContaPontos) == 3070  # um por cliente com CPF
+        assert _contar(db, m.Cliente, m.Cliente.cpf == "12345678909") == 0
         # Aba Clientes: 2.535 linhas = 2.367 CPFs distintos (131 repetidos) + 28 linhas sem CPF válido, uma
         # delas ligada pelo e-mail a quem tem CPF: 2.394 clientes
         da_aba = select(func.count(func.distinct(m.DePara.id_destino))).where(m.DePara.origem == clientes.ORIGEM_CLIENTES)
@@ -106,7 +108,7 @@ def test_clientes_reais_deduplicados_com_consentimento_conservador(staging):
 
     rodar(["clientes"])  # de novo: atualiza, não duplica
     with SessionLocal() as db:
-        assert _contar(db, m.Cliente, vulto) == 4854 and _contar(db, m.ContaPontos) == 3071
+        assert _contar(db, m.Cliente, vulto) == 4851 and _contar(db, m.ContaPontos) == 3070
 
 
 def test_cliente_que_ja_era_da_lorenzi_vira_um_registro_so(staging, client, admin):

@@ -236,6 +236,16 @@ def nome_pessoa(valor) -> str | None:
     return re.sub(r"\s+", " ", str(valor)).strip()
 
 
+# Identidades usadas pelo time de TI/QA da Vulto para testar o PDV e o app (o CPF 123.456.789-09 tem
+# dígito válido): o que vem delas é teste, não cliente nem venda
+IDENTIDADES_DE_TESTE = {"12345678909", "00000000000", "teste@vulto.com.br", "qa.app@vulto.com.br"}
+
+
+def identidade_de_teste(valor) -> bool:
+    texto = str(valor or "").strip().lower()
+    return texto in IDENTIDADES_DE_TESTE or re.sub(r"\D", "", texto) in {"12345678909", "00000000000"} and "@" not in texto
+
+
 @dataclass(frozen=True)
 class Referencia:
     tipo: str  # "cpf", "email" ou "telefone"

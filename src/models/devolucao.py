@@ -16,6 +16,7 @@ if TYPE_CHECKING:
     from src.models.movimentacao import Movimentacao
     from src.models.pedido import Pedido
     from src.models.usuario import Usuario
+    from src.models.variacao import Variacao
 
 
 class Devolucao(Base):
@@ -25,14 +26,17 @@ class Devolucao(Base):
     __table_args__ = (
         CheckConstraint("quantidade > 0", name="ck_devolucoes_quantidade"),
         CheckConstraint("valor_devolvido >= 0", name="ck_devolucoes_valor"),
+        CheckConstraint("item_pedido_id IS NOT NULL OR variacao_id IS NOT NULL", name="ck_devolucoes_peca"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    item_pedido_id: Mapped[int] = mapped_column(ForeignKey("itens_pedido.id"), index=True)
-    pedido_id: Mapped[int] = mapped_column(ForeignKey("pedidos.id"), index=True)
+    # Nulos só em devoluções da Vulto que não dá para ligar a nenhuma venda (sem origem): aí vale variacao_id
+    item_pedido_id: Mapped[int | None] = mapped_column(ForeignKey("itens_pedido.id"), index=True)
+    pedido_id: Mapped[int | None] = mapped_column(ForeignKey("pedidos.id"), index=True)
+    variacao_id: Mapped[int | None] = mapped_column(ForeignKey("variacoes.id"))
     atendimento_id: Mapped[int | None] = mapped_column(ForeignKey("atendimentos.id"))
-    # Quem da equipe registrou
-    usuario_id: Mapped[int] = mapped_column(ForeignKey("usuarios.id"))
+    # Quem da equipe registrou (nulo nas devoluções migradas da Vulto, que não guardava)
+    usuario_id: Mapped[int | None] = mapped_column(ForeignKey("usuarios.id"))
     # Loja em que a peça volta para o estoque
     loja_id: Mapped[int] = mapped_column(ForeignKey("lojas.id"), index=True)
     # Movimentação DEVOLUCAO gerada no estoque (rastreabilidade)
@@ -42,9 +46,10 @@ class Devolucao(Base):
     motivo: Mapped[str] = mapped_column(Text, default="")
     criada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)
 
-    item: Mapped[ItemPedido] = relationship(back_populates="devolucoes")
-    pedido: Mapped[Pedido] = relationship(lazy="joined")
+    item: Mapped[ItemPedido | None] = relationship(back_populates="devolucoes")
+    variacao: Mapped[Variacao | None] = relationship()
+    pedido: Mapped[Pedido | None] = relationship(lazy="joined")
     atendimento: Mapped[Atendimento | None] = relationship()
-    usuario: Mapped[Usuario] = relationship(lazy="joined")
+    usuario: Mapped[Usuario | None] = relationship(lazy="joined")
     loja: Mapped[Loja] = relationship(lazy="joined")
     movimentacao: Mapped[Movimentacao | None] = relationship()

@@ -219,8 +219,12 @@ def _registros_referencias(ctx: Contexto, conhecidos: dict[str, set[str]]) -> li
     ultimas: dict[tuple[str, str], datetime] = {}
     invalidas: Counter = Counter()
     ambiguas: Counter = Counter()
+    de_teste: Counter = Counter()
     for tabela in ("db__vendas", "db__compras"):
         for ref, criado in ctx.db.execute(text(f"SELECT cliente_ref, criado_em FROM legado_vulto.{tabela}")):
+            if n.identidade_de_teste(ref):
+                de_teste[ref.strip()] += 1
+                continue
             try:
                 referencia = n.referencia_cliente(ref)
             except n.ValorInvalido:
@@ -244,6 +248,16 @@ def _registros_referencias(ctx: Contexto, conhecidos: dict[str, set[str]]) -> li
             f"Referência de cliente que não identifica ninguém ({vezes} vendas/compras): ficam sem cliente.",
             "DESCARTADO",
             id_origem=ref[:80],
+            original=ref,
+        )
+        ctx.resultado.descartados += 1
+    for ref, vezes in sorted(de_teste.items()):
+        ctx.ocorrencia(
+            "REFERENCIA_DE_TESTE",
+            "vulto.db:vendas/compras.cliente_ref",
+            f"Identidade usada pela TI/QA da Vulto para testes ({vezes} vendas/compras): não vira cliente.",
+            "DESCARTADO",
+            id_origem=ref,
             original=ref,
         )
         ctx.resultado.descartados += 1
@@ -373,6 +387,7 @@ def migrar(db: Session) -> Resultado:
     indices["telefone"] = {telefone_e164(c.telefone): c for c in lorenzi if telefone_e164(c.telefone)}
     lojas = {i: lojas_vulto.loja_da_vulto(db, i) for i in lojas_vulto.LOJAS}
     contas = sem_nome = mesclados = 0
+    usados: set[int] = set()
     for grupo in sorted(grupos, key=lambda g: min((r.origem, r.id_origem) for r in g.registros)):
         cliente = _ja_migrado(db, grupo) or _da_lorenzi(indices, grupo)
         if cliente is not None and cliente.id not in criados:
@@ -385,6 +400,7 @@ def migrar(db: Session) -> Resultado:
             criados.add(cliente.id)
             sem_nome += cliente.nome == NOME_PROVISORIO
         db.flush()
+        usados.add(cliente.id)
         for r in grupo.registros:
             migracao_repository.vincular(db, r.origem, r.id_origem, "clientes", cliente.id)
         _registrar_fusao(ctx, grupo, cliente)
@@ -392,6 +408,7 @@ def migrar(db: Session) -> Resultado:
             contas += _conta_pontos(db, cliente, grupo)
 
     db.flush()
+    _remover_obsoletos(ctx, criados - usados)
     ctx.resultado.carregados = len(grupos)
     ctx.resultado.corrigidos = len(ctx.corrigidos)
     ctx.resultado.ocorrencias = migracao_repository.ocorrencias_por_acao(db, DOMINIO)
@@ -583,3 +600,26 @@ def _conta_pontos(db: Session, cliente: m.Cliente, grupo: Grupo) -> int:
         db.add(conta)
     conta.categoria_declarada = grupo.mais_recente("categoria_declarada")
     return 1
+
+
+def _remover_obsoletos(ctx: Contexto, obsoletos: set[int]) -> None:
+    """Clientes que a migração criou numa rodada anterior e que nenhuma origem produz mais (ex.: as
+    identidades de teste): saem, com os vínculos e a conta Vulto+. Pedidos ficam sem cliente; quem tem
+    atendimento fica (o atendimento exige cliente) e vira ocorrência. Nunca toca nos da Casa Lorenzi."""
+    db = ctx.db
+    for cliente_id in sorted(obsoletos):
+        if db.scalar(select(m.Atendimento.id).where(m.Atendimento.cliente_id == cliente_id).limit(1)):
+            ctx.ocorrencia(
+                "CLIENTE_OBSOLETO_COM_ATENDIMENTO",
+                ORIGEM_CRIADO,
+                "Cliente que a migração não produz mais, mas com atendimento: fica.",
+                "PENDENTE",
+                id_origem=str(cliente_id),
+            )
+            continue
+        db.execute(m.Pedido.__table__.update().where(m.Pedido.cliente_id == cliente_id).values(cliente_id=None))
+        contas = select(m.ContaPontos.id).where(m.ContaPontos.cliente_id == cliente_id)
+        db.execute(m.MovimentoPontos.__table__.delete().where(m.MovimentoPontos.conta_id.in_(contas)))
+        db.execute(m.ContaPontos.__table__.delete().where(m.ContaPontos.cliente_id == cliente_id))
+        db.execute(m.DePara.__table__.delete().where(m.DePara.tabela_destino == "clientes", m.DePara.id_destino == cliente_id))
+        db.execute(m.Cliente.__table__.delete().where(m.Cliente.id == cliente_id))
