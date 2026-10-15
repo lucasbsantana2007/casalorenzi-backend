@@ -96,14 +96,17 @@ def obter(db: Session, estoque_id: int) -> m.Estoque:
 
 
 def posicao_em_data(
-    db: Session, data: str | None, loja_id: int | None = None, busca: str | None = None
+    db: Session, data: str | None, loja_id: int | None = None, busca: str | None = None, marca: str | None = None
 ) -> list[tuple[m.Estoque, int]]:
-    """Reconstrói o saldo de cada item ao final do dia informado, a partir do histórico."""
+    """Reconstrói o saldo de cada item ao final do dia informado, a partir do histórico (na Vulto, o
+    histórico reconstruído na migração: antes da contagem de set/26 ele é derivado)."""
     dia = ler_data(data)
     if dia is None:
         raise DadosInvalidos("Informe a data de referência.")
     saldos = estoque_repository.saldos_ate(db, fim_do_dia(dia))
     itens = _filtrar(estoque_repository.listar(db, loja_id=loja_id, incluir_removidos=True), busca, None)
+    if marca:
+        itens = [e for e in itens if e.loja.marca == marca]
     itens.sort(key=lambda e: (not e.variacao.produto.ativo, chave_texto(e.variacao.produto.nome), e.loja_id))
     return [(e, int(saldos.get(e.id) or 0)) for e in itens]
 
