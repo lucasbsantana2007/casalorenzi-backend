@@ -13,7 +13,7 @@ from datetime import UTC, date, datetime, time, timedelta
 from decimal import Decimal, InvalidOperation
 from zoneinfo import ZoneInfo
 
-from src.entities.cliente import cpf_valido, email_valido
+from src.entities.cliente import cpf_valido, email_valido, telefone_e164
 from src.entities.pedido import CANAL_APP, CANAL_LOJA, CANAL_SITE
 from src.entities.produto import alias_normalizado
 
@@ -213,14 +213,9 @@ def telefone(valor) -> str | None:
     (ex.: "90429-6274") não dá para saber a cidade: inválido."""
     if _vazio(valor):
         return None
-    digitos = re.sub(r"\D", "", str(valor))
-    if len(digitos) in (12, 13) and digitos.startswith("55"):
-        digitos = digitos[2:]
-    if len(digitos) == 11 and digitos[0] != "0" and digitos[1] != "0" and digitos[2] == "9":
-        return f"+55{digitos}"
-    if len(digitos) == 10 and digitos[0] != "0" and digitos[1] != "0" and digitos[2] in "2345":
-        return f"+55{digitos}"
-    raise ValorInvalido(f"Telefone inválido: {valor!r}")
+    if (numero := telefone_e164(valor)) is None:
+        raise ValorInvalido(f"Telefone inválido: {valor!r}")
+    return numero
 
 
 def instagram(valor) -> str | None:

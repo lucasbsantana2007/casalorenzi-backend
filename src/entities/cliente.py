@@ -43,3 +43,16 @@ def cpf_valido(cpf: str | None) -> bool:
     if len(d) != 11 or len(set(d)) == 1:
         return False
     return _digito_verificador(d[:9]) == int(d[9]) and _digito_verificador(d[:10]) == int(d[10])
+
+
+def telefone_e164(valor: str | int | None) -> str | None:
+    """Telefone brasileiro em E.164 (+5511948854328), ou None se não der para saber o número completo:
+    aceita "11951021527", "+55 11 91217-2644", "(11) 98369-1660"; sem DDD ("90429-6274"), None."""
+    digitos = re.sub(r"\D", "", str(valor or ""))
+    if len(digitos) in (12, 13) and digitos.startswith("55"):
+        digitos = digitos[2:]
+    if len(digitos) not in (10, 11) or digitos[0] == "0" or digitos[1] == "0":
+        return None
+    celular = len(digitos) == 11 and digitos[2] == "9"
+    fixo = len(digitos) == 10 and digitos[2] in "2345"
+    return f"+55{digitos}" if celular or fixo else None
