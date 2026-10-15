@@ -47,6 +47,7 @@ def produto_resumo(produto: m.Produto) -> dict:
         "categoria": produto.categoria.nome,
         "precoBase": float(produto.preco_base),
         "ativo": produto.ativo,
+        "marca": produto.marca,
         "imagemUrl": imagem_url(produto),
     }
 
@@ -59,6 +60,7 @@ def variacao_base(variacao: m.Variacao) -> dict:
         "tamanho": variacao.tamanho,
         "cor": variacao.cor,
         "ean": variacao.ean,
+        "ativa": variacao.ativa,
     }
 
 
@@ -78,7 +80,14 @@ def produto_saida(
             **variacao_base(v),
             "estoqueTotal": totais.get(v.id, 0),
             "disponivel": (disponiveis if disponiveis is not None else totais).get(v.id, 0),
-            **({"precoCusto": float(v.preco_custo) if v.preco_custo is not None else None} if com_custo else {}),
+            **(
+                {
+                    "precoCusto": float(v.preco_custo) if v.preco_custo is not None else None,
+                    "custoMedio": float(v.custo_medio) if v.custo_medio is not None else None,
+                }
+                if com_custo
+                else {}
+            ),
         }
         for v in produto.variacoes
     ]
@@ -99,4 +108,22 @@ def produto_saida(
         "variacoes": variacoes,
         "estoqueTotal": sum(v["estoqueTotal"] for v in variacoes),
         "disponivel": sum(v["disponivel"] for v in variacoes),
+    }
+
+
+def grafia_saida(codigo: str, variacao: m.Variacao, alias: m.SkuAlias | None) -> dict:
+    """Resultado da busca por grafia de SKU: a variação (com o produto) e o alias que casou."""
+    return {
+        "grafia": codigo,
+        "variacao": variacao_saida(variacao),
+        "alias": (
+            {
+                "alias": alias.alias,
+                "origem": alias.origem,
+                "validoDe": alias.valido_de.isoformat() if alias.valido_de else None,
+                "validoAte": alias.valido_ate.isoformat() if alias.valido_ate else None,
+            }
+            if alias
+            else None
+        ),
     }
