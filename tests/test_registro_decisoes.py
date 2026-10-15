@@ -5,11 +5,11 @@ import os
 import re
 
 import pytest
-from sqlalchemy import func, select, text
+from sqlalchemy import event, func, select, text
 
 from src import models as m
 from src.config.settings import VULTO_DADOS
-from src.database.connection import SessionLocal
+from src.database.connection import SessionLocal, engine
 from src.migracao_vulto import atendimento, fidelidade, usuarios, vendas
 from src.migracao_vulto.__main__ import rodar
 from src.relatorios import registro_decisoes
@@ -37,11 +37,24 @@ def _descartados(db, dominio: str) -> int:
     )
 
 
+# A migração roda do computador de quem migra contra o banco de produção: cada comando é uma ida e volta
+# pela internet (~140 ms até o Render). Em lote, a carga inteira cabe em menos de mil comandos (eram 137 mil:
+# 5 horas); o limite pega a volta de uma consulta por registro.
+LIMITE_DE_COMANDOS = 1500
+
+
 def test_conciliacao_e_registro_de_decisoes(staging):
-    resultados = {
-        r.dominio: r
-        for r in rodar(["lojas", "produtos", "clientes", "usuarios", "vendas", "estoque", "fidelidade", "atendimento"])
-    }
+    comandos = []
+    contar = lambda *_args: comandos.append(1)  # noqa: E731
+    event.listen(engine, "before_cursor_execute", contar)
+    try:
+        resultados = {
+            r.dominio: r
+            for r in rodar(["lojas", "produtos", "clientes", "usuarios", "vendas", "estoque", "fidelidade", "atendimento"])
+        }
+    finally:
+        event.remove(engine, "before_cursor_execute", contar)
+    assert len(comandos) < LIMITE_DE_COMANDOS, f"{len(comandos)} comandos SQL na migração"
     with SessionLocal() as db:
         # Lido = migrado + descartado com ocorrência, domínio a domínio (os 1:1; estoque, produtos e clientes juntam
         # vários registros num só e são conferidos pelos totais nos testes de cada etapa)
