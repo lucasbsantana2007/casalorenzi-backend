@@ -21,8 +21,8 @@ from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from datetime import date, timedelta
 from decimal import Decimal
+from typing import TYPE_CHECKING
 
-import pandas as pd
 from sqlalchemy import delete, select, text
 from sqlalchemy.orm import Session
 
@@ -32,6 +32,9 @@ from src.migracao_vulto import normalizacao as n
 from src.migracao_vulto.relatorio import Resultado
 from src.migracao_vulto.staging import SCHEMA
 from src.repositories import migracao_repository
+
+if TYPE_CHECKING:
+    import pandas as pd
 
 DOMINIO = "produtos"
 ARQUIVO = "catalogo.xlsx"
@@ -210,7 +213,10 @@ def _moeda(valor: Decimal | None) -> str:
 # ---------- Leitura do catálogo ----------
 
 
-def _ler(db: Session, tabela: str, colunas: dict, extras: tuple[str, ...] = ()) -> pd.DataFrame:
+def _ler(db: Session, tabela: str, colunas: dict, extras: tuple[str, ...] = ()) -> "pd.DataFrame":
+    # Importado aqui: quem só usa as constantes do módulo (a API) não carrega o pandas
+    import pandas as pd
+
     selecao = ", ".join([f'"{origem}" AS {padrao}' for padrao, origem in colunas.items()] + list(extras))
     return pd.read_sql(
         text(f'SELECT _linha, _tachado, _cor_fundo, {selecao} FROM {SCHEMA}."{tabela}" ORDER BY _linha'), db.connection()
@@ -218,6 +224,8 @@ def _ler(db: Session, tabela: str, colunas: dict, extras: tuple[str, ...] = ()) 
 
 
 def ler_catalogo(ctx: Contexto) -> list[Linha]:
+    import pandas as pd
+
     linhas: list[Linha] = []
     lidas = 0
     inicio_inverno_26 = None
