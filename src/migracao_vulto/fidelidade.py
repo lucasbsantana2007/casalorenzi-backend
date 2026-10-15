@@ -26,7 +26,7 @@ from dataclasses import dataclass
 from datetime import datetime, time, timedelta
 from decimal import Decimal
 
-from sqlalchemy import delete, func, select, text
+from sqlalchemy import delete, func, select, text, update
 from sqlalchemy.orm import Session
 
 from src import models as m
@@ -422,6 +422,7 @@ def migrar(db: Session) -> Resultado:
     resgates_da_planilha(ctx)
 
     existentes = {c.cliente_id: c for c in db.scalars(select(m.ContaPontos))}
+    atualizacoes: dict[int, dict] = {}
     db.execute(
         delete(m.MovimentoPontos).where(
             m.MovimentoPontos.conta_id.in_([c.id for c in existentes.values()]), m.MovimentoPontos.origem.in_(ORIGENS)
@@ -463,28 +464,33 @@ def migrar(db: Session) -> Resultado:
             bonus_ouro += regra.aplicar_validade(base + dobro + bonus, meses, DATA_CORTE).saldo - com_dobro
 
         cliente_id = ctx.cliente_por_cpf[cpf]
-        conta = existentes.get(cliente_id) or m.ContaPontos(cliente_id=cliente_id)
-        db.add(conta)
-        conta.categoria, conta.saldo = categoria, validade.saldo
+        conta = existentes.get(cliente_id)
+        if conta is None:
+            conta = m.ContaPontos(cliente_id=cliente_id, categoria=categoria, saldo=validade.saldo)
+            db.add(conta)
+        else:
+            atualizacoes[conta.id] = {"id": conta.id, "categoria": categoria, "saldo": validade.saldo}
         if conta.categoria_declarada and CATEGORIA_DECLARADA.get(conta.categoria_declarada.strip().lower()) != categoria:
             divergentes += 1
-        db.flush()
+        # Pelo relacionamento (conta=): a conta nova ainda não tem id, e um flush por conta seriam milhares de idas ao banco
         for mv in movs:
             db.add(
                 m.MovimentoPontos(
-                    conta_id=conta.id, tipo=mv.tipo, quantidade=mv.quantidade, data=mv.quando,
+                    conta=conta, tipo=mv.tipo, quantidade=mv.quantidade, data=mv.quando,
                     vence_em=regra.somar_meses(mv.quando, meses) if mv.quantidade > 0 else None,
                     pedido_id=mv.pedido_id, origem=mv.origem, obs=mv.obs,
                 )
             )  # fmt: skip
         for quando, quantidade in validade.vencimentos:
             obs = f"pontos vencidos ({meses} meses, os mais antigos primeiro)"
-            db.add(m.MovimentoPontos(conta_id=conta.id, tipo="VENCIMENTO", quantidade=-quantidade, data=quando,
+            db.add(m.MovimentoPontos(conta=conta, tipo="VENCIMENTO", quantidade=-quantidade, data=quando,
                                      origem=ORIGEM_VALIDADE, obs=obs))  # fmt: skip
         total += len(movs) + len(validade.vencimentos)
     for conta in existentes.values():  # conta sem nenhum ponto: Bronze, saldo zero
-        if conta.categoria is None:
-            conta.categoria, conta.saldo = regra.categoria_pela_regra(0), 0
+        if conta.id not in atualizacoes and conta.categoria is None:
+            atualizacoes[conta.id] = {"id": conta.id, "categoria": regra.categoria_pela_regra(0), "saldo": 0}
+    if atualizacoes:  # em lote, pela chave (o ORM mandaria um UPDATE por conta)
+        db.execute(update(m.ContaPontos), list(atualizacoes.values()))
     db.flush()
 
     if depois_do_corte:
