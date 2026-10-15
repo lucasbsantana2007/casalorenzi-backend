@@ -1,0 +1,8 @@
+﻿cenario;pontos;valor_do_ponto;valor;observacao
+Ouro 12 meses;3257953;0,05;162897,65;
+Ouro 12 meses;3257953;0,10;325795,30;
+Ouro 18 meses;3352597;0,05;167629,85;gravado nas contas
+Ouro 18 meses;3352597;0,10;335259,70;gravado nas contas
+faixa minimo;3212053;0,05;160602,65;Ouro 12 meses, menos os resgates anotados sem CPF, a R$ 0,05
+faixa vigente;3352597;0,05;167629,85;Ouro 18 meses (o combinado, gravado nas contas), a R$ 0,05
+faixa maximo;4258631;0,10;425863,10;Ouro 18 meses, mais o dobro do online e o bônus Ouro que o sistema nunca deu, a R$ 0,10 (o valor que o sistema da Vulto seguiu dando)
