@@ -21,6 +21,7 @@ from src.routers import (
     conta,
     dashboard,
     devolucoes,
+    diretoria,
     estoque,
     financeiro,
     frete,
@@ -77,6 +78,7 @@ for modulo in (
     conta,
     dashboard,
     financeiro,
+    diretoria,
     frete,
     administracao,
 ):
