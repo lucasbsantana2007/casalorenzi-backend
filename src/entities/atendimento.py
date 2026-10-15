@@ -1,6 +1,10 @@
 """Atendimento (chamado do cliente) e suas mensagens."""
 
 STATUS_ATENDIMENTO = ("ABERTO", "EM_ANDAMENTO", "AGUARDANDO_CLIENTE", "CONCLUIDO")
+# Por onde o cliente falou. SITE: aberto no site ou no painel (todos os da Casa Lorenzi); os outros vieram
+# do atendimento da Vulto, guardados com o contato original (telefone, e-mail ou @ do Instagram)
+CANAIS_ATENDIMENTO = ("SITE", "WHATSAPP", "INSTAGRAM", "EMAIL")
+CANAL_PADRAO = "SITE"
 EM_ABERTO = ("ABERTO", "EM_ANDAMENTO", "AGUARDANDO_CLIENTE")
 AUTOR_MENSAGEM = ("CLIENTE", "ATENDENTE", "SISTEMA")
 DESCRICAO_MINIMA = 10
