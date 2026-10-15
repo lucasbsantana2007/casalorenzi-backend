@@ -280,9 +280,21 @@ duplicar) que nunca apaga dados da Casa Lorenzi. O legado (`vulto-legado-back/`)
 Regras e decisões em `CLAUDE.md` e `docs/registro_decisoes.md`.
 
 ```bash
-python -m src.migracao_vulto --tudo            # todos os domínios, na ordem
-python -m src.migracao_vulto --dominio lojas   # um domínio só
+python -m src.migracao_vulto --tudo              # staging e todos os domínios, na ordem
+python -m src.migracao_vulto --dominio staging   # só a cópia crua do legado
+python -m src.migracao_vulto --dominio lojas     # um domínio só
 ```
+
+Os arquivos do legado vêm de `VULTO_DADOS` no `.env` (padrão: `../vulto-legado-back/data`).
+
+**Staging (schema `legado_vulto`).** Primeira camada: cada tabela do `vulto.db`, cada aba das
+planilhas e o export do atendimento viram uma tabela crua (`db__vendas`, `catalogo__verao_26`,
+`clientes__clientes`, `atendimentos`...), com todas as colunas em texto, sem limpeza, e com
+`_arquivo`, `_aba` e `_linha` (a linha como aparece no Excel; no `vulto.db`, o rowid). Das planilhas
+vêm também `_tipos` (o tipo que o Excel deu à célula, ex.: data) e a formatação da linha
+(`_tachado`, `_cor_fonte`, `_cor_fundo`). `legado_vulto._cargas` lista cada tabela com a origem, a
+linha do cabeçalho, os nomes originais das colunas e as contagens. As senhas em texto puro dos
+funcionários não são copiadas e a `senha_master` entra mascarada. Cada carga recria o schema.
 
 Ao final, imprime lidos, carregados, corrigidos e descartados por domínio. Contra o banco do Render,
 rode do seu computador com a "External Database URL": `DATABASE_URL="postgresql+psycopg://..."`.
