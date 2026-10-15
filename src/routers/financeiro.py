@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from src import models as m
 from src.database.connection import get_db
 from src.middlewares.autenticacao import exigir_modulo
-from src.use_cases import faturamento, financeiro
+from src.use_cases import faturamento, fidelidade, financeiro
 
 router = APIRouter(prefix="/financeiro", tags=["Financeiro"])
 
@@ -67,3 +67,16 @@ def obter_comparativo_vulto(
     trocas, devoluções, testes, duplicatas, Batel, fuso, outros) e o nosso faturamento líquido com e sem
     frete. sistemaVulto + soma dos ajustes = nossoComFrete."""
     return faturamento.comparativo_vulto(db, de, ate)
+
+
+@router.get("/vulto-mais/passivo")
+def obter_passivo_vulto_mais(
+    data: str | None = None,
+    db: Session = Depends(get_db),
+    _: m.Usuario = Depends(exigir_modulo("financeiro")),
+):
+    """Passivo de pontos do Vulto+ na data (padrão: 01/10/2026, a virada): pontos válidos com a validade
+    FIFO (Ouro 12 e Ouro 18 meses), em reais pelo valor vigente (R$ 0,05) e pelo antigo (R$ 0,10), e a faixa
+    mínima/vigente/máxima com o critério de cada uma. Na data da virada, o máximo soma o que o sistema da
+    Vulto nunca aplicou (dobro do online, bônus Ouro) e o mínimo tira os resgates anotados sem CPF."""
+    return fidelidade.passivo(db, data)
