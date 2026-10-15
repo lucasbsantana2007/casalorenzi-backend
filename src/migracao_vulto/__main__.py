@@ -1,7 +1,10 @@
 """Linha de comando da migração da Vulto (uma transação por domínio).
 
     python -m src.migracao_vulto --tudo
+    python -m src.migracao_vulto --dominio staging   # só a cópia crua do legado (schema legado_vulto)
     python -m src.migracao_vulto --dominio lojas
+
+Os dados do legado vêm da pasta VULTO_DADOS (padrão: ../vulto-legado-back/data).
 
 Contra o banco de produção, rode do seu computador com a URL externa do banco:
     DATABASE_URL="postgresql+psycopg://..." python -m src.migracao_vulto --tudo
@@ -14,11 +17,12 @@ from sqlalchemy.orm import Session
 
 from src.database.connection import SessionLocal
 from src.entities.migracao import DOMINIOS_MIGRACAO
-from src.migracao_vulto import lojas
+from src.migracao_vulto import lojas, staging
 from src.migracao_vulto.relatorio import Resultado, formatar
 
 # Domínios implementados, na ordem de DOMINIOS_MIGRACAO (os outros chegam etapa por etapa)
 MIGRADORES: dict[str, Callable[[Session], Resultado]] = {
+    staging.DOMINIO: staging.migrar,
     lojas.DOMINIO: lojas.migrar,
 }
 

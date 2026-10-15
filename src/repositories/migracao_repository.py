@@ -66,6 +66,7 @@ def registrar_ocorrencia(
 
 
 def ocorrencias_por_acao(db: Session, dominio: str) -> dict[str, int]:
+    db.flush()  # a sessão não descarrega sozinha (autoflush desligado): conta também as da transação
     linhas = db.execute(
         select(m.MigracaoOcorrencia.acao_tomada, func.count())
         .where(m.MigracaoOcorrencia.dominio == dominio)
