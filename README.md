@@ -113,13 +113,21 @@ Nunca coloque a chave no git; no deploy (Render), cadastre as mesmas variáveis 
 
 | Módulo | Tabelas |
 | --- | --- |
-| Núcleo | `lojas` (endereço, telefone, horários e `ativa`), `usuarios` (só a equipe: ADMINISTRADOR, LOJISTA, OPERADOR; sem senha enquanto o convite está pendente) |
-| Clientes | `clientes` (CPF e e-mail únicos, senha só como hash), `tokens_senha` |
-| Catálogo | `categorias`, `produtos` (com descrição, composição e cuidados), `variacoes` (SKU, com `preco_custo`), `imagens_produto` (foto enviada no cadastro) |
+| Núcleo | `lojas` (endereço, telefone, horários, `ativa`, `marca` e `tipo`), `usuarios` (só a equipe: ADMINISTRADOR, LOJISTA, OPERADOR; sem senha enquanto o convite está pendente) |
+| Clientes | `clientes` (CPF e e-mail únicos, e-mail opcional para clientes vindos da Vulto, pelo menos um de CPF/e-mail/telefone, consentimento de marketing; senha só como hash), `tokens_senha` |
+| Catálogo | `categorias`, `produtos` (com descrição, composição, cuidados, `marca` e `colecao`), `variacoes` (SKU, com `preco_custo` e `ean`), `sku_alias` (outras grafias do SKU, com vigência), `imagens_produto` (foto enviada no cadastro) |
 | Estoque | `estoques` (saldo por **loja + SKU**), `movimentacoes` (histórico com sinal), `transferencias` (com `pedido_id` quando atendem um pedido) |
 | Vendas | `pedidos` (com frete e endereço de entrega no e-commerce), `itens_pedido`, `eventos_pedido` (histórico), `pagamentos`, `devolucoes` |
 | Atendimento | `tipos_solicitacao`, `atendimentos` (sempre de um cliente), `mensagens`, `anexos` (foto) |
 | Administração | `config_frete` e `frete_regioes` (frete configurável), `log_acoes` (quem fez o quê) |
+| Vulto+ | `contas_pontos` (saldo e categoria por cliente), `movimentos_pontos` (extrato com sinal e validade) |
+| Migração da Vulto | `de_para` (cada registro migrado aponta para a origem), `migracao_ocorrencias` (problemas nos dados e o que foi feito) |
+
+**Duas marcas, uma plataforma.** Desde a compra da Vulto, `lojas` e `produtos` têm `marca`
+(`LORENZI` ou `VULTO`) e `lojas` tem `tipo` (`FISICA`, `CD` ou `VIRTUAL`); pedidos, estoques e
+atendimentos herdam a marca pela loja ou pelo produto. Cliente não tem marca: a mesma pessoa é um
+registro só. Os canais são `Loja física`, `E-commerce` e `App`. O site (vitrine, página Lojas,
+checkout e expedição) continua só com a Casa Lorenzi; o painel vê as duas marcas.
 
 **Um login só para equipe e clientes.** O cliente cria a conta no checkout (nome, CPF, e-mail,
 telefone e senha) e entra pelo mesmo `POST /auth/login`; o token traz o papel `CLIENTE`, que só
@@ -138,12 +146,12 @@ Todas sob o prefixo `/api`. As rotas internas exigem `Authorization: Bearer <tok
 | --- | --- | --- |
 | POST | `/auth/login` · GET `/auth/me` | público · logado (equipe ou cliente) |
 | POST | `/auth/cadastro` (conta do cliente; já devolve a sessão), `/auth/esqueci-senha`, `/auth/redefinir-senha` | público |
-| GET | `/lojas` (com endereço, telefone, horários e `ativa`), `/categorias`, `/tipos-solicitacao` | público |
+| GET | `/lojas?marca` (com endereço, telefone, horários, `ativa`, `marca` e `tipo`; visitante e cliente só veem as da Casa Lorenzi), `/categorias`, `/tipos-solicitacao` | público |
 | GET, PUT · PUT · POST | `/conta` · `/conta/senha` · `/conta/exclusao` (configurações da conta) | o próprio cliente |
 | GET | `/frete/condicoes` (valores e prazos, sem custo) | público |
 | GET, PUT | `/frete/config` · POST `/frete/simulacao` | administrador |
 | GET, POST | `/admin/funcionarios` · PUT `/admin/funcionarios/{id}` · PATCH `/admin/funcionarios/{id}/status` · POST `/admin/funcionarios/{id}/convite` | administrador |
-| GET, POST | `/admin/lojas` · PUT `/admin/lojas/{id}` | administrador |
+| GET, POST | `/admin/lojas` · PUT `/admin/lojas/{id}` (`marca` e `tipo` opcionais; a marca não muda depois do cadastro) | administrador |
 | GET | `/admin/log?area&usuarioId&busca` | administrador |
 | GET | `/usuarios?papel=` | equipe |
 | GET | `/produtos?busca&categoria&ativo`, `/produtos/{id}` (`precoCusto` só para o administrador), `/produtos/{id}/imagem` | público (vitrine) |
@@ -162,8 +170,8 @@ Todas sob o prefixo `/api`. As rotas internas exigem `Authorization: Bearer <tok
 | POST | `/atendimentos` (cliente: abre para si; equipe: em nome do cliente), `/atendimentos/{id}/mensagens` (aceita `anexo`) | administrador, lojista, cliente dono |
 | GET | `/clientes?busca` | administrador, lojista |
 | GET | `/clientes/{id}`, `/clientes/{id}/pedidos`, `/clientes/{id}/pedidos/{numero}`, `/clientes/{id}/atendimentos`, `/clientes/{id}/atendimentos/{aid}` | administrador, lojista, o próprio cliente |
-| GET | `/dashboard/resumo?lojaId` | equipe |
-| GET | `/financeiro/resumo?de&ate&comparar&agrupar&lojas&canais&categorias&generos` | administrador |
+| GET | `/dashboard/resumo?lojaId&marca` | equipe |
+| GET | `/financeiro/resumo?de&ate&comparar&agrupar&lojas&canais&categorias&generos&marcas` (sem `marcas`, soma as duas) | administrador |
 
 ## Regras importantes
 
@@ -264,6 +272,22 @@ alembic upgrade head
 Outros comandos: `alembic current`, `alembic history`, `alembic downgrade -1`.
 **A migration vai no mesmo commit do código que depende dela**, para o time aplicar com `alembic upgrade head`.
 Nunca mude o banco à mão.
+
+## Migração dos dados da Vulto
+
+Os dados da Vulto entram uma única vez, por um pipeline idempotente (pode rodar de novo sem
+duplicar) que nunca apaga dados da Casa Lorenzi. O legado (`vulto-legado-back/`) é só leitura.
+Regras e decisões em `CLAUDE.md` e `docs/registro_decisoes.md`.
+
+```bash
+python -m src.migracao_vulto --tudo            # todos os domínios, na ordem
+python -m src.migracao_vulto --dominio lojas   # um domínio só
+```
+
+Ao final, imprime lidos, carregados, corrigidos e descartados por domínio. Contra o banco do Render,
+rode do seu computador com a "External Database URL": `DATABASE_URL="postgresql+psycopg://..."`.
+**Atenção:** `python -m src.database.seed --recriar` apaga tudo, inclusive o que veio da Vulto;
+depois dele, rode a migração de novo.
 
 ## Testes
 
