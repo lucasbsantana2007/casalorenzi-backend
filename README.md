@@ -170,6 +170,7 @@ Todas sob o prefixo `/api`. As rotas internas exigem `Authorization: Bearer <tok
 | GET · GET, PATCH | `/atendimentos` · `/atendimentos/{id}` | administrador, lojista |
 | POST | `/atendimentos` (cliente: abre para si; equipe: em nome do cliente), `/atendimentos/{id}/mensagens` (aceita `anexo`) | administrador, lojista, cliente dono |
 | GET | `/clientes?busca` | administrador, lojista |
+| GET | `/clientes/unificado?cpf&email&telefone` (a mesma pessoa nas duas marcas: pedidos da Casa Lorenzi e da Vulto, conta Vulto+) | administrador, lojista |
 | GET | `/clientes/{id}`, `/clientes/{id}/pedidos`, `/clientes/{id}/pedidos/{numero}`, `/clientes/{id}/atendimentos`, `/clientes/{id}/atendimentos/{aid}` | administrador, lojista, o próprio cliente |
 | GET | `/dashboard/resumo?lojaId&marca` | equipe |
 | GET | `/financeiro/resumo?de&ate&comparar&agrupar&lojas&canais&categorias&generos&marcas` (sem `marcas`, soma as duas) | administrador |
@@ -309,6 +310,14 @@ Preço: o mais frequente da aba; entre coleções, `REGRA_PRECO` em `produtos.py
 Operações/Financeiro; `MAIS_NOVA` é a regra de Compras). Linha tachada ou vermelha = variação
 inativa. A categoria vem do prefixo do SKU (Calças, Bermudas e Shorts e Não catalogado são novas;
 o resto usa as da Casa Lorenzi).
+
+**Clientes** (`--dominio clientes`). Aba Clientes, clientes antigos, `cliente_ref` das vendas e das
+compras e os contatos do atendimento viram um cliente por pessoa (CPF → e-mail → telefone; CPFs
+diferentes nunca se juntam), também contra os clientes da Casa Lorenzi, que nunca são sobrescritos
+(só os campos vazios são completados). Consentimento de mensagens só com "sim" explícito e sem
+"não ligar"; telefone sem DDD fica vazio; quem só aparece nas vendas entra com o nome provisório
+"Cliente Vulto (sem nome)". Cliente com CPF ganha conta Vulto+ com a categoria declarada na planilha.
+Telefones da Vulto ficam em E.164 (`+5511...`); os da Casa Lorenzi continuam como foram cadastrados.
 
 Ao final, imprime lidos, carregados, corrigidos e descartados por domínio. Contra o banco do Render,
 rode do seu computador com a "External Database URL": `DATABASE_URL="postgresql+psycopg://..."`.

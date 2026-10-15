@@ -4,9 +4,9 @@ Quem pode ver o quê é conferido na rota (o cliente só acessa o próprio id)."
 from sqlalchemy.orm import Session
 
 from src import models as m
-from src.entities.cliente import cpf_do_id
+from src.entities.cliente import cpf_do_id, cpf_valido, email_valido, normalizar_email, telefone_e164
 from src.repositories import atendimento_repository, cliente_repository, pedido_repository
-from src.utils.erros import NaoEncontrado
+from src.utils.erros import DadosInvalidos, NaoEncontrado
 
 
 def listar(db: Session, busca: str | None = None) -> list[m.Cliente]:
@@ -59,3 +59,33 @@ def pedido_por_numero(db: Session, cliente_id: int, numero: str) -> m.Pedido:
     if pedido is None:
         raise NaoEncontrado("Não encontramos um pedido com esse número.")
     return pedido
+
+
+def unificado(
+    db: Session, cpf: str | None = None, email: str | None = None, telefone: str | None = None
+) -> list[tuple[m.Cliente, list[m.Pedido], m.ContaPontos | None]]:
+    """A mesma pessoa nas duas marcas: busca por CPF, e-mail e/ou telefone (qualquer máscara) e devolve
+    cada cliente encontrado com os pedidos da Casa Lorenzi e da Vulto e a conta Vulto+. Vários
+    parâmetros que apontam para clientes diferentes devolvem todos (a equipe vê a divergência)."""
+    if not any(v and v.strip() for v in (cpf, email, telefone)):
+        raise DadosInvalidos("Informe CPF, e-mail ou telefone.")
+    encontrados: dict[int, m.Cliente] = {}
+    if cpf and cpf.strip():
+        if not cpf_valido(cpf):
+            raise DadosInvalidos("CPF inválido.")
+        if (cliente := cliente_repository.por_cpf(db, cpf_do_id(cpf))) is not None:
+            encontrados[cliente.id] = cliente
+    if email and email.strip():
+        if not email_valido(email):
+            raise DadosInvalidos("E-mail inválido.")
+        if (cliente := cliente_repository.por_email(db, normalizar_email(email))) is not None:
+            encontrados[cliente.id] = cliente
+    if telefone and telefone.strip():
+        if (numero := telefone_e164(telefone)) is None:
+            raise DadosInvalidos("Telefone inválido: informe com DDD.")
+        encontrados.update({c.id: c for c in cliente_repository.por_telefone(db, numero)})
+    return [
+        (c, pedido_repository.do_cliente(db, c.id), cliente_repository.conta_pontos(db, c.id))
+        for c in sorted(encontrados.values(), key=lambda c: c.id)
+        if c.excluido_em is None
+    ]
