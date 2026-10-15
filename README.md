@@ -173,10 +173,12 @@ Todas sob o prefixo `/api`. As rotas internas exigem `Authorization: Bearer <tok
 | GET | `/clientes?busca` | administrador, lojista |
 | GET | `/clientes/unificado?cpf&email&telefone` (a mesma pessoa nas duas marcas: pedidos da Casa Lorenzi e da Vulto, conta Vulto+) | administrador, lojista |
 | GET | `/clientes/{id}`, `/clientes/{id}/pedidos`, `/clientes/{id}/pedidos/{numero}`, `/clientes/{id}/atendimentos`, `/clientes/{id}/atendimentos/{aid}` | administrador, lojista, o próprio cliente |
+| GET | `/clientes/{id}/vulto-mais` (extrato de pontos do Vulto+: saldo, categoria, a vencer e movimentos) | administrador, lojista, o próprio cliente |
 | GET | `/dashboard/resumo?lojaId&marca` | equipe |
 | GET | `/financeiro/resumo?de&ate&comparar&agrupar&lojas&canais&categorias&generos&marcas` (sem `marcas`, soma as duas) | administrador |
 | GET | `/financeiro/faturamento?de&ate&marca` (mês × loja × canal, com e sem frete, devoluções e líquido) | administrador |
 | GET | `/financeiro/faturamento/comparativo-vulto?de&ate` (relatório do sistema da Vulto × nosso número, com a diferença por ajuste) | administrador |
+| GET | `/financeiro/vulto-mais/passivo?data` (pontos válidos do Vulto+ em R$, cenários Ouro 12/18 meses e a faixa mínima/máxima; padrão 01/10/2026) | administrador |
 
 ## Regras importantes
 
@@ -339,6 +341,17 @@ planilha: 30/09, estimado; a Savassi contou por modelo e foi rateada) e o saldo 
 desconhecido, é o menor que deixa o histórico sem saldo negativo. Antes da contagem, o histórico é
 derivado; o saldo em 01/10/2026 é o contado mais os movimentos depois dele.
 
+**Fidelidade** (`--dominio fidelidade`). O Vulto+ vira `contas_pontos` + `movimentos_pontos` (pontos só
+com CPF). Saldo inicial: a coluna Pontos da planilha, congelada em 01/01/2025 ("2.203" = 2203; "2,7k",
+estimado; duplicados somam). Depois, os movimentos do `vulto.db` corrigidos: o crédito inflado pelo bug do
+app v3.4 (pontos sobre centavos) volta ao valor certo e os ajustes manuais dessa correção saem; venda
+aguardando pagamento, de teste ou duplicada não pontua; venda cancelada sem estorno é estornada. Resgates
+anotados só na planilha (2025 em diante) são debitados. Regras em `src/entities/fidelidade.py`: categoria
+pelos pontos do ano, validade FIFO de 12 meses (Ouro 18, o combinado, é o gravado), saldo nunca negativo.
+O passivo (`/financeiro/vulto-mais/passivo`) recalcula a validade nos dois cenários do Ouro e mostra a
+faixa: R$ 0,05 por ponto (vigente desde mar/2025) a R$ 0,10 (o que o sistema da Vulto seguiu dando), com o
+dobro do online e o bônus Ouro que o sistema nunca aplicou no máximo.
+
 Ao final, imprime lidos, carregados, corrigidos e descartados por domínio. Contra o banco do Render,
 rode do seu computador com a "External Database URL": `DATABASE_URL="postgresql+psycopg://..."`.
 **Atenção:** `python -m src.database.seed --recriar` apaga tudo, inclusive o que veio da Vulto;
@@ -401,3 +414,5 @@ No plano grátis, a API "dorme" sem uso e o primeiro acesso seguinte demora pert
 ## Próximos passos
 
 - Integração real de pagamento (hoje simulado: todo checkout é aprovado).
+- Vulto+ na plataforma: creditar e resgatar pontos nas vendas novas e rodar os vencimentos depois de
+  01/10/2026 (hoje o saldo das contas é o da virada).
