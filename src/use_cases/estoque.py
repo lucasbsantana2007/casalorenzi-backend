@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from src import models as m
 from src.entities.estoque import ORDEM_STATUS, SINAL_POR_TIPO_MANUAL, quantidade_valida_para_tipo, status_estoque
+from src.entities.marca import MARCA_PADRAO
 from src.repositories import cadastro_repository, estoque_repository, sessao
 from src.use_cases import log_acoes
 from src.utils.datas import agora, fim_do_dia, inicio_do_dia, ler_data
@@ -46,8 +47,10 @@ def aplicar_movimentacao(
 
 
 def criar_estoques_zerados(db: Session, variacao: m.Variacao) -> None:
-    """Toda variação nova passa a existir, com saldo zero, em todas as lojas."""
-    for loja in cadastro_repository.lojas(db):
+    """Toda variação nova passa a existir, com saldo zero, em todas as lojas da marca do produto."""
+    # Produto ainda não gravado: o default da coluna só vale no INSERT
+    marca = variacao.produto.marca or MARCA_PADRAO
+    for loja in cadastro_repository.lojas(db, marca=marca):
         sessao.adicionar(db, m.Estoque(loja_id=loja.id, variacao=variacao, quantidade=0, quantidade_min=2, atualizado_em=agora()))
 
 
