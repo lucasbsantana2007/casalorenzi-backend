@@ -58,6 +58,7 @@ def variacao_base(variacao: m.Variacao) -> dict:
         "sku": variacao.sku,
         "tamanho": variacao.tamanho,
         "cor": variacao.cor,
+        "ean": variacao.ean,
     }
 
 
@@ -92,6 +93,8 @@ def produto_saida(
         "composicao": produto.composicao,
         "cuidados": produto.cuidados,
         "ativo": produto.ativo,
+        "marca": produto.marca,
+        "colecao": produto.colecao,
         "imagemUrl": imagem_url(produto),
         "variacoes": variacoes,
         "estoqueTotal": sum(v["estoqueTotal"] for v in variacoes),
