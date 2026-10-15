@@ -145,6 +145,9 @@ def test_instagram_nome_e_texto():
     invalido(n.instagram, "@nome com espaço")
     assert n.nome_pessoa("  ALINE   BARROS ") == "ALINE BARROS"
     assert n.nome_pessoa("Larissa V. Batista") == "Larissa V. Batista"
+    # O atendimento anotava "?" ou "Cliente" quando a pessoa não dizia o nome
+    assert n.nome_pessoa("?") is None
+    assert n.nome_pessoa(" Cliente ") is None
     assert n.texto_livre("  oi\r\nquero trocar  ") == "oi\nquero trocar"
     assert n.texto_livre("   ") is None
 

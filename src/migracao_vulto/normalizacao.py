@@ -229,11 +229,19 @@ def instagram(valor) -> str | None:
     return texto
 
 
+# O que o atendimento anotava no lugar do nome quando a pessoa não dizia
+NOMES_GENERICOS = {"cliente"}
+
+
 def nome_pessoa(valor) -> str | None:
-    """Trim e espaços únicos; a capitalização fica como veio (o original continua no staging)."""
+    """Trim e espaços únicos; a capitalização fica como veio (o original continua no staging). Sem nenhuma
+    letra ("?") ou genérico ("Cliente"): sem nome."""
     if _vazio(valor):
         return None
-    return re.sub(r"\s+", " ", str(valor)).strip()
+    nome = re.sub(r"\s+", " ", str(valor)).strip()
+    if not re.search(r"[^\W\d_]", nome) or nome.lower() in NOMES_GENERICOS:
+        return None
+    return nome
 
 
 # Identidades usadas pelo time de TI/QA da Vulto para testar o PDV e o app (o CPF 123.456.789-09 tem
