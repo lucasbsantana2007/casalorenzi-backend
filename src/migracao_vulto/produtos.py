@@ -578,7 +578,8 @@ def _ultimo_custo_da_aba(linhas: list[Linha]) -> Decimal | None:
 
 def _garantir_categorias(db: Session) -> dict[str, m.Categoria]:
     categorias = {c.nome: c for c in db.scalars(select(m.Categoria))}
-    for nome in {*n.CATEGORIA_POR_PREFIXO.values(), *n.CATEGORIAS_NOVAS}:
+    # Em ordem fixa (um set mudaria a ordem a cada processo, e com ela o id das categorias criadas)
+    for nome in dict.fromkeys([*n.CATEGORIA_POR_PREFIXO.values(), *n.CATEGORIAS_NOVAS]):
         if nome not in categorias:
             categorias[nome] = m.Categoria(nome=nome)
             db.add(categorias[nome])
