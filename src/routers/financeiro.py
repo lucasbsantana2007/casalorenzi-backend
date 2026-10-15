@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from src import models as m
 from src.database.connection import get_db
 from src.middlewares.autenticacao import exigir_modulo
-from src.use_cases import financeiro
+from src.use_cases import faturamento, financeiro
 
 router = APIRouter(prefix="/financeiro", tags=["Financeiro"])
 
@@ -39,3 +39,31 @@ def obter_resumo(
         generos=generos,
         marcas=marcas,
     )
+
+
+@router.get("/faturamento")
+def obter_faturamento(
+    de: str | None = None,
+    ate: str | None = None,
+    marca: Literal["LORENZI", "VULTO"] | None = None,
+    db: Session = Depends(get_db),
+    _: m.Usuario = Depends(exigir_modulo("financeiro")),
+):
+    """Faturamento por mês × loja × canal (padrão: jan/2025 a set/2026), com e sem frete. Receita = vendas
+    não canceladas e com pagamento que não está só pendente; trocas não são receita; devoluções saem na
+    data em que aconteceram (líquido). Devolução da Vulto sem venda de origem: canal "Sem origem"."""
+    return faturamento.faturamento(db, de, ate, marca)
+
+
+@router.get("/faturamento/comparativo-vulto")
+def obter_comparativo_vulto(
+    de: str | None = None,
+    ate: str | None = None,
+    db: Session = Depends(get_db),
+    _: m.Usuario = Depends(exigir_modulo("financeiro")),
+):
+    """ "Sistema da Vulto × nosso número", mês a mês: o /relatorio/faturamento do sistema antigo refeito
+    sobre os dados originais, os ajustes que explicam a diferença (centavos, cancelados, aguardando,
+    trocas, devoluções, testes, duplicatas, Batel, fuso, outros) e o nosso faturamento líquido com e sem
+    frete. sistemaVulto + soma dos ajustes = nossoComFrete."""
+    return faturamento.comparativo_vulto(db, de, ate)
