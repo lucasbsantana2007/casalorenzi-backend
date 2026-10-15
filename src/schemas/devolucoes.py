@@ -20,9 +20,9 @@ def devolucao_saida(d: m.Devolucao) -> dict:
     return {
         "id": d.id,
         "pedidoId": d.pedido_id,
-        "pedidoNumero": d.pedido.numero,
+        "pedidoNumero": d.pedido.numero if d.pedido else None,  # nulo: devolução da Vulto sem venda de origem
         "itemPedidoId": d.item_pedido_id,
-        "variacaoId": d.item.variacao_id,
+        "variacaoId": d.item.variacao_id if d.item else d.variacao_id,
         "atendimentoId": d.atendimento_id,
         "usuarioId": d.usuario_id,
         "lojaId": d.loja_id,
@@ -33,5 +33,5 @@ def devolucao_saida(d: m.Devolucao) -> dict:
         "criadaEm": ms(d.criada_em),
         "loja": loja_saida(d.loja),
         "usuario": usuario_resumo(d.usuario),
-        "variacao": variacao_saida(d.item.variacao),
+        "variacao": variacao_saida(d.item.variacao if d.item else d.variacao),
     }
