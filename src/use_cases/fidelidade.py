@@ -85,16 +85,19 @@ def passivo(db: Session, data: str | None) -> dict:
             "minimo": {
                 "pontos": minimo,
                 "valor": _reais(minimo, regra.VALOR_PONTO_VIGENTE),
+                "valorPonto": float(regra.VALOR_PONTO_VIGENTE),
                 "criterio": f"Ouro {menor['validadeOuroMeses']} meses, menos os resgates anotados sem CPF, a R$ 0,05",
             },
             "vigente": {
                 "pontos": gravado["pontos"],
                 "valor": gravado["valorVigente"],
+                "valorPonto": float(regra.VALOR_PONTO_VIGENTE),
                 "criterio": f"Ouro {gravado['validadeOuroMeses']} meses (o combinado, gravado nas contas), a R$ 0,05",
             },
             "maximo": {
                 "pontos": maximo,
                 "valor": _reais(maximo, regra.VALOR_PONTO_ANTIGO),
+                "valorPonto": float(regra.VALOR_PONTO_ANTIGO),
                 "criterio": f"Ouro {maior['validadeOuroMeses']} meses"
                 + (", mais o dobro do online e o bônus Ouro que o sistema nunca deu" if nao_aplicados else "")
                 + ", a R$ 0,10 (o valor que o sistema da Vulto seguiu dando)",
