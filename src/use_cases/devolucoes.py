@@ -123,7 +123,7 @@ def registrar(
         loja_id=loja_id,
         movimentacao_id=mov.id,
         quantidade=quantidade,
-        valor_devolvido=valor_devolvido(item.preco_unitario, quantidade),
+        valor_devolvido=valor_devolvido(item.preco_unitario, quantidade, pedido.desconto, pedido.subtotal),
         motivo=motivo,
         criada_em=momento,
     )

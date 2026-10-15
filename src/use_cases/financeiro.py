@@ -85,7 +85,8 @@ def resumo(
             not filtro_generos or produto.genero in filtro_generos
         )
 
-    # Pedido recortado pelos filtros: com filtro de produto, só os itens que batem entram na receita
+    # Pedido recortado pelos filtros: com filtro de produto, só os itens que batem entram na receita.
+    # O desconto do resgate de pontos sai da receita na proporção de cada item.
     def recortar(pedido: m.Pedido) -> dict | None:
         if filtro_lojas and pedido.loja_id not in filtro_lojas:
             return None
@@ -94,12 +95,14 @@ def resumo(
         itens = [i for i in pedido.itens if not filtra_produto or produto_valido(i.variacao.produto)]
         if not itens:
             return None
+        pago = 1 - float(pedido.desconto or 0) / float(pedido.subtotal) if pedido.subtotal else 1
         return {
             "loja_id": pedido.loja_id,
             "status": pedido.status,
             "criado_em": pedido.criado_em,
             "itens": itens,
-            "total": sum(float(i.preco_unitario) * i.quantidade for i in itens),
+            "pago": pago,
+            "total": sum(float(i.preco_unitario) * i.quantidade for i in itens) * pago,
         }
 
     pedidos = pedido_repository.todos(db)
@@ -148,7 +151,7 @@ def resumo(
 
     def receita_categoria(lista, categoria: str) -> float:
         return sum(
-            float(i.preco_unitario) * i.quantidade
+            float(i.preco_unitario) * i.quantidade * p["pago"]
             for p in lista
             for i in p["itens"]
             if i.variacao.produto.categoria.nome == categoria
