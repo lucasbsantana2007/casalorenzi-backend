@@ -11,7 +11,9 @@ from sqlalchemy.orm import Session
 from src import models as m
 from src.database.connection import get_db
 from src.middlewares.autenticacao import Sessao, exigir_cliente_ou_modulo, exigir_modulo
+from src.repositories import atendimento_repository
 from src.routers.atendimentos import detalhe_saida, lista_saida
+from src.schemas.atendimentos import anexo_saida
 from src.schemas.clientes import cliente_saida
 from src.schemas.pedidos import pedido_saida
 from src.use_cases import clientes
@@ -58,8 +60,11 @@ def consultar_pedido(cliente_id: str, numero: str, db: Session = Depends(get_db)
 
 @router.get("/{cliente_id}/atendimentos")
 def listar_atendimentos(cliente_id: str, db: Session = Depends(get_db), sessao: Sessao = Depends(acesso)):
+    """Cada chamado vem com `foto`: a primeira imagem que o cliente anexou (ou null), para a capa na lista."""
     cliente = _cliente(db, sessao, cliente_id)
-    return lista_saida(db, clientes.atendimentos(db, cliente.id))
+    lista = clientes.atendimentos(db, cliente.id)
+    fotos = atendimento_repository.primeiras_fotos_do_cliente(db, [a.id for a in lista])
+    return [{**item, "foto": anexo_saida(fotos.get(a.id))} for a, item in zip(lista, lista_saida(db, lista), strict=True)]
 
 
 @router.get("/{cliente_id}/atendimentos/{atendimento_id}")

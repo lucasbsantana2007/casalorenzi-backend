@@ -1,5 +1,5 @@
 from sqlalchemy import func, select, true
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, undefer
 
 from src import models as m
 from src.entities.atendimento import EM_ABERTO
@@ -69,3 +69,27 @@ def ultimas_mensagens(db: Session, atendimento_ids: list[int]) -> dict[int, m.Me
     sub = select(m.Mensagem.id, ordem).where(m.Mensagem.atendimento_id.in_(atendimento_ids)).subquery()
     mensagens = db.scalars(select(m.Mensagem).join(sub, sub.c.id == m.Mensagem.id).where(sub.c.ordem == 1))
     return {msg.atendimento_id: msg for msg in mensagens}
+
+
+def primeiras_fotos_do_cliente(db: Session, atendimento_ids: list[int]) -> dict[int, m.Anexo]:
+    """Primeira foto que o cliente anexou em cada atendimento, numa única consulta (já com o arquivo)."""
+    if not atendimento_ids:
+        return {}
+    ordem = (
+        func.row_number()
+        .over(partition_by=m.Mensagem.atendimento_id, order_by=(m.Mensagem.enviado_em, m.Mensagem.id))
+        .label("ordem")
+    )
+    sub = (
+        select(m.Anexo.id, m.Mensagem.atendimento_id, ordem)
+        .join(m.Mensagem, m.Mensagem.id == m.Anexo.mensagem_id)
+        .where(m.Mensagem.atendimento_id.in_(atendimento_ids), m.Mensagem.autor_tipo == "CLIENTE")
+        .subquery()
+    )
+    linhas = db.execute(
+        select(sub.c.atendimento_id, m.Anexo)
+        .join(sub, sub.c.id == m.Anexo.id)
+        .where(sub.c.ordem == 1)
+        .options(undefer(m.Anexo.dados))
+    )
+    return {atendimento_id: anexo for atendimento_id, anexo in linhas}
