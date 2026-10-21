@@ -1,7 +1,8 @@
 """Login único (equipe e clientes), cadastro da conta do cliente e "esqueci a senha".
 
 - O mesmo /auth/login serve aos dois: o e-mail é procurado primeiro na equipe e depois nos
-  clientes com conta. A mensagem de erro é a mesma para e-mail inexistente e senha errada.
+  clientes com conta. O cliente também entra pelo CPF (decisão 53 da Vulto: há clientes sem e-mail
+  e famílias com o mesmo e-mail). A mensagem de erro é a mesma para conta inexistente e senha errada.
 - A conta do cliente nasce no checkout (CPF + e-mail + senha) e já devolve a sessão.
 - "Esqueci a senha" responde igual exista ou não a conta, e o link vale 30 minutos, uma vez.
 """
@@ -29,7 +30,7 @@ from src.utils.datas import agora
 from src.utils.erros import Conflito, DadosInvalidos, Expirado, NaoAutenticado, SemPermissao
 from src.utils.seguranca import confere_hash, criar_token, gerar_hash
 
-CREDENCIAIS_INVALIDAS = "E-mail ou senha incorretos."
+CREDENCIAIS_INVALIDAS = "E-mail, CPF ou senha incorretos."
 CONVITE_PENDENTE = "Esta conta ainda não tem senha. Use o link do convite enviado por e-mail para criá-la."
 CAMINHO_NOVA_SENHA = "/login/nova-senha"
 
@@ -38,9 +39,18 @@ def sessao_do_cliente(cliente: m.Cliente) -> str:
     return criar_token(cliente.id, CLIENTE)
 
 
+def cliente_pelo_login(db: Session, login: str | None) -> m.Cliente | None:
+    """O cliente do e-mail (se só um cliente usa esse e-mail) ou do CPF (com ou sem máscara)."""
+    login = (login or "").strip()
+    if "@" in login:
+        return cliente_repository.por_email(db, login)
+    cpf = somente_digitos_cpf(login)
+    return cliente_repository.por_cpf(db, cpf) if len(cpf) == 11 else None
+
+
 def entrar(db: Session, email: str, senha: str) -> tuple[str, m.Usuario | m.Cliente]:
-    """(token, conta). A conta é um m.Usuario (equipe) ou um m.Cliente."""
-    usuario = usuario_repository.por_email(db, email)
+    """(token, conta). `email` aceita o e-mail ou, para cliente, o CPF. A conta é um m.Usuario ou um m.Cliente."""
+    usuario = usuario_repository.por_email(db, email) if "@" in (email or "") else None
     if usuario is not None:
         if usuario.convite_pendente and usuario.ativo:
             raise NaoAutenticado(CONVITE_PENDENTE)
@@ -50,7 +60,7 @@ def entrar(db: Session, email: str, senha: str) -> tuple[str, m.Usuario | m.Clie
         if not usuario.ativo:
             raise SemPermissao("Esta conta está desativada. Fale com o administrador.")
         return criar_token(usuario.id, usuario.papel), usuario
-    cliente = cliente_repository.por_email(db, email)
+    cliente = cliente_pelo_login(db, email)
     if cliente is None or not confere_hash(senha, cliente.senha_hash):
         raise NaoAutenticado(CREDENCIAIS_INVALIDAS)
     return sessao_do_cliente(cliente), cliente
@@ -99,14 +109,21 @@ def cadastrar_cliente(
 
 
 def solicitar_nova_senha(db: Session, email: str | None) -> str | None:
-    """Gera o link de troca para a conta do e-mail (equipe ou cliente). A resposta da rota é a mesma
-    exista ou não a conta. O link sai no log (ainda não há envio de e-mail) e só volta na resposta
-    com LINK_SENHA_NA_RESPOSTA=true (demonstração)."""
-    alvo = normalizar_email(email)
-    if not email_valido(alvo):
-        raise DadosInvalidos("Informe um e-mail válido.")
-    usuario = usuario_repository.por_email(db, alvo)
-    cliente = None if usuario is not None else cliente_repository.por_email(db, alvo)
+    """Gera o link de troca para a conta do e-mail ou do CPF (cliente) e manda para o e-mail da conta.
+    A resposta da rota é a mesma exista ou não a conta. Cliente sem e-mail não recebe link: o atendimento
+    cadastra o e-mail dele (POST /clientes/{cpf}/acesso). O link só volta na resposta com
+    LINK_SENHA_NA_RESPOSTA=true (demonstração)."""
+    alvo = (email or "").strip()
+    if "@" in alvo:
+        alvo = normalizar_email(alvo)
+        if not email_valido(alvo):
+            raise DadosInvalidos("Informe um e-mail válido.")
+    elif len(somente_digitos_cpf(alvo)) != 11:
+        raise DadosInvalidos("Informe o e-mail ou o CPF da conta.")
+    usuario = usuario_repository.por_email(db, alvo) if "@" in alvo else None
+    cliente = None if usuario is not None else cliente_pelo_login(db, alvo)
+    if cliente is not None and not cliente.email:
+        return None
     if (usuario is None and cliente is None) or (usuario is not None and not usuario.ativo):
         return None
     link = criar_link_senha(db, VALIDADE_TOKEN_SENHA, usuario=usuario, cliente=cliente)

@@ -23,7 +23,7 @@ def test_login_devolve_token_e_usuario(client):
 def test_login_com_senha_errada(client):
     r = client.post("/api/auth/login", json={"email": "helena@casalorenzi.com.br", "senha": "errada"})
     assert r.status_code == 401
-    assert r.json() == {"detail": "E-mail ou senha incorretos."}
+    assert r.json() == {"detail": "E-mail, CPF ou senha incorretos."}
 
 
 def test_rotas_internas_exigem_token(client):

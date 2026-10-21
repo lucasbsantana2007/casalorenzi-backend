@@ -440,7 +440,7 @@ def test_email_de_mais_de_um_cliente_nao_entra_nem_cadastra_de_novo(client):
         email = mariana_db.email
     # E-mail de duas pessoas não identifica ninguém: a mensagem é a de sempre
     r = client.post("/api/auth/login", json={"email": email, "senha": SENHA_DEMO})
-    assert r.status_code == 401 and r.json() == {"detail": "E-mail ou senha incorretos."}
+    assert r.status_code == 401 and r.json() == {"detail": "E-mail, CPF ou senha incorretos."}
     assert client.post("/api/auth/esqueci-senha", json={"email": email}).json()["linkDemo"] is None
     r = client.post(
         "/api/auth/cadastro",
