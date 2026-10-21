@@ -1,7 +1,10 @@
 """Visão financeira: receita, pedidos, ticket médio, estoque valorizado, pós-venda e devoluções.
 
-devolucoesValor/devolucoesValorAnterior somam o valor reembolsado (valor_devolvido) no período e
-no período de comparação. A receita continua bruta: quem quiser a líquida subtrai as devoluções."""
+Receita = o total dos pedidos de venda não cancelados (itens − desconto + frete), a mesma regra do
+faturamento da diretoria. Troca não é receita. Com filtro de categoria ou gênero, só os itens que batem
+entram (desconto e frete não se dividem por item).
+devolucoesValor soma o valor reembolsado no período; receitaLiquida = receita − devoluções. Devolução sem
+pedido de origem (Vulto) entra pela loja em que foi registrada: loja física → Loja física, CD → E-commerce."""
 
 from datetime import datetime, timedelta
 
@@ -97,13 +100,8 @@ def resumo(
         itens = [i for i in pedido.itens if not filtra_produto or produto_valido(i.variacao.produto)]
         if not itens:
             return None
-        return {
-            "loja_id": pedido.loja_id,
-            "status": pedido.status,
-            "criado_em": pedido.criado_em,
-            "itens": itens,
-            "total": sum(float(i.preco_unitario) * i.quantidade for i in itens),
-        }
+        valor = sum(float(i.preco_unitario) * i.quantidade for i in itens) if filtra_produto else float(pedido.total)
+        return {"loja_id": pedido.loja_id, "status": pedido.status, "criado_em": pedido.criado_em, "itens": itens, "total": valor}
 
     pedidos = pedido_repository.todos(db)
     por_id = {p.id: p for p in pedidos}
@@ -213,18 +211,18 @@ def resumo(
 
     # Valor reembolsado em devoluções (tabela devolucoes). Respeita os mesmos filtros da receita:
     # loja e canal do pedido de origem (não a loja que recebeu a peça) e categoria/gênero do produto.
-    itens_por_id = {i.id: i for p in pedidos for i in p.itens}
 
     def devolucao_conta(d: m.Devolucao) -> bool:
-        pedido = por_id.get(d.pedido_id)
-        if pedido is None:
+        pedido = por_id.get(d.pedido_id) if d.pedido_id else None
+        if pedido is not None and pedido.tipo in TIPOS_SEM_RECEITA:
             return False
-        if filtro_lojas and pedido.loja_id not in filtro_lojas:
+        loja_id = pedido.loja_id if pedido else d.loja_id
+        canal = pedido.canal if pedido else ("Loja física" if d.loja.tipo == "LOJA" else "E-commerce")
+        if filtro_lojas and loja_id not in filtro_lojas:
             return False
-        if filtro_canais and pedido.canal not in filtro_canais:
+        if filtro_canais and canal not in filtro_canais:
             return False
-        item = itens_por_id.get(d.item_pedido_id)
-        return not filtra_produto or (item is not None and produto_valido(item.variacao.produto))
+        return not filtra_produto or produto_valido(d.variacao.produto)
 
     devolvido = [
         (d.criada_em, float(d.valor_devolvido))
@@ -235,9 +233,14 @@ def resumo(
     def valor_devolvido(a: datetime, b: datetime) -> float:
         return sum(valor for quando, valor in devolvido if a <= quando < b)
 
+    devolvido_atual = valor_devolvido(inicio, fim)
+    devolvido_anterior = valor_devolvido(*comp) if comp else None
     return {
         "receita": soma(atual),
         "receitaAnterior": soma(anterior) if comp else None,
+        # Receita menos devoluções: o faturamento da diretoria
+        "receitaLiquida": soma(atual) - devolvido_atual,
+        "receitaLiquidaAnterior": soma(anterior) - devolvido_anterior if comp else None,
         "pedidos": len(atual),
         "pedidosAnterior": len(anterior) if comp else None,
         "pecas": pecas(atual),
@@ -245,8 +248,8 @@ def resumo(
         "cancelados": sum(1 for p in entre(recortados, inicio, fim) if p["status"] == "CANCELADO"),
         "valorEstoque": valor_estoque(estoques),
         "taxaPosVenda": total_pos_venda / pedidos_no_periodo if pedidos_no_periodo else 0,
-        "devolucoesValor": valor_devolvido(inicio, fim),
-        "devolucoesValorAnterior": valor_devolvido(*comp) if comp else None,
+        "devolucoesValor": devolvido_atual,
+        "devolucoesValorAnterior": devolvido_anterior,
         "porLoja": por_loja,
         "porCategoria": por_categoria,
         "serie": serie,
