@@ -1,0 +1,420 @@
+<title>Banco Casa Lorenzi + Vulto</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: prancheta de schema — cabeçalho curto, diagrama grande com grade de fundo e um painel de leitura ao lado. */
+:root {
+  --fundo: #f3f5f8;
+  --papel: #ffffff;
+  --tinta: #172030;
+  --suave: #586477;
+  --borda: #cbd3de;
+  --cab: #e7ebf1;
+  --linha: #98a4b6;
+  --grade: #e2e7ee;
+  --novo: #0b7764;
+  --novo-fundo: #daf1ea;
+  --novo-tinta: #08594b;
+  --mudou: #ad5a06;
+  --mudou-fundo: #fbedd8;
+  --destaque: #3150cf;
+  --sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --fundo: #0d1219; --papel: #141b25; --tinta: #e4e9f1; --suave: #96a2b5; --borda: #2d3949;
+    --cab: #1c2531; --linha: #546378; --grade: #161e29; --novo: #46cdb0; --novo-fundo: #0f342d;
+    --novo-tinta: #82e2cc; --mudou: #f1a54f; --mudou-fundo: #37260f; --destaque: #8ba2ff; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --fundo: #0d1219; --papel: #141b25; --tinta: #e4e9f1; --suave: #96a2b5; --borda: #2d3949;
+  --cab: #1c2531; --linha: #546378; --grade: #161e29; --novo: #46cdb0; --novo-fundo: #0f342d;
+  --novo-tinta: #82e2cc; --mudou: #f1a54f; --mudou-fundo: #37260f; --destaque: #8ba2ff; color-scheme: dark;
+}
+body {
+  background: var(--fundo); color: var(--tinta); font: 15px/1.5 var(--sans);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 20px 28px;
+}
+.pagina { max-width: 1680px; margin: 0 auto; display: grid; gap: 16px; }
+header { display: grid; gap: 10px; }
+.olho { font: 500 12px var(--mono); color: var(--suave); letter-spacing: .02em; }
+h1 { margin: 0; font: 600 clamp(24px, 3vw, 32px)/1.15 var(--sans); text-wrap: balance; letter-spacing: -.01em; }
+.sub { margin: 0; max-width: 70ch; color: var(--suave); }
+.numeros { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 4px 0 0; padding: 0; list-style: none; font-variant-numeric: tabular-nums; }
+.numeros li { display: flex; align-items: baseline; gap: 6px; color: var(--suave); }
+.numeros b { font: 600 18px var(--sans); color: var(--tinta); }
+.ponto-cor { width: 9px; height: 9px; border-radius: 50%; align-self: center; background: var(--linha); }
+.ponto-cor.nova { background: var(--novo); } .ponto-cor.alterada { background: var(--mudou); }
+
+.barra { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; }
+.segmento { display: inline-flex; border: 1px solid var(--borda); border-radius: 8px; overflow: hidden; background: var(--papel); }
+.segmento button, .zoom button {
+  font: 500 13px var(--sans); color: var(--tinta); background: transparent; border: 0; padding: 7px 12px; cursor: pointer;
+}
+.segmento button + button { border-left: 1px solid var(--borda); }
+.segmento button[aria-pressed="true"] { background: var(--tinta); color: var(--papel); }
+.busca { flex: 1 1 220px; max-width: 320px; }
+.busca input {
+  width: 100%; box-sizing: border-box; font: 13px var(--sans); color: var(--tinta); background: var(--papel);
+  border: 1px solid var(--borda); border-radius: 8px; padding: 7px 10px;
+}
+.zoom { display: inline-flex; align-items: center; gap: 2px; margin-left: auto; border: 1px solid var(--borda); border-radius: 8px; background: var(--papel); }
+.zoom output { font: 12px var(--mono); color: var(--suave); min-width: 44px; text-align: center; font-variant-numeric: tabular-nums; }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--destaque); outline-offset: 2px; }
+
+.legenda { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 12.5px; color: var(--suave); }
+.legenda span { display: inline-flex; align-items: center; gap: 6px; }
+.legenda svg { flex: none; overflow: visible; }
+
+.area { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 16px; align-items: start; }
+.quadro {
+  position: relative; min-width: 0; height: min(80vh, 940px); overflow: auto; border: 1px solid var(--borda); border-radius: 10px;
+  background-color: var(--papel);
+  background-image: linear-gradient(var(--grade) 1px, transparent 1px), linear-gradient(90deg, var(--grade) 1px, transparent 1px);
+  background-size: 24px 24px; cursor: grab; touch-action: pan-x pan-y;
+}
+.quadro.arrastando { cursor: grabbing; user-select: none; }
+#mapa { display: block; width: 100%; height: auto; }
+
+/* SVG: tabelas */
+#mapa .grupo { font: 600 13px var(--sans); letter-spacing: .12em; fill: var(--suave); }
+#mapa .tab { cursor: pointer; transition: opacity .12s; }
+#mapa .tab .corpo { fill: var(--papel); stroke: var(--borda); stroke-width: 1; }
+#mapa .tab.nova .corpo { stroke: var(--novo); stroke-width: 1.6; }
+#mapa .tab.alterada .corpo { stroke: var(--mudou); stroke-width: 1.6; }
+#mapa .tab .cab { fill: var(--cab); }
+#mapa .tab.nova .cab { fill: var(--novo-fundo); }
+#mapa .tab.alterada .cab { fill: var(--mudou-fundo); }
+#mapa .nome-tab { font: 600 12px var(--mono); fill: var(--tinta); }
+#mapa .selo { font: 700 9px var(--sans); letter-spacing: .1em; }
+#mapa .tab.nova .selo { fill: var(--novo); } #mapa .tab.alterada .selo { fill: var(--mudou); }
+#mapa .col { font: 400 11px var(--mono); fill: var(--tinta); }
+#mapa .tipo { font: 400 10.5px var(--mono); fill: var(--suave); }
+#mapa .chave { font: 700 8.5px var(--sans); letter-spacing: .05em; fill: var(--suave); }
+#mapa .ponto.cheia { fill: var(--suave); }
+#mapa .ponto.vazia { fill: var(--papel); stroke: var(--suave); stroke-width: 1.2; }
+#mapa .lin.nova .fundo { fill: var(--novo-fundo); } #mapa .lin.nova .marca { fill: var(--novo); }
+#mapa .lin.nova .col { fill: var(--novo-tinta); font-weight: 600; }
+#mapa .lin.mudou .fundo { fill: var(--mudou-fundo); } #mapa .lin.mudou .marca { fill: var(--mudou); }
+#mapa .tab:focus { outline: none; }
+#mapa .tab:focus-visible .corpo, #mapa .tab.sel .corpo { stroke: var(--destaque); stroke-width: 2.6; }
+
+/* SVG: ligações */
+#mapa .rel { transition: opacity .12s; }
+#mapa .rel path { fill: none; stroke: var(--linha); stroke-width: 1.1; }
+#mapa .rel.opcional .l { stroke-dasharray: 5 4; }
+#mapa .rel.nova path { stroke: var(--novo); }
+#mapa .rel.mudou path { stroke: var(--mudou); }
+#mapa.foco .tab:not(.aceso) { opacity: .26; }
+#mapa.foco .rel:not(.aceso) { opacity: .06; }
+#mapa .rel.aceso path { stroke: var(--destaque); stroke-width: 2; }
+#mapa.so-mudou .tab.igual { opacity: .22; }
+#mapa.so-mudou .rel.igual { opacity: .1; }
+#mapa.buscando .tab:not(.achado) { opacity: .16; }
+#mapa.buscando .rel { opacity: .08; }
+#mapa .lin.achado .col { fill: var(--destaque); font-weight: 700; }
+
+/* Painel */
+.painel {
+  position: sticky; top: max(12px, env(safe-area-inset-top, 0px)); max-height: min(80vh, 940px); overflow: auto;
+  background: var(--papel); border: 1px solid var(--borda); border-radius: 10px; padding: 16px 18px 20px; min-width: 0;
+}
+.painel h2 { margin: 0 0 4px; font: 600 18px/1.3 var(--sans); }
+.painel h2.mono { font: 600 17px var(--mono); overflow-wrap: anywhere; }
+.painel h3 { margin: 18px 0 8px; font: 600 12px var(--sans); letter-spacing: .1em; text-transform: uppercase; color: var(--suave); display: flex; align-items: center; gap: 7px; }
+.painel p { margin: 0; }
+.nota { color: var(--suave); font-size: 13.5px; }
+.lista { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.item {
+  width: 100%; text-align: left; display: grid; gap: 1px; padding: 7px 8px; margin: 0 -8px; border: 0; border-radius: 7px;
+  background: transparent; color: var(--tinta); font: inherit; cursor: pointer;
+}
+.item:hover { background: var(--cab); }
+.item .mono { font: 600 13px var(--mono); }
+.item small { color: var(--suave); font-size: 12.5px; line-height: 1.4; }
+.fichas { display: flex; flex-wrap: wrap; gap: 6px; }
+.ficha {
+  font: 500 12.5px var(--mono); color: var(--tinta); background: var(--cab); border: 0; border-radius: 6px; padding: 3px 8px; cursor: pointer;
+}
+.ficha:hover { background: var(--borda); }
+.estado { display: inline-block; font: 700 10px var(--sans); letter-spacing: .08em; padding: 2px 7px; border-radius: 5px; vertical-align: middle; }
+.estado.nova { color: var(--novo-tinta); background: var(--novo-fundo); }
+.estado.alterada, .estado.mudou, .estado.ampliada { color: var(--mudou); background: var(--mudou-fundo); }
+.estado.igual { color: var(--suave); background: var(--cab); }
+.voltar { font: 500 13px var(--sans); color: var(--destaque); background: none; border: 0; padding: 0; margin-bottom: 10px; cursor: pointer; }
+.colunas { list-style: none; margin: 0; padding: 0; display: grid; }
+.colunas li { padding: 7px 0 7px 10px; border-top: 1px solid var(--grade); border-left: 3px solid transparent; display: grid; gap: 2px; }
+.colunas li.nova { border-left-color: var(--novo); background: linear-gradient(90deg, var(--novo-fundo), transparent 70%); }
+.colunas li.mudou { border-left-color: var(--mudou); background: linear-gradient(90deg, var(--mudou-fundo), transparent 70%); }
+.linha1 { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; }
+.linha1 .mono { font: 600 13px var(--mono); }
+.linha1 .tipo { font: 12px var(--mono); color: var(--suave); }
+.etiqueta { font: 600 10.5px var(--sans); color: var(--suave); border: 1px solid var(--borda); border-radius: 4px; padding: 0 5px; }
+.etiqueta.link { cursor: pointer; color: var(--destaque); border-color: currentColor; background: none; }
+.colunas .nota { font-size: 12.5px; line-height: 1.45; }
+.regras { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; font-size: 13.5px; }
+.regras li { display: grid; grid-template-columns: auto 1fr; gap: 8px; align-items: baseline; }
+.regras small { display: block; color: var(--suave); font: 11.5px var(--mono); overflow-wrap: anywhere; }
+
+@media (max-width: 1020px) {
+  .area { grid-template-columns: minmax(0, 1fr); }
+  .painel { position: static; max-height: none; }
+  .quadro { height: 70vh; }
+  .zoom { margin-left: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  #mapa .tab, #mapa .rel { transition: none; }
+}
+</style>
+
+<div class="pagina">
+  <header>
+    <div class="olho">casalorenzi-backend · gerado dos models por scripts/diagrama_banco/gerar.py</div>
+    <h1>Banco Casa Lorenzi + Vulto</h1>
+    <p class="sub">As {{total}} tabelas do banco depois da preparação para a Vulto (migração f060e5b0d838), comparadas com o banco de antes ({{antes}} tabelas).
+      Passe o mouse numa tabela para ver as ligações dela; clique para ler o que mudou.</p>
+    <ul class="numeros">
+      <li><b>{{total}}</b> tabelas</li>
+      <li><span class="ponto-cor nova"></span><b>{{novas}}</b> novas</li>
+      <li><span class="ponto-cor alterada"></span><b>{{alteradas}}</b> alteradas</li>
+      <li><span class="ponto-cor"></span><b>{{iguais}}</b> sem mudança</li>
+      <li><b>{{apagadas}}</b> apagadas</li>
+      <li><b>{{colunas_novas}}</b> colunas novas em tabelas que já existiam</li>
+      <li><b>{{regras}}</b> regras novas ou ampliadas no banco</li>
+    </ul>
+  </header>
+
+  <div class="barra">
+    <div class="segmento" role="group" aria-label="Destacar">
+      <button type="button" id="ver-tudo" aria-pressed="true">Tudo</button>
+      <button type="button" id="ver-mudou" aria-pressed="false">Só o que mudou</button>
+    </div>
+    <label class="busca"><span hidden>Buscar</span><input id="busca" type="search" placeholder="Buscar tabela ou coluna (ex.: marca, cliente_id)" autocomplete="off"></label>
+    <div class="zoom" role="group" aria-label="Zoom">
+      <button type="button" id="menos" aria-label="Diminuir">−</button>
+      <output id="nivel">100%</output>
+      <button type="button" id="mais" aria-label="Aumentar">+</button>
+      <button type="button" id="ajustar">Ajustar</button>
+    </div>
+  </div>
+
+  <div class="legenda" aria-label="Legenda">
+    <span><svg width="22" height="12"><rect x="1" y="1" width="20" height="10" rx="2" fill="var(--novo-fundo)" stroke="var(--novo)" stroke-width="1.5"/></svg>Tabela ou coluna nova</span>
+    <span><svg width="22" height="12"><rect x="1" y="1" width="20" height="10" rx="2" fill="var(--mudou-fundo)" stroke="var(--mudou)" stroke-width="1.5"/></svg>Alterada</span>
+    <span><svg width="34" height="12"><path d="M0,6 H34" stroke="var(--linha)" stroke-width="1.3"/></svg>Ligação obrigatória</span>
+    <span><svg width="34" height="12"><path d="M0,6 H34" stroke="var(--linha)" stroke-width="1.3" stroke-dasharray="5 4"/></svg>Ligação opcional</span>
+    <span><svg width="24" height="12"><path d="M2,6 H22 M2,1 V11" stroke="var(--suave)" stroke-width="1.3" fill="none"/></svg>um</span>
+    <span><svg width="24" height="12"><path d="M2,6 H22 M10,6 L22,1 M10,6 L22,11" stroke="var(--suave)" stroke-width="1.3" fill="none"/></svg>muitos</span>
+    <span><svg width="12" height="12"><circle cx="6" cy="6" r="3" fill="var(--suave)"/></svg>obrigatória</span>
+    <span><svg width="12" height="12"><circle cx="6" cy="6" r="3" fill="var(--papel)" stroke="var(--suave)" stroke-width="1.2"/></svg>pode ficar vazia</span>
+    <span>PK chave · FK ligação · UQ única</span>
+  </div>
+
+  <div class="area">
+    <div class="quadro" id="quadro"><!--SVG--></div>
+    <aside class="painel" id="painel" aria-live="polite"></aside>
+  </div>
+</div>
+
+<script>
+const D = /*DADOS*/null;
+const R = /*RESUMO*/null;
+const svg = document.getElementById('mapa');
+const quadro = document.getElementById('quadro');
+const painel = document.getElementById('painel');
+const camadaLigacoes = document.getElementById('ligacoes');
+const tabs = new Map([...svg.querySelectorAll('.tab')].map(g => [g.dataset.t, g]));
+const rels = [...svg.querySelectorAll('.rel')];
+const viz = {};
+for (const nome of tabs.keys()) viz[nome] = { rels: [], sai: [], entra: [] };
+for (const r of rels) {
+  viz[r.dataset.a].rels.push(r); viz[r.dataset.b].rels.push(r);
+  viz[r.dataset.a].sai.push(r.dataset.e); viz[r.dataset.b].entra.push(r.dataset.e);
+}
+const NOME_ESTADO = { nova: 'NOVA', alterada: 'ALTERADA', igual: 'SEM MUDANÇA', mudou: 'MUDOU', ampliada: 'AMPLIADA' };
+let selecionada = null;
+
+function h(tag, attrs, ...filhos) {
+  const el = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs || {})) {
+    if (k === 'on') el.addEventListener('click', v);
+    else if (v !== null && v !== undefined && v !== false) el.setAttribute(k, v === true ? '' : v);
+  }
+  for (const f of filhos.flat()) if (f !== null && f !== undefined && f !== false) el.append(f);
+  return el;
+}
+const semAcento = s => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+const primeiraFrase = s => (s.match(/^.*?[.!?](\s|$)/) || [s])[0].trim();
+
+/* ---------- destaque das ligações ---------- */
+function acender(nome) {
+  svg.querySelectorAll('.aceso').forEach(e => e.classList.remove('aceso'));
+  svg.classList.toggle('foco', !!nome);
+  if (!nome) return;
+  tabs.get(nome).classList.add('aceso');
+  for (const r of viz[nome].rels) {
+    r.classList.add('aceso');
+    camadaLigacoes.appendChild(r);
+    tabs.get(r.dataset.a).classList.add('aceso');
+    tabs.get(r.dataset.b).classList.add('aceso');
+  }
+}
+for (const [nome, g] of tabs) {
+  g.addEventListener('mouseenter', () => acender(nome));
+  g.addEventListener('mouseleave', () => acender(selecionada));
+  g.addEventListener('click', () => selecionar(nome));
+  g.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selecionar(nome); } });
+}
+
+/* ---------- painel ---------- */
+function botaoTabela(nome, detalhe) {
+  const t = D.tabelas[nome];
+  return h('li', null, h('button', { class: 'item', type: 'button', on: () => selecionar(nome, true) },
+    h('span', { class: 'mono' }, nome), detalhe ? h('small', null, detalhe) : null));
+}
+function resumo() {
+  const por = e => Object.values(D.tabelas).filter(t => t.estado === e);
+  const contagem = t => {
+    const novas = t.colunas.filter(c => c.estado === 'nova').length;
+    const mudaram = t.colunas.filter(c => c.estado === 'mudou').length;
+    const regras = t.regras.filter(r => r.estado !== 'igual').length;
+    return [novas && `${novas} coluna${novas > 1 ? 's' : ''} nova${novas > 1 ? 's' : ''}`,
+      mudaram && (mudaram === 1 ? '1 mudou' : `${mudaram} mudaram`),
+      regras && `${regras} regra${regras > 1 ? 's' : ''}`].filter(Boolean).join(' · ');
+  };
+  painel.replaceChildren(
+    h('h2', null, 'O que mudou'),
+    h('p', { class: 'nota' }, `Comparado com o banco de antes da união (${R.antes} tabelas). Nenhuma tabela foi apagada: cada dado da Vulto coube nas tabelas da Lorenzi com colunas novas, e só o Vulto+ e o controle da migração ganharam tabela própria.`),
+    h('h3', null, h('span', { class: 'ponto-cor nova' }), `Novas (${R.novas})`),
+    h('ul', { class: 'lista' }, por('nova').map(t => botaoTabela(t.nome, primeiraFrase(t.doc)))),
+    h('h3', null, h('span', { class: 'ponto-cor alterada' }), `Alteradas (${R.alteradas})`),
+    h('ul', { class: 'lista' }, por('alterada').map(t => botaoTabela(t.nome, contagem(t)))),
+    h('h3', null, h('span', { class: 'ponto-cor' }), `Sem mudança (${R.iguais})`),
+    h('div', { class: 'fichas' }, por('igual').map(t => h('button', { class: 'ficha', type: 'button', on: () => selecionar(t.nome, true) }, t.nome))),
+  );
+}
+function detalhe(nome) {
+  const t = D.tabelas[nome];
+  const tabelaNova = t.estado === 'nova';
+  const colunas = t.colunas.map(c => h('li', { class: c.estado },
+    h('div', { class: 'linha1' },
+      h('span', { class: 'mono' }, c.nome), h('span', { class: 'tipo' }, c.tipo),
+      c.pk ? h('span', { class: 'etiqueta' }, 'PK') : null,
+      c.fk ? h('button', { class: 'etiqueta link', type: 'button', on: () => selecionar(c.fk.split('.')[0], true) }, '→ ' + c.fk) : null,
+      c.unica && !c.pk ? h('span', { class: 'etiqueta' }, 'única') : null,
+      c.opcional ? h('span', { class: 'etiqueta' }, 'opcional') : null,
+      c.estado !== 'igual' ? h('span', { class: 'estado ' + c.estado }, c.estado === 'nova' ? 'NOVA' : 'MUDOU: ' + c.mudancas.join(', ').toUpperCase()) : null),
+    c.nota ? h('div', { class: 'nota' }, c.nota) : null));
+  const regras = t.regras.map(r => {
+    const estado = tabelaNova ? 'nova' : r.estado;
+    return h('li', null, h('span', { class: 'estado ' + estado }, NOME_ESTADO[estado]),
+      h('span', null, r.texto, r.extra ? ` (${r.extra})` : '', h('small', null, r.nome)));
+  });
+  const ligacao = (ids, lado) => ids.map(id => {
+    const l = D.ligacoes.find(x => x.id === id);
+    const alvo = lado === 'sai' ? l.para : l.de;
+    return h('button', { class: 'ficha', type: 'button', on: () => selecionar(alvo, true) }, lado === 'sai' ? `${l.id.split('.')[1]} → ${alvo}` : `${alvo}.${l.id.split('.')[1]}`);
+  });
+  painel.replaceChildren(
+    h('button', { class: 'voltar', type: 'button', on: () => selecionar(null) }, '← O que mudou'),
+    h('h2', { class: 'mono' }, nome, ' ', h('span', { class: 'estado ' + t.estado }, NOME_ESTADO[t.estado])),
+    t.doc ? h('p', { class: 'nota' }, t.doc) : null,
+    h('h3', null, `Colunas (${t.colunas.length})`),
+    h('ul', { class: 'colunas' }, colunas),
+    t.regras.length ? h('h3', null, 'Regras que o banco confere') : null,
+    t.regras.length ? h('ul', { class: 'regras' }, regras) : null,
+    viz[nome].sai.length ? h('h3', null, 'Aponta para') : null,
+    viz[nome].sai.length ? h('div', { class: 'fichas' }, ligacao(viz[nome].sai, 'sai')) : null,
+    viz[nome].entra.length ? h('h3', null, 'Recebe ligações de') : null,
+    viz[nome].entra.length ? h('div', { class: 'fichas' }, ligacao(viz[nome].entra, 'entra')) : null,
+  );
+  painel.scrollTop = 0;
+}
+function selecionar(nome, centralizar) {
+  if (selecionada) tabs.get(selecionada).classList.remove('sel');
+  selecionada = nome;
+  if (nome) {
+    tabs.get(nome).classList.add('sel');
+    detalhe(nome);
+    if (centralizar) mostrar(nome);
+  } else resumo();
+  acender(nome);
+}
+
+/* ---------- filtro e busca ---------- */
+const verTudo = document.getElementById('ver-tudo'), verMudou = document.getElementById('ver-mudou');
+function filtro(soMudou) {
+  svg.classList.toggle('so-mudou', soMudou);
+  verTudo.setAttribute('aria-pressed', String(!soMudou));
+  verMudou.setAttribute('aria-pressed', String(soMudou));
+}
+verTudo.addEventListener('click', () => filtro(false));
+verMudou.addEventListener('click', () => filtro(true));
+document.getElementById('busca').addEventListener('input', e => {
+  const termo = semAcento(e.target.value.trim());
+  svg.querySelectorAll('.achado').forEach(el => el.classList.remove('achado'));
+  svg.classList.toggle('buscando', !!termo);
+  if (!termo) return;
+  for (const [nome, g] of tabs) {
+    let achou = semAcento(nome).includes(termo);
+    for (const linha of g.querySelectorAll('.lin')) {
+      if (semAcento(linha.dataset.c).includes(termo)) { linha.classList.add('achado'); achou = true; }
+    }
+    g.classList.toggle('achado', achou);
+  }
+});
+
+/* ---------- zoom e arrasto ---------- */
+let z = 1;
+const nivel = document.getElementById('nivel');
+function zoom(novo, cx, cy) {
+  const caixa = quadro.getBoundingClientRect();
+  cx = cx ?? caixa.width / 2; cy = cy ?? caixa.height / 2;
+  const px = (quadro.scrollLeft + cx) / z, py = (quadro.scrollTop + cy) / z;
+  z = Math.min(2, Math.max(0.15, novo));
+  svg.style.width = (R.W * z) + 'px';
+  quadro.scrollLeft = px * z - cx; quadro.scrollTop = py * z - cy;
+  nivel.textContent = Math.round(z * 100) + '%';
+}
+function ajustar() { zoom(quadro.clientWidth / R.W); quadro.scrollTo(0, 0); }
+function mostrar(nome) {
+  if (z < 0.75) zoom(0.9);
+  const b = tabs.get(nome).getBBox();
+  quadro.scrollTo({ left: (b.x + b.width / 2) * z - quadro.clientWidth / 2, top: b.y * z - 24, behavior: 'smooth' });
+}
+document.getElementById('mais').addEventListener('click', () => zoom(z * 1.25));
+document.getElementById('menos').addEventListener('click', () => zoom(z / 1.25));
+document.getElementById('ajustar').addEventListener('click', ajustar);
+quadro.addEventListener('wheel', e => {
+  if (!e.ctrlKey && !e.metaKey) return;
+  e.preventDefault();
+  const caixa = quadro.getBoundingClientRect();
+  zoom(z * (e.deltaY < 0 ? 1.12 : 1 / 1.12), e.clientX - caixa.left, e.clientY - caixa.top);
+}, { passive: false });
+let arrasto = null;
+quadro.addEventListener('pointerdown', e => {
+  if (e.pointerType !== 'mouse' || e.button !== 0 || e.target.closest('.tab')) return;
+  arrasto = { x: e.clientX, y: e.clientY, l: quadro.scrollLeft, t: quadro.scrollTop, moveu: false };
+  quadro.setPointerCapture(e.pointerId);
+  quadro.classList.add('arrastando');
+});
+quadro.addEventListener('pointermove', e => {
+  if (!arrasto) return;
+  const dx = e.clientX - arrasto.x, dy = e.clientY - arrasto.y;
+  if (Math.abs(dx) + Math.abs(dy) > 3) arrasto.moveu = true;
+  quadro.scrollLeft = arrasto.l - dx; quadro.scrollTop = arrasto.t - dy;
+});
+quadro.addEventListener('pointerup', () => {
+  if (arrasto && !arrasto.moveu && selecionada) selecionar(null);
+  arrasto = null; quadro.classList.remove('arrastando');
+});
+
+resumo();
+ajustar();
+</script>
