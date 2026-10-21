@@ -70,7 +70,7 @@ def _validar_funcionario(db: Session, dados, usuario_id: int | None = None) -> d
     if not email_valido(email):
         raise DadosInvalidos("Informe um e-mail válido.")
     outro = usuario_repository.por_email(db, email)
-    if (outro is not None and outro.id != usuario_id) or cliente_repository.por_email(db, email) is not None:
+    if (outro is not None and outro.id != usuario_id) or cliente_repository.email_em_uso(db, email):
         raise Conflito("Este e-mail já está em uso.")
     if dados.papel not in PAPEIS:
         raise DadosInvalidos("Selecione o cargo.")

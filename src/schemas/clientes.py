@@ -16,4 +16,9 @@ def cliente_saida(cliente: m.Cliente | None) -> dict | None:
         "cpf": cliente.cpf,
         "temConta": cliente.senha_hash is not None,
         "excluido": cliente.excluido_em is not None,
+        # Calculados do cadastro: o que só o cliente pode corrigir (CPF_INVALIDO, SEM_EMAIL, TELEFONE_SEM_DDD...)
+        "dadosValidos": cliente.dados_validos,
+        "problemasCadastro": cliente.problemas_cadastro,
+        # Precisa corrigir o cadastro no próximo login para continuar usando os benefícios (decisão 52)
+        "atualizarCadastro": cliente.atualizar_cadastro,
     }

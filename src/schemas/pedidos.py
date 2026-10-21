@@ -54,12 +54,13 @@ class PedidoAtualizacao(Entrada):
 
 
 def _frete(pedido: m.Pedido, com_custo: bool = False) -> dict | None:
-    """com_custo: só para o Administrador (quanto o envio custou para a loja)."""
-    if pedido.frete_tipo is None:
+    """com_custo: só para o Administrador (quanto o envio custou para a loja).
+    Vendas online da Vulto têm o valor do frete, mas não o tipo (Padrão ou Expresso): tipo nulo."""
+    if pedido.frete_tipo is None and pedido.frete_valor is None:
         return None
     frete = {
         "tipo": pedido.frete_tipo,
-        "label": ROTULOS.get(pedido.frete_tipo, pedido.frete_tipo),
+        "label": ROTULOS.get(pedido.frete_tipo, "Frete"),
         "valor": float(pedido.frete_valor or 0),
         "prazoDias": pedido.frete_prazo_dias,
     }
@@ -100,15 +101,22 @@ def pedido_saida(pedido: m.Pedido | None) -> dict | None:
         "clienteId": cliente.cpf if cliente else None,  # id público do cliente = CPF
         "lojaId": pedido.loja_id,
         "canal": pedido.canal,
+        "tipo": pedido.tipo,
         "status": pedido.status,
+        "statusOrigem": pedido.status_origem,
         "criadoEm": ms(pedido.criado_em),
         "codigoRastreio": pedido.codigo_rastreio,
         "subtotal": float(pedido.subtotal),
+        "desconto": float(pedido.desconto),
         "total": float(pedido.total),
         "frete": _frete(pedido),
         "endereco": _endereco(pedido),
         "pagamento": _pagamento(pedido),
         "contato": {"nome": cliente.nome, "email": cliente.email, "telefone": cliente.telefone} if cliente else None,
+        # Venda sem cadastro do cliente (Vulto): o que foi digitado no PDV
+        "clienteContato": pedido.cliente_contato,
+        "vendedorNome": pedido.vendedor_nome,
+        "observacao": pedido.observacao,
         "loja": loja_saida(pedido.loja),
         "itens": [
             {
@@ -165,6 +173,7 @@ def pedido_publico_saida(pedido: m.Pedido) -> dict:
         "frete": _frete(pedido),
         "pagamento": _pagamento(pedido),
         "subtotal": float(pedido.subtotal),
+        "desconto": float(pedido.desconto),
         "total": float(pedido.total),
         "itens": [
             {

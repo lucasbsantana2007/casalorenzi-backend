@@ -9,9 +9,12 @@ from src.repositories import atendimento_repository, cliente_repository, pedido_
 from src.utils.erros import NaoEncontrado
 
 
-def listar(db: Session, busca: str | None = None) -> list[m.Cliente]:
-    """Busca por nome, e-mail ou telefone (até 50 resultados)."""
-    return cliente_repository.listar(db, busca)
+def listar(db: Session, busca: str | None = None, dados_validos: bool | None = None) -> list[m.Cliente]:
+    """Busca por nome, e-mail ou telefone (até 50 resultados). Com dados_validos, filtra pelo cadastro
+    completo (True) ou com algo a corrigir (False) e traz todos: é a lista de quem contatar."""
+    if dados_validos is None:
+        return cliente_repository.listar(db, busca)
+    return [c for c in cliente_repository.listar(db, busca, limite=None) if c.dados_validos == dados_validos]
 
 
 def por_cpf(db: Session, cpf: str | int) -> m.Cliente:

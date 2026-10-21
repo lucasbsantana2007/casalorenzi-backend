@@ -43,8 +43,8 @@ def atualizar(
         if not senha_atual:
             raise DadosInvalidos("Para trocar o e-mail, confirme com a sua senha atual.")
         _conferir_senha(cliente, senha_atual)
-        outro = cliente_repository.por_email(db, email)
-        if (outro is not None and outro.id != cliente.id) or usuario_repository.por_email(db, email) is not None:
+        em_uso = cliente_repository.email_em_uso(db, email, exceto_id=cliente.id)
+        if em_uso or usuario_repository.por_email(db, email) is not None:
             raise Conflito("Já existe uma conta com este e-mail.")
     cliente.nome, cliente.email, cliente.telefone = nome, email, telefone
     sessao.confirmar(db, cliente)

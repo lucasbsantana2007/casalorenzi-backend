@@ -58,7 +58,7 @@ def _itens(db: Session, dados: CheckoutEntrada) -> list[tuple[m.Variacao, int, D
         if not 1 <= item.quantidade <= QUANTIDADE_MAX:
             raise DadosInvalidos(f"A quantidade de cada item deve ficar entre 1 e {QUANTIDADE_MAX}.")
         pedido_por_variacao[variacao.id] = pedido_por_variacao.get(variacao.id, 0) + item.quantidade
-        itens.append((variacao, item.quantidade, variacao.produto.preco_base))
+        itens.append((variacao, item.quantidade, variacao.preco_vigente))
     # Trava os saldos dessas peças até o fim da compra: com duas compras simultâneas da última peça,
     # a segunda espera a primeira terminar e já a enxerga como prometida
     estoque_repository.travar_variacoes(db, sorted(pedido_por_variacao))

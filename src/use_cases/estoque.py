@@ -22,6 +22,7 @@ def aplicar_movimentacao(
     origem: str,
     usuario_id: int | None,
     transferencia_id: int | None = None,
+    pedido_id: int | None = None,
     quando: datetime | None = None,
 ) -> m.Movimentacao:
     """Registra a movimentação e atualiza o saldo, sem confirmar a transação."""
@@ -36,6 +37,7 @@ def aplicar_movimentacao(
         origem=origem,
         usuario_id=usuario_id,
         transferencia_id=transferencia_id,
+        pedido_id=pedido_id,
         saldo_resultante=saldo,
         criado_em=quando,
     )

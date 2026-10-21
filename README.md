@@ -111,15 +111,25 @@ Nunca coloque a chave no git; no deploy (Render), cadastre as mesmas variáveis 
 
 ## Modelo de dados
 
+Duas marcas na mesma plataforma: Casa Lorenzi e Vulto (rede comprada em 2026). A marca está em
+`lojas`, `produtos` e `atendimentos`; o resto herda pela loja ou pelo produto. Cliente não tem marca: a
+mesma pessoa é um registro só (chave: CPF). O que mudou para receber a Vulto, e de onde vem cada dado
+dela, está em [docs/banco_uniao_vulto.md](docs/banco_uniao_vulto.md).
+O diagrama das tabelas, com o que a união mudou, está em [docs/diagrama_banco.html](docs/diagrama_banco.html)
+(abra no navegador). Para refazer depois de mudar `src/models/`: `python scripts/diagrama_banco/gerar.py`
+(com `--comparar-com <URL de um banco na versão anterior>`, ele marca o que é novo e o que mudou).
+
 | Módulo | Tabelas |
 | --- | --- |
-| Núcleo | `lojas` (endereço, telefone, horários e `ativa`), `usuarios` (só a equipe: ADMINISTRADOR, LOJISTA, OPERADOR; sem senha enquanto o convite está pendente) |
-| Clientes | `clientes` (CPF e e-mail únicos, senha só como hash), `tokens_senha` |
-| Catálogo | `categorias`, `produtos` (com descrição, composição e cuidados), `variacoes` (SKU, com `preco_custo`), `imagens_produto` (foto enviada no cadastro) |
-| Estoque | `estoques` (saldo por **loja + SKU**), `movimentacoes` (histórico com sinal), `transferencias` (com `pedido_id` quando atendem um pedido) |
-| Vendas | `pedidos` (com frete e endereço de entrega no e-commerce), `itens_pedido`, `eventos_pedido` (histórico), `pagamentos`, `devolucoes` |
-| Atendimento | `tipos_solicitacao`, `atendimentos` (sempre de um cliente), `mensagens`, `anexos` (foto) |
+| Núcleo | `lojas` (endereço, telefone, horários, `ativa`, `marca` e `tipo`: LOJA ou CD), `usuarios` (só a equipe: ADMINISTRADOR, LOJISTA, OPERADOR; sem senha enquanto o convite está pendente) |
+| Clientes | `clientes` (CPF único; e-mail opcional e não único; senha só como hash; consentimento de marketing), `tokens_senha` |
+| Catálogo | `categorias`, `fornecedores`, `produtos` (com descrição, composição, cuidados, marca, código do modelo e coleção), `variacoes` (SKU, com `preco_custo`, EAN, código do CD, preço próprio e situação no catálogo), `imagens_produto` (foto enviada no cadastro) |
+| Estoque | `estoques` (saldo por **loja + SKU**, nunca negativo), `movimentacoes` (histórico com sinal, inclusive saldo inicial, inventário e avaria), `transferencias` (com `pedido_id` quando atendem um pedido) |
+| Vendas | `pedidos` (loja física, e-commerce ou app; venda ou troca; com desconto, frete e endereço de entrega), `itens_pedido`, `eventos_pedido` (histórico), `pagamentos`, `devolucoes` |
+| Vulto+ | `movimentos_pontos` (extrato de pontos com o saldo resultante) |
+| Atendimento | `tipos_solicitacao`, `atendimentos` (site, WhatsApp, Instagram ou e-mail; com cliente ou só o contato), `mensagens`, `anexos` (foto) |
 | Administração | `config_frete` e `frete_regioes` (frete configurável), `log_acoes` (quem fez o quê) |
+| Migração da Vulto | `decisoes_migracao` (registro de decisões: os 54 da Vulto e os da união, em [docs/registro_decisoes_uniao.md](docs/registro_decisoes_uniao.md)), `de_para` (origem de cada registro migrado) |
 
 **Um login só para equipe e clientes.** O cliente cria a conta no checkout (nome, CPF, e-mail,
 telefone e senha) e entra pelo mesmo `POST /auth/login`; o token traz o papel `CLIENTE`, que só
@@ -160,7 +170,7 @@ Todas sob o prefixo `/api`. As rotas internas exigem `Authorization: Bearer <tok
 | POST | `/pedidos/{id}/devolucoes` · GET `/devolucoes?de&ate&lojaId` | equipe |
 | GET · GET, PATCH | `/atendimentos` · `/atendimentos/{id}` | administrador, lojista |
 | POST | `/atendimentos` (cliente: abre para si; equipe: em nome do cliente), `/atendimentos/{id}/mensagens` (aceita `anexo`) | administrador, lojista, cliente dono |
-| GET | `/clientes?busca` | administrador, lojista |
+| GET | `/clientes?busca&dadosValidos` (`dadosValidos=false`: todos com cadastro a corrigir, com o motivo) | administrador, lojista |
 | GET | `/clientes/{id}`, `/clientes/{id}/pedidos`, `/clientes/{id}/pedidos/{numero}`, `/clientes/{id}/atendimentos`, `/clientes/{id}/atendimentos/{aid}` | administrador, lojista, o próprio cliente |
 | GET | `/dashboard/resumo?lojaId` | equipe |
 | GET | `/financeiro/resumo?de&ate&comparar&agrupar&lojas&canais&categorias&generos` | administrador |

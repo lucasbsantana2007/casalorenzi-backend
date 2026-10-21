@@ -83,9 +83,14 @@ def listar(
         sem_responsavel=responsavel_id == "nenhum",
         responsavel_id=int(responsavel_id) if responsavel_id and responsavel_id.isdigit() else None,
     )
-    return [
-        a for a in atendimentos if corresponde(busca, a.protocolo, a.cliente.nome, a.cliente.email, a.tipo_solicitacao.titulo)
-    ]
+    return [a for a in atendimentos if corresponde(busca, a.protocolo, *_textos_do_cliente(a), a.tipo_solicitacao.titulo)]
+
+
+def _textos_do_cliente(atendimento: m.Atendimento) -> tuple[str, ...]:
+    """Nome e e-mail do cliente para a busca; sem cliente identificado (WhatsApp, Instagram), o contato."""
+    if atendimento.cliente is None:
+        return atendimento.contato_nome or "", atendimento.contato or ""
+    return atendimento.cliente.nome, atendimento.cliente.email or ""
 
 
 def abrir_para_cliente(
@@ -221,6 +226,8 @@ def responder_como_cliente(
     return atendimento
 
 
-def totais_do_cliente(db: Session, cliente_id: int) -> tuple[int, int]:
-    """(pedidos, atendimentos) do cliente, mostrados no detalhe do atendimento."""
+def totais_do_cliente(db: Session, cliente_id: int | None) -> tuple[int, int]:
+    """(pedidos, atendimentos) do cliente, mostrados no detalhe do atendimento (zero sem cliente identificado)."""
+    if cliente_id is None:
+        return 0, 0
     return pedido_repository.contar_do_cliente(db, cliente_id), atendimento_repository.contar_do_cliente(db, cliente_id)

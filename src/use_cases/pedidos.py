@@ -156,7 +156,14 @@ def listar(
     if escopo is not None:
         loja_id = escopo
     pedidos = pedido_repository.listar(db, status=status, loja_id=loja_id, canal=canal)
-    return [p for p in pedidos if corresponde(busca, p.numero, p.cliente.nome, p.cliente.email)]
+    return [p for p in pedidos if corresponde(busca, p.numero, *_textos_do_cliente(p))]
+
+
+def _textos_do_cliente(pedido: m.Pedido) -> tuple[str, ...]:
+    """Nome e e-mail do cliente para a busca; venda sem cadastro (Vulto) busca pelo contato digitado."""
+    if pedido.cliente is None:
+        return (pedido.cliente_contato or "",)
+    return pedido.cliente.nome, pedido.cliente.email or ""
 
 
 def obter(db: Session, pedido_id: int, usuario: m.Usuario) -> m.Pedido:
@@ -213,6 +220,7 @@ def _enviar(db: Session, pedido: m.Pedido, codigo_rastreio: str | None, usuario:
             quantidade=-item.quantidade,
             origem=f"Pedido {pedido.numero} (e-commerce)",
             usuario_id=usuario.id,
+            pedido_id=pedido.id,
             quando=momento,
         )
     pedido.status = "ENVIADO"

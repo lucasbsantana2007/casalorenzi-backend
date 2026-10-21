@@ -30,6 +30,8 @@ def loja_saida(loja: m.Loja | None) -> dict | None:
         "telefone": loja.telefone,
         "horarios": list(loja.horarios or []),
         "ativa": loja.ativa,
+        "marca": loja.marca,
+        "tipo": loja.tipo,
     }
 
 
