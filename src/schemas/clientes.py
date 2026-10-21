@@ -1,4 +1,11 @@
 from src import models as m
+from src.schemas.comum import Entrada
+
+
+class AcessoEntrada(Entrada):
+    """E-mail para onde vai o link de criar a senha."""
+
+    email: str = ""
 
 
 def cliente_saida(cliente: m.Cliente | None) -> dict | None:

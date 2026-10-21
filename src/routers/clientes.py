@@ -12,7 +12,7 @@ from src import models as m
 from src.database.connection import get_db
 from src.middlewares.autenticacao import Sessao, exigir_cliente_ou_modulo, exigir_modulo
 from src.routers.atendimentos import detalhe_saida, lista_saida
-from src.schemas.clientes import cliente_saida
+from src.schemas.clientes import AcessoEntrada, cliente_saida
 from src.schemas.pedidos import pedido_saida
 from src.use_cases import clientes
 from src.utils.erros import NaoEncontrado
@@ -48,6 +48,13 @@ def obter(cliente_id: str, db: Session = Depends(get_db), sessao: Sessao = Depen
     cliente = _cliente(db, sessao, cliente_id)
     total_pedidos, total_atendimentos = clientes.totais(db, cliente.id)
     return {**cliente_saida(cliente), "totalPedidos": total_pedidos, "totalAtendimentos": total_atendimentos}
+
+
+@router.post("/{cliente_id}/acesso")
+def liberar_acesso(cliente_id: str, dados: AcessoEntrada, db: Session = Depends(get_db), _: m.Usuario = Depends(acesso_painel)):
+    """Só a equipe de atendimento. Cadastra o e-mail do cliente (ex.: cliente da Vulto sem e-mail) e manda
+    o link para ele criar a senha; depois ele entra com o CPF ou o e-mail. E-mail de outra conta: 409."""
+    return {"enviado": True, "linkDemo": clientes.liberar_acesso(db, clientes.por_cpf(db, cliente_id), dados.email)}
 
 
 @router.get("/{cliente_id}/pedidos")

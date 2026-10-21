@@ -146,7 +146,7 @@ Todas sob o prefixo `/api`. As rotas internas exigem `Authorization: Bearer <tok
 
 | Método | Rota | Quem acessa |
 | --- | --- | --- |
-| POST | `/auth/login` · GET `/auth/me` | público · logado (equipe ou cliente) |
+| POST | `/auth/login` (o cliente entra com o e-mail ou o CPF no campo `email`) · GET `/auth/me` | público · logado (equipe ou cliente) |
 | POST | `/auth/cadastro` (conta do cliente; já devolve a sessão), `/auth/esqueci-senha`, `/auth/redefinir-senha` | público |
 | GET | `/lojas` (com endereço, telefone, horários e `ativa`), `/categorias`, `/tipos-solicitacao` | público |
 | GET, PUT · PUT · POST | `/conta` · `/conta/senha` · `/conta/exclusao` (configurações da conta) | o próprio cliente |
@@ -170,6 +170,7 @@ Todas sob o prefixo `/api`. As rotas internas exigem `Authorization: Bearer <tok
 | POST | `/pedidos/{id}/devolucoes` · GET `/devolucoes?de&ate&lojaId` | equipe |
 | GET · GET, PATCH | `/atendimentos` · `/atendimentos/{id}` | administrador, lojista |
 | POST | `/atendimentos` (cliente: abre para si; equipe: em nome do cliente), `/atendimentos/{id}/mensagens` (aceita `anexo`) | administrador, lojista, cliente dono |
+| POST | `/clientes/{id}/acesso` (cadastra o e-mail do cliente sem e-mail e manda o link para criar a senha) | administrador, lojista |
 | GET | `/clientes?busca&dadosValidos` (`dadosValidos=false`: todos com cadastro a corrigir, com o motivo) | administrador, lojista |
 | GET | `/clientes/{id}`, `/clientes/{id}/pedidos`, `/clientes/{id}/pedidos/{numero}`, `/clientes/{id}/atendimentos`, `/clientes/{id}/atendimentos/{aid}` | administrador, lojista, o próprio cliente |
 | GET | `/dashboard/resumo?lojaId` | equipe |

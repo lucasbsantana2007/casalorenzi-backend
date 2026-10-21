@@ -228,17 +228,22 @@ com os dados reais.
   vende peça da Vulto, e a expedição sai só de loja da Lorenzi.
 - **Estoque zerado automático só dentro da marca:** produto novo nasce nas lojas da marca dele; loja nova,
   com as peças da marca dela.
-- **Financeiro:** troca não conta como receita.
+- **Financeiro com a regra da diretoria:** receita = total dos pedidos de venda não cancelados (itens −
+  desconto + frete); troca não é receita; devolução sem pedido de origem entra pela loja em que foi
+  registrada; `receitaLiquida` = receita − devoluções. Só com as lojas da Vulto, de jan/2025 a set/2026, a
+  tela dá R$ 6.498.071,30 (Loja física R$ 3.891.612,41 · E-commerce R$ 1.682.985,19 · App R$ 923.473,70).
+- **Login com e-mail ou CPF** (decisão 53), sempre com a senha. E-mail usado por mais de um cliente não
+  entra: essas pessoas entram pelo CPF. O "esqueci a senha" também aceita o CPF e manda o link para o
+  e-mail da conta. Quem não tem e-mail (747 clientes que vieram só do sistema de pontos) ganha acesso pelo
+  atendimento: `POST /clientes/{cpf}/acesso` cadastra o e-mail e manda o link para criar a senha.
 - O número dos pedidos do site continua na sequência `CL-` com `APP-7001205` no banco; e-mail de mais de um
   cliente não entra nem é reaproveitado em conta nova; pedido e atendimento sem cliente aparecem no painel
   e na busca; o checkout cobra o preço próprio do SKU.
 
 ## O que fica para depois
 
-- **Financeiro com a regra da Vulto:** a tela soma o valor dos itens (sem desconto e sem frete) e só olha as
-  devoluções ligadas a um pedido; o número da diretoria (total com desconto e frete, menos as devoluções pela
-  loja) sai das consultas acima.
-- **Login com CPF** (decisão 53) e a tela de "atualizar cadastro" no primeiro login (decisão 52).
+- **Tela de "atualizar cadastro" no primeiro login** (decisão 52): o banco já marca quem precisa
+  (`clientes.atualizar_cadastro`) e a API mostra o motivo (`problemasCadastro`); falta a tela no site.
 - **Desempenho:** a lista de pedidos e o financeiro carregam todos os pedidos na memória; com os 18 mil
   da Vulto, levam cerca de 3 segundos. Vale filtrar e somar no banco.
 - **Branch `feat/resgate-pontos-vulto-mais`:** cria a mesma tabela `movimentos_pontos` e a coluna

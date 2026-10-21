@@ -440,7 +440,7 @@ def test_email_de_mais_de_um_cliente_nao_entra_nem_cadastra_de_novo(client):
         email = mariana_db.email
     # E-mail de duas pessoas não identifica ninguém: a mensagem é a de sempre
     r = client.post("/api/auth/login", json={"email": email, "senha": SENHA_DEMO})
-    assert r.status_code == 401 and r.json() == {"detail": "E-mail ou senha incorretos."}
+    assert r.status_code == 401 and r.json() == {"detail": "E-mail, CPF ou senha incorretos."}
     assert client.post("/api/auth/esqueci-senha", json={"email": email}).json()["linkDemo"] is None
     r = client.post(
         "/api/auth/cadastro",
@@ -575,3 +575,30 @@ def test_troca_nao_conta_como_receita(client, admin):
         db.commit()
     depois = client.get(f"/api/financeiro/resumo?{periodo}", headers=admin).json()
     assert (depois["receita"], depois["pedidos"]) == (antes["receita"], antes["pedidos"])
+
+
+def test_financeiro_soma_o_total_e_desconta_as_devolucoes_sem_pedido(client, admin):
+    """Receita = total do pedido (itens − desconto + frete); devolução sem pedido entra pela loja dela."""
+    hoje = datetime.now(UTC)
+    periodo = f"de={hoje:%Y-%m-%d}&ate={hoje:%Y-%m-%d}&comparar=nenhum"
+    antes = client.get(f"/api/financeiro/resumo?{periodo}", headers=admin).json()
+    with SessionLocal() as db:
+        cd = _loja_vulto(db, tipo="CD")
+        variacao = _variacao_do_seed(db)
+        # Itens R$ 279,80 − desconto R$ 27,98 + frete R$ 14,90 = R$ 266,72
+        _venda_vulto(
+            db, cd, variacao, numero="APP-1", canal="App", frete_valor=Decimal("14.90"), total=Decimal("266.72"), criado_em=hoje
+        )
+        db.add(
+            m.Devolucao(variacao_id=variacao.id, loja_id=cd.id, quantidade=1, valor_devolvido=Decimal("119.90"), criada_em=hoje)
+        )
+        db.commit()
+    depois = client.get(f"/api/financeiro/resumo?{periodo}", headers=admin).json()
+    assert round(depois["receita"] - antes["receita"], 2) == 266.72
+    assert round(depois["devolucoesValor"] - antes["devolucoesValor"], 2) == 119.90
+    assert round(depois["receitaLiquida"], 2) == round(depois["receita"] - depois["devolucoesValor"], 2)
+    # A devolução no CD conta no E-commerce, não na loja física
+    online = client.get(f"/api/financeiro/resumo?{periodo}&canais=E-commerce", headers=admin).json()
+    fisica = client.get(f"/api/financeiro/resumo?{periodo}&canais=Loja física", headers=admin).json()
+    assert antes["devolucoesValor"] == 0  # o banco de demonstração não tem devoluções
+    assert round(online["devolucoesValor"], 2) == 119.90 and fisica["devolucoesValor"] == 0
