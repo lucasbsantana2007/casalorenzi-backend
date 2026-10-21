@@ -7,6 +7,7 @@ from sqlalchemy import Boolean, CheckConstraint, Date, DateTime, ForeignKey, Str
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.database.connection import Base
+from src.entities.cliente import problemas_do_cadastro
 from src.entities.pedido import CANAIS
 from src.models._restricoes import valor_em
 
@@ -57,3 +58,14 @@ class Cliente(Base):
     excluido_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     loja_preferida: Mapped[Loja | None] = relationship(lazy="joined")
+
+    @property
+    def problemas_cadastro(self) -> list[str]:
+        """O que o cliente precisa corrigir no cadastro (src/entities/cliente.py). A conta excluída não tem dados."""
+        if self.excluido_em is not None:
+            return []
+        return problemas_do_cadastro(self.cpf, self.email, self.telefone)
+
+    @property
+    def dados_validos(self) -> bool:
+        return not self.problemas_cadastro

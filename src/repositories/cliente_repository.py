@@ -33,7 +33,8 @@ def por_cpf(db: Session, cpf: str) -> m.Cliente | None:
     return db.scalar(select(m.Cliente).where(m.Cliente.cpf == cpf))
 
 
-def listar(db: Session, busca: str | None = None, limite: int = 50) -> list[m.Cliente]:
+def listar(db: Session, busca: str | None = None, limite: int | None = 50) -> list[m.Cliente]:
+    """limite=None traz todos (a lista de quem tem cadastro a corrigir)."""
     consulta = select(m.Cliente).where(m.Cliente.excluido_em.is_(None)).order_by(m.Cliente.nome, m.Cliente.id).limit(limite)
     if busca and busca.strip():
         termo = f"%{busca.strip().lower()}%"

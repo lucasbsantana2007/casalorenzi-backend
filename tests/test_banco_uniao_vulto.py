@@ -11,6 +11,7 @@ from sqlalchemy.exc import IntegrityError
 
 from src import models as m
 from src.database.connection import SessionLocal, engine
+from src.entities.cliente import problemas_do_cadastro
 from src.entities.fidelidade import categoria_pelo_saldo, valor_em_reais
 from src.entities.pedido import proximo_numero
 from src.entities.produto import ean_interno
@@ -496,3 +497,56 @@ def test_devolucao_da_vulto_sem_venda_original(client, admin):
         "ck_devolucoes_item_do_pedido",
         m.Devolucao(item_pedido_id=1, variacao_id=1, loja_id=1, quantidade=1, valor_devolvido=1, criada_em=AGORA),
     )
+
+
+# ---------- Dados válidos: o que só o cliente pode corrigir ----------
+
+
+@pytest.mark.parametrize(
+    ("cpf", "email", "telefone", "problemas"),
+    [
+        ("15881399803", "mariana@gmail.com", "(11) 98422-1937", []),
+        ("15881399803", "mariana@gmail.com", "41907233343", []),
+        ("15881399803", "mariana@gmail.com", "+55 11 94885-4328", []),
+        ("15881399803", "mariana@gmail.com", None, []),  # telefone é opcional
+        ("21297628578", "alice@gmail.com", None, ["CPF_INVALIDO"]),  # dígito errado (decisão 50)
+        (None, "antigo@gmail.com", None, ["SEM_CPF"]),
+        ("15881399803", None, "943716949", ["SEM_EMAIL", "TELEFONE_SEM_DDD"]),
+        ("15881399803", "fulano@gmial", "123", ["EMAIL_INVALIDO", "TELEFONE_INVALIDO"]),
+    ],
+)
+def test_problemas_do_cadastro(cpf, email, telefone, problemas):
+    assert problemas_do_cadastro(cpf, email, telefone) == problemas
+
+
+def test_lista_de_clientes_com_cadastro_a_corrigir(client, admin):
+    _gravar(
+        m.Cliente(nome="(sem cadastro na planilha)", cpf="00009297197", atualizar_cadastro=True),
+        m.Cliente(nome="Alice Nogueira", cpf="21297628578", email="alice@gmail.com", atualizar_cadastro=True),
+        m.Cliente(nome="Alexandre Almeida Ribeiro", cpf="16643840813", email="alexandre@yahoo.com.br", telefone="943716949"),
+        m.Cliente(nome="Cadastro Completo", cpf="11144477735", email="completo@gmail.com", telefone="41907233343"),
+    )
+    a_corrigir = {c["nome"]: c for c in client.get("/api/clientes?dadosValidos=false", headers=admin).json()}
+    assert set(a_corrigir) == {"(sem cadastro na planilha)", "Alice Nogueira", "Alexandre Almeida Ribeiro"}
+    assert a_corrigir["(sem cadastro na planilha)"]["problemasCadastro"] == ["SEM_EMAIL"]
+    assert a_corrigir["Alice Nogueira"]["problemasCadastro"] == ["CPF_INVALIDO"]
+    assert a_corrigir["Alice Nogueira"]["atualizarCadastro"] is True
+    assert a_corrigir["Alexandre Almeida Ribeiro"]["problemasCadastro"] == ["TELEFONE_SEM_DDD"]
+
+    validos = client.get("/api/clientes?dadosValidos=true", headers=admin).json()
+    assert "Cadastro Completo" in {c["nome"] for c in validos} and all(c["dadosValidos"] for c in validos)
+    detalhe = client.get("/api/clientes/11144477735", headers=admin).json()
+    assert detalhe["dadosValidos"] is True and detalhe["problemasCadastro"] == []
+
+
+def test_filtro_de_dados_validos_traz_todos_sem_o_limite_da_busca(client, admin):
+    def cpf(base: int) -> str:
+        digitos = f"{base:09d}"
+        for _ in range(2):
+            soma = sum(int(d) * (len(digitos) + 1 - i) for i, d in enumerate(digitos))
+            digitos += str(soma * 10 % 11 % 10)
+        return digitos
+
+    _gravar(*(m.Cliente(nome=f"Só sistema {n}", cpf=cpf(400000000 + n)) for n in range(60)))
+    assert len(client.get("/api/clientes?busca=Só sistema", headers=admin).json()) == 50
+    assert len(client.get("/api/clientes?busca=Só sistema&dadosValidos=false", headers=admin).json()) == 60

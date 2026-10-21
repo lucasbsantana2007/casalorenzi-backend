@@ -31,9 +31,16 @@ def _cliente(db: Session, sessao: Sessao, cpf: str) -> m.Cliente:
 
 
 @router.get("")
-def listar(busca: str | None = None, db: Session = Depends(get_db), _: m.Usuario = Depends(acesso_painel)):
-    """Busca por nome, e-mail, telefone (até 50 resultados). Só a equipe. Usada para abrir chamado em nome do cliente."""
-    return [cliente_saida(c) for c in clientes.listar(db, busca)]
+def listar(
+    busca: str | None = None,
+    dadosValidos: bool | None = None,
+    db: Session = Depends(get_db),
+    _: m.Usuario = Depends(acesso_painel),
+):
+    """Busca por nome, e-mail, telefone (até 50 resultados). Só a equipe. Usada para abrir chamado em nome do cliente.
+    dadosValidos=false lista todos os clientes com algo a corrigir no cadastro (CPF inválido, sem e-mail,
+    telefone sem DDD...), com o motivo em problemasCadastro: a lista de quem contatar."""
+    return [cliente_saida(c) for c in clientes.listar(db, busca, dadosValidos)]
 
 
 @router.get("/{cliente_id}")
