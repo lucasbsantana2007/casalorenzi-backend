@@ -281,9 +281,9 @@ class Carga:
         self.de_para.append({"origem": origem, "id_origem": str(id_origem), "tabela_destino": tabela, "id_destino": id_destino})
 
     def _inserir(self, modelo, linhas: list[dict]) -> list[int]:
-        """Grava em lote e devolve os ids na ordem das linhas. Os ids saem da própria sequência da tabela
-        (reservados de uma vez), para o INSERT ir em lotes: pedir os ids de volta faria o SQLAlchemy gravar
-        linha por linha, uma viagem ao banco cada."""
+        """Grava em lote e devolve os ids na ordem das linhas. Os ids saem da própria sequência da tabela,
+        reservados de uma vez, e cada INSERT leva até mil linhas: no banco do Render, longe daqui, uma
+        viagem por linha (o que o executemany faz) levaria horas."""
         if not linhas:
             return []
         ids = list(
@@ -294,7 +294,9 @@ class Carga:
         )
         for linha, ident in zip(linhas, ids, strict=True):
             linha["id"] = ident
-        self.db.execute(insert(modelo), linhas)
+        lote = max(1, min(1000, 30000 // len(linhas[0])))  # o PostgreSQL aceita até 65.535 parâmetros por comando
+        for inicio in range(0, len(linhas), lote):
+            self.db.execute(insert(modelo).values(linhas[inicio : inicio + lote]))
         return ids
 
     # ----- etapas -----
@@ -861,23 +863,23 @@ class Carga:
         numeros = [int(d["numero"]) for d in decisoes]
         if len(set(numeros)) != len(numeros):
             raise CargaRecusada("O registro de decisões tem números repetidos.")
-        for d in decisoes:
-            numero = int(d["numero"])
-            decisao = m.DecisaoMigracao(
-                numero=numero,
-                area=AREA_DECISAO.get(numero, "GERAL"),
-                o_que_encontramos=d["oque"],
-                onde=d["onde"],
-                quantos_registros=d["quantos"],
-                o_que_decidimos=d["decidimos"],
-                por_que=d["porque"],
-                impacto=d["impacto"],
-                tipo=TIPO_DECISAO[d["tipo"]],
-                situacao="A_DECIDIR" if d["decidimos"].lstrip("*").startswith("A decidir") else "APLICADA",
-            )
-            self.db.add(decisao)
-            self.db.flush()
-            self._mapear("registro_decisoes", numero, "decisoes_migracao", decisao.id)
+        linhas = [
+            {
+                "numero": int(d["numero"]),
+                "area": AREA_DECISAO.get(int(d["numero"]), "GERAL"),
+                "o_que_encontramos": d["oque"],
+                "onde": d["onde"],
+                "quantos_registros": d["quantos"],
+                "o_que_decidimos": d["decidimos"],
+                "por_que": d["porque"],
+                "impacto": d["impacto"],
+                "tipo": TIPO_DECISAO[d["tipo"]],
+                "situacao": "A_DECIDIR" if d["decidimos"].lstrip("*").startswith("A decidir") else "APLICADA",
+            }
+            for d in decisoes
+        ]
+        for linha, ident in zip(linhas, self._inserir(m.DecisaoMigracao, linhas), strict=True):
+            self._mapear("registro_decisoes", linha["numero"], "decisoes_migracao", ident)
         self.rel.contagens["decisões no registro"] = len(decisoes)
 
     # ----- conferência -----

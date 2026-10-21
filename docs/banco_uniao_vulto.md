@@ -207,7 +207,7 @@ python -m src.migracao_vulto --origem ../copy.vulto-legado-back             # gr
 - Uma transação só. Antes de gravar, confere os três números e as contagens contra a origem; se algo não
   bater, desfaz tudo e diz o quê.
 - Roda uma vez só: com registros da Vulto no `de_para`, recusa.
-- Grava em lote (cerca de 16 segundos no banco local).
+- Grava em lote, até mil linhas por comando: cerca de 16 segundos no banco local e 2 minutos no do Render.
 
 **Conferido no banco local (21/10/2026):** as 130 combinações de mês × loja × canal do faturamento são
 iguais às da origem (Loja física R$ 3.891.612,41 · E-commerce R$ 1.682.985,19 · App R$ 923.473,70); as
