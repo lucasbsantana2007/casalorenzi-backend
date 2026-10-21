@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 
 from src import models as m
 from src.database.connection import get_db
+from src.entities.marca import MARCA_DO_SITE
 from src.entities.papeis import ADMINISTRADOR
 from src.middlewares.autenticacao import Sessao, exigir_modulo, sessao_opcional
 from src.schemas.produtos import ProdutoEntrada, produto_saida
@@ -14,6 +15,11 @@ acesso_admin = exigir_modulo("produtos")
 
 def _ve_custo(sessao: Sessao | None) -> bool:
     return sessao is not None and sessao.usuario is not None and sessao.usuario.papel == ADMINISTRADOR
+
+
+def _marca_visivel(sessao: Sessao | None) -> str | None:
+    """Visitante e cliente veem só a marca do site; a equipe vê as duas."""
+    return None if sessao is not None and sessao.usuario is not None else MARCA_DO_SITE
 
 
 def _saida(db: Session, produto: m.Produto, com_custo: bool) -> dict:
@@ -32,7 +38,7 @@ def listar(
 ):
     """Pública: alimenta também a vitrine da loja. estoqueTotal é o físico; disponivel desconta as peças
     reservadas por pedidos ainda não enviados. precoCusto das variações só para o Administrador."""
-    lista = produtos.listar(db, busca, categoria, ativo)
+    lista = produtos.listar(db, busca, categoria, ativo, _marca_visivel(sessao))
     totais = produtos.totais_de_estoque(db, lista)
     disponiveis = produtos.disponiveis_para_venda(db, lista)
     com_custo = _ve_custo(sessao)
@@ -41,7 +47,7 @@ def listar(
 
 @router.get("/{produto_id}")
 def obter(produto_id: int, db: Session = Depends(get_db), sessao: Sessao | None = Depends(sessao_opcional)):
-    return _saida(db, produtos.obter(db, produto_id), _ve_custo(sessao))
+    return _saida(db, produtos.obter(db, produto_id, _marca_visivel(sessao)), _ve_custo(sessao))
 
 
 @router.get("/{produto_id}/imagem", response_class=Response)

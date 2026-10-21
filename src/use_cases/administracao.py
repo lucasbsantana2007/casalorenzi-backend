@@ -253,9 +253,9 @@ def criar_loja(db: Session, autor: m.Usuario, dados) -> m.Loja:
     loja = m.Loja(**_validar_loja(db, dados))
     sessao.adicionar(db, loja)
     sessao.gerar_ids(db)
-    # Estoque zerado de todas as variações, para a loja já poder receber transferências
+    # Estoque zerado das variações da mesma marca, para a loja já poder receber transferências
     momento = agora()
-    for variacao in produto_repository.todas_variacoes(db):
+    for variacao in produto_repository.todas_variacoes(db, marca=loja.marca):
         sessao.adicionar(
             db, m.Estoque(loja_id=loja.id, variacao_id=variacao.id, quantidade=0, quantidade_min=2, atualizado_em=momento)
         )

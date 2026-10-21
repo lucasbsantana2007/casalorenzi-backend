@@ -5,10 +5,14 @@ from src import models as m
 from src.entities.papeis import EQUIPE
 
 
-def lojas(db: Session, somente_ativas: bool = False) -> list[m.Loja]:
+def lojas(db: Session, somente_ativas: bool = False, marca: str | None = None, tipo: str | None = None) -> list[m.Loja]:
     consulta = select(m.Loja).order_by(m.Loja.id)
     if somente_ativas:
         consulta = consulta.where(m.Loja.ativa.is_(True))
+    if marca:
+        consulta = consulta.where(m.Loja.marca == marca)
+    if tipo:
+        consulta = consulta.where(m.Loja.tipo == tipo)
     return list(db.scalars(consulta))
 
 

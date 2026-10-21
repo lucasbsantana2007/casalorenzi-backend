@@ -47,9 +47,9 @@ def aplicar_movimentacao(
     return mov
 
 
-def criar_estoques_zerados(db: Session, variacao: m.Variacao) -> None:
-    """Toda variação nova passa a existir, com saldo zero, em todas as lojas."""
-    for loja in cadastro_repository.lojas(db):
+def criar_estoques_zerados(db: Session, variacao: m.Variacao, marca: str) -> None:
+    """Toda variação nova passa a existir, com saldo zero, em todas as lojas da marca do produto."""
+    for loja in cadastro_repository.lojas(db, marca=marca):
         sessao.adicionar(db, m.Estoque(loja_id=loja.id, variacao=variacao, quantidade=0, quantidade_min=2, atualizado_em=agora()))
 
 
