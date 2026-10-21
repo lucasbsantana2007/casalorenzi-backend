@@ -47,22 +47,35 @@ def tipo_solicitacao_saida(tipo: m.TipoSolicitacao) -> dict:
     }
 
 
+def _cliente_resumo(a: m.Atendimento) -> dict:
+    """Sem cliente identificado (WhatsApp, Instagram da Vulto): o nome e o contato que ele deu."""
+    if a.cliente is None:
+        return {"id": None, "nome": a.contato_nome or a.contato}
+    return {"id": a.cliente.cpf, "nome": a.cliente.nome}
+
+
 def atendimento_saida(a: m.Atendimento, ultima: m.Mensagem | None) -> dict:
+    cliente_id = a.cliente.cpf if a.cliente else None
     return {
         "id": a.id,
         "protocolo": a.protocolo,
-        "clienteId": a.cliente.cpf,
+        "clienteId": cliente_id,
         # Nome antigo, mantido enquanto o frontend usa solicitanteId
-        "solicitanteId": a.cliente.cpf,
+        "solicitanteId": cliente_id,
         "responsavelId": a.responsavel_id,
         "tipoSolicitacaoId": a.tipo_solicitacao_id,
         "status": a.status,
         "pedidoId": a.pedido_id,
         "lojaId": a.loja_id,
+        "marca": a.marca,
+        "canal": a.canal,
+        "contato": a.contato,
+        "contatoNome": a.contato_nome,
+        "pedidoCitado": a.pedido_citado,
         "criadoEm": ms(a.criado_em),
         "atualizadoEm": ms(a.atualizado_em),
         "tipoSolicitacao": tipo_solicitacao_saida(a.tipo_solicitacao),
-        "cliente": {"id": a.cliente.cpf, "nome": a.cliente.nome},
+        "cliente": _cliente_resumo(a),
         "responsavel": usuario_resumo(a.responsavel),
         "loja": loja_saida(a.loja),
         "ultimaMensagem": (
@@ -92,15 +105,18 @@ def mensagem_saida(msg: m.Mensagem) -> dict:
         "conteudo": msg.conteudo,
         "enviadoEm": ms(msg.enviado_em),
         "autor": usuario_resumo(msg.autor),
+        # Quem escreveu fora da plataforma (atendente da ferramenta da Vulto); nulo nas mensagens daqui
+        "autorNome": msg.autor_nome,
         "anexo": anexo_saida(msg.anexo),
     }
 
 
 def atendimento_detalhado_saida(a: m.Atendimento, total_pedidos: int, total_atendimentos: int) -> dict:
     mensagens = a.mensagens
+    cliente = cliente_saida(a.cliente) or _cliente_resumo(a)
     return {
         **atendimento_saida(a, mensagens[-1] if mensagens else None),
-        "cliente": {**cliente_saida(a.cliente), "totalPedidos": total_pedidos, "totalAtendimentos": total_atendimentos},
+        "cliente": {**cliente, "totalPedidos": total_pedidos, "totalAtendimentos": total_atendimentos},
         "pedido": pedido_saida(a.pedido),
         "mensagens": [mensagem_saida(msg) for msg in mensagens],
     }

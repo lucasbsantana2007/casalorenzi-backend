@@ -3,7 +3,7 @@ from __future__ import annotations
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
-from sqlalchemy import ForeignKey, Integer, Numeric
+from sqlalchemy import CheckConstraint, ForeignKey, Integer, Numeric
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.database.connection import Base
@@ -15,7 +15,13 @@ if TYPE_CHECKING:
 
 
 class ItemPedido(Base):
+    """Peça vendida. A peça devolvida não vira item negativo: fica em devolucoes."""
+
     __tablename__ = "itens_pedido"
+    __table_args__ = (
+        CheckConstraint("quantidade > 0", name="ck_itens_pedido_quantidade"),
+        CheckConstraint("preco_unitario >= 0", name="ck_itens_pedido_preco"),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     pedido_id: Mapped[int] = mapped_column(ForeignKey("pedidos.id"), index=True)

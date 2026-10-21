@@ -1,6 +1,13 @@
-"""Atendimento (chamado do cliente) e suas mensagens."""
+"""Atendimento (chamado do cliente) e suas mensagens.
+
+Canal por onde o cliente falou: SITE (chamado aberto no site ou pelo painel, o único da Casa Lorenzi)
+e os da ferramenta à parte que a Vulto usava (WhatsApp, Instagram e e-mail). Atendimento de um canal
+externo pode não ter cliente identificado: aí fica o contato (telefone, e-mail ou @) que ele usou.
+"""
 
 STATUS_ATENDIMENTO = ("ABERTO", "EM_ANDAMENTO", "AGUARDANDO_CLIENTE", "CONCLUIDO")
+CANAIS_ATENDIMENTO = ("SITE", "WHATSAPP", "INSTAGRAM", "EMAIL")
+CANAL_ATENDIMENTO_PADRAO = "SITE"
 EM_ABERTO = ("ABERTO", "EM_ANDAMENTO", "AGUARDANDO_CLIENTE")
 AUTOR_MENSAGEM = ("CLIENTE", "ATENDENTE", "SISTEMA")
 DESCRICAO_MINIMA = 10

@@ -48,6 +48,7 @@ def produto_resumo(produto: m.Produto) -> dict:
         "precoBase": float(produto.preco_base),
         "ativo": produto.ativo,
         "imagemUrl": imagem_url(produto),
+        "marca": produto.marca,
     }
 
 
@@ -75,6 +76,11 @@ def produto_saida(
     variacoes = [
         {
             **variacao_base(v),
+            # Preço de venda do SKU: o do produto, salvo quando o SKU tem preço próprio
+            "preco": float(v.preco_vigente),
+            "status": v.status,
+            "ean": v.ean,
+            "codigoCd": v.codigo_cd,
             "estoqueTotal": totais.get(v.id, 0),
             "disponivel": (disponiveis if disponiveis is not None else totais).get(v.id, 0),
             **({"precoCusto": float(v.preco_custo) if v.preco_custo is not None else None} if com_custo else {}),
@@ -86,6 +92,10 @@ def produto_saida(
         "nome": produto.nome,
         "categoria": produto.categoria.nome,
         "precoBase": float(produto.preco_base),
+        "marca": produto.marca,
+        "codigoModelo": produto.codigo_modelo,
+        "colecao": produto.colecao,
+        "fornecedor": produto.fornecedor.nome if produto.fornecedor else None,
         "genero": produto.genero,
         "estacao": produto.estacao,
         "descricao": produto.descricao,

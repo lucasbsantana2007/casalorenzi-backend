@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import DateTime, ForeignKey, Integer, UniqueConstraint, func
+from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Integer, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.database.connection import Base
@@ -14,10 +14,14 @@ if TYPE_CHECKING:
 
 
 class Estoque(Base):
-    """Saldo de uma variação em uma loja. A quantidade é sempre o resultado das movimentações."""
+    """Saldo de uma variação em uma loja ou CD. A quantidade é sempre o resultado das movimentações
+    e nunca fica negativa (o sistema da Vulto deixava, e o estoque dele virou "ficção")."""
 
     __tablename__ = "estoques"
-    __table_args__ = (UniqueConstraint("loja_id", "variacao_id", name="uq_estoques_loja_variacao"),)
+    __table_args__ = (
+        UniqueConstraint("loja_id", "variacao_id", name="uq_estoques_loja_variacao"),
+        CheckConstraint("quantidade >= 0 AND quantidade_min >= 0", name="ck_estoques_quantidade"),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     loja_id: Mapped[int] = mapped_column(ForeignKey("lojas.id"), index=True)

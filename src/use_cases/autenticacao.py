@@ -21,6 +21,7 @@ from src.entities.cliente import (
     somente_digitos_cpf,
 )
 from src.entities.papeis import CLIENTE
+from src.entities.pedido import CANAL_ECOMMERCE
 from src.integrations import modelos_email
 from src.integrations.email import enviar as enviar_email
 from src.repositories import cliente_repository, sessao, usuario_repository
@@ -86,11 +87,13 @@ def cadastrar_cliente(
 
     if cliente_repository.por_cpf(db, cpf) is not None:
         raise Conflito("Já existe uma conta com este CPF. Entre com o seu e-mail e senha.")
-    if usuario_repository.por_email(db, email) is not None or cliente_repository.por_email(db, email) is not None:
+    if usuario_repository.por_email(db, email) is not None or cliente_repository.email_em_uso(db, email):
         # Inclui clientes antigos (sem conta) com este e-mail: eles criam a senha pelo "esqueci a senha"
         raise Conflito("Já existe uma conta com este e-mail. Entre com o seu e-mail e senha.")
 
-    cliente = cliente_repository.criar(db, nome=nome, email=email, telefone=telefone, cpf=cpf, senha_hash=gerar_hash(senha))
+    cliente = cliente_repository.criar(
+        db, nome=nome, email=email, telefone=telefone, cpf=cpf, senha_hash=gerar_hash(senha), canal_cadastro=CANAL_ECOMMERCE
+    )
     sessao.confirmar(db, cliente)
     return sessao_do_cliente(cliente), cliente
 

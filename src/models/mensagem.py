@@ -18,7 +18,9 @@ if TYPE_CHECKING:
 
 class Mensagem(Base):
     """Conversa do atendimento. autor_id aponta só para a equipe (ATENDENTE); mensagens do
-    CLIENTE e do SISTEMA ficam com autor_id nulo (o cliente é o do atendimento)."""
+    CLIENTE e do SISTEMA ficam com autor_id nulo (o cliente é o do atendimento).
+    autor_nome: quem escreveu, quando não é um usuário da plataforma (atendentes da ferramenta da
+    Vulto, ex.: "Júlia", "Time Insta"; o "Bot Vulto" entra como SISTEMA)."""
 
     __tablename__ = "mensagens"
     __table_args__ = (
@@ -30,6 +32,7 @@ class Mensagem(Base):
     atendimento_id: Mapped[int] = mapped_column(ForeignKey("atendimentos.id"), index=True)
     autor_id: Mapped[int | None] = mapped_column(ForeignKey("usuarios.id"))
     autor_tipo: Mapped[str] = mapped_column(String(20))
+    autor_nome: Mapped[str | None] = mapped_column(String(120))
     conteudo: Mapped[str] = mapped_column(Text)
     enviado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 

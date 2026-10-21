@@ -2,6 +2,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
 from src import models as m
+from src.entities.pedido import PREFIXO_NUMERO
 
 
 def com_itens():
@@ -45,9 +46,9 @@ def do_cliente_por_numero(db: Session, cliente_id: int, numero: str) -> m.Pedido
 
 def reservar_numeracao(db: Session) -> list[str]:
     """Trava a numeração até o fim da transação (dois checkouts simultâneos não pegam o mesmo número)
-    e devolve os números já usados."""
+    e devolve os números já usados na sequência CL- (os pedidos da Vulto têm outra numeração)."""
     db.execute(select(func.pg_advisory_xact_lock(_TRAVA_NUMERACAO)))
-    return list(db.scalars(select(m.Pedido.numero)))
+    return list(db.scalars(select(m.Pedido.numero).where(m.Pedido.numero.startswith(PREFIXO_NUMERO, autoescape=True))))
 
 
 # Chave do advisory lock da numeração de pedidos (qualquer inteiro fixo e exclusivo)

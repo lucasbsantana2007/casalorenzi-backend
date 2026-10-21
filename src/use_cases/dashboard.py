@@ -81,7 +81,7 @@ def resumo(db: Session, usuario: m.Usuario, loja_id: int | None) -> dict:
                 {
                     "nivel": "warning",
                     "titulo": f"Atendimento sem responsável · {a.protocolo}",
-                    "descricao": f"{a.cliente.nome} aguarda retorno",
+                    "descricao": f"{a.cliente.nome if a.cliente else a.contato_nome or a.contato} aguarda retorno",
                     "link": f"/atendimento/{a.id}",
                 }
             )

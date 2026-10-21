@@ -112,12 +112,14 @@ def registrar(
         quantidade=quantidade,
         origem=f"Devolução do pedido {pedido.numero}",
         usuario_id=usuario.id,
+        pedido_id=pedido.id,
         quando=momento,
     )
     sessao.gerar_ids(db)
     devolucao = m.Devolucao(
         item_pedido_id=item.id,
         pedido_id=pedido.id,
+        variacao_id=item.variacao_id,
         atendimento_id=atendimento.id if atendimento else None,
         usuario_id=usuario.id,
         loja_id=loja_id,

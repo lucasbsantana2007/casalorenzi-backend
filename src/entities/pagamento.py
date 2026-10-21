@@ -3,19 +3,24 @@ no cartão); o pedido está pago quando a soma dos APROVADOS cobre o total.
 
 PENDENTE → APROVADO → ESTORNADO
 PENDENTE → ESTORNADO (pagamento que não se concretizou)
+APROVADO → CHARGEBACK (o banco do cliente contestou e tirou o valor da loja)
+
+NAO_INFORMADO: forma de pagamento que o sistema de origem não registrou (as vendas da Vulto só
+têm a forma de pagamento na planilha manual da Batel). Não se inventa uma forma que não se sabe.
 """
 
 from decimal import Decimal
 
-METODOS_PAGAMENTO = ("PIX", "CARTAO", "DINHEIRO", "DEBITO")
+METODOS_PAGAMENTO = ("PIX", "CARTAO", "DINHEIRO", "DEBITO", "NAO_INFORMADO")
 METODOS_ECOMMERCE = ("PIX", "CARTAO")
-STATUS_PAGAMENTO = ("APROVADO", "ESTORNADO", "PENDENTE")
+STATUS_PAGAMENTO = ("APROVADO", "ESTORNADO", "PENDENTE", "CHARGEBACK")
 PARCELAS_MAX = 6
 
 TRANSICOES = {
     ("PENDENTE", "APROVADO"),
     ("PENDENTE", "ESTORNADO"),
     ("APROVADO", "ESTORNADO"),
+    ("APROVADO", "CHARGEBACK"),
 }
 
 # Usado para pedidos antigos, que não registravam a forma de pagamento (migration e carga)

@@ -9,9 +9,12 @@ from src.models.anexo import Anexo
 from src.models.atendimento import Atendimento
 from src.models.categoria import Categoria
 from src.models.cliente import Cliente
+from src.models.de_para import DePara
+from src.models.decisao_migracao import DecisaoMigracao
 from src.models.devolucao import Devolucao
 from src.models.estoque import Estoque
 from src.models.evento_pedido import EventoPedido
+from src.models.fornecedor import Fornecedor
 from src.models.frete import ConfigFrete, FreteRegiao
 from src.models.imagem_produto import ImagemProduto
 from src.models.item_pedido import ItemPedido
@@ -19,6 +22,7 @@ from src.models.log_acao import LogAcao
 from src.models.loja import Loja
 from src.models.mensagem import Mensagem
 from src.models.movimentacao import Movimentacao
+from src.models.movimento_pontos import MovimentoPontos
 from src.models.pagamento import Pagamento
 from src.models.pedido import Pedido
 from src.models.produto import Produto
@@ -31,6 +35,7 @@ from src.models.variacao import Variacao
 __all__ = [
     "Loja",
     "Categoria",
+    "Fornecedor",
     "Usuario",
     "Cliente",
     "TokenSenha",
@@ -45,6 +50,7 @@ __all__ = [
     "Pagamento",
     "EventoPedido",
     "Devolucao",
+    "MovimentoPontos",
     "TipoSolicitacao",
     "Atendimento",
     "Mensagem",
@@ -52,4 +58,6 @@ __all__ = [
     "ConfigFrete",
     "FreteRegiao",
     "LogAcao",
+    "DecisaoMigracao",
+    "DePara",
 ]
