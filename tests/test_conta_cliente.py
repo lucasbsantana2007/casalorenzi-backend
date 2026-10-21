@@ -157,6 +157,12 @@ def test_cliente_abre_chamado_com_foto_e_conversa_com_a_equipe(client, mariana, 
     detalhe = client.get(f"/api/clientes/{MARIANA_ID}/atendimentos/{chamado['id']}", headers=mariana)
     assert detalhe.status_code == 200 and detalhe.json()["protocolo"] == chamado["protocolo"]
 
+    # Na lista, a foto do cliente vira a capa do chamado; quem não anexou nada fica sem
+    lista = client.get(f"/api/clientes/{MARIANA_ID}/atendimentos", headers=mariana).json()
+    capa = next(a for a in lista if a["id"] == chamado["id"])["foto"]
+    assert capa["nome"] == "botao.png" and capa["url"].startswith("data:image/png;base64,")
+    assert all(a["foto"] is None for a in lista if a["id"] != chamado["id"])
+
     # A equipe responde; o cliente responde de volta (autor vem do token)
     assert (
         client.post(f"/api/atendimentos/{chamado['id']}/mensagens", headers=admin, json={"conteudo": "Vamos trocar."}).status_code
