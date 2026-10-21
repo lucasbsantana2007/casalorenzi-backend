@@ -15,6 +15,8 @@ from sqlalchemy.orm import Session
 
 from src import models as m
 from src.entities.frete import uf_do_cep
+from src.entities.loja import LOJA
+from src.entities.marca import MARCA_DO_SITE
 from src.entities.papeis import ADMINISTRADOR, loja_do_escopo, ve_pedido_da_loja
 from src.entities.pedido import STATUS_PEDIDO, pode_mudar, pontuar_loja
 from src.entities.transferencia import pode_mudar as transferencia_pode_mudar
@@ -75,7 +77,8 @@ def escolher_loja_expedicao(db: Session, itens: list[tuple[int, int]], cep: str)
         cobertos = sum(1 for variacao_id, quantidade in itens if livres.get((loja.id, variacao_id), 0) >= quantidade)
         return pontuar_loja(cobertos, loja.uf == uf)
 
-    lojas = cadastro_repository.lojas(db, somente_ativas=True)  # loja desativada não despacha
+    # Só lojas ativas da marca do site despacham (loja desativada, CD e lojas da Vulto ficam de fora)
+    lojas = cadastro_repository.lojas(db, somente_ativas=True, marca=MARCA_DO_SITE, tipo=LOJA)
     if not lojas:
         raise Conflito("Nenhuma loja disponível para expedir o pedido.")
     return max(lojas, key=lambda loja: (pontos(loja), -loja.id))

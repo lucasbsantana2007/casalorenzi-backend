@@ -169,7 +169,8 @@ SELECT date_trunc('month', p.criado_em AT TIME ZONE 'America/Sao_Paulo') AS mes,
 FROM pedidos p JOIN lojas l ON l.id = p.loja_id
 WHERE l.marca = 'VULTO' AND p.tipo = 'VENDA' AND p.status <> 'CANCELADO'
 GROUP BY 1, 2, 3;
--- (menos SUM(valor_devolvido) de devolucoes nas lojas da Vulto, pelo mês de criada_em)
+-- menos SUM(valor_devolvido) das devoluções nas lojas da Vulto, pelo mês de criada_em
+-- (canal da devolução: loja física → Loja física; CD Cajamar → E-commerce)
 
 -- 2. Estoque em 01/10/2026 por loja/CD e produto
 SELECT l.nome, v.sku, e.quantidade FROM estoques e
@@ -192,24 +193,53 @@ este schema e o de/para acima, para provar que a estrutura os recebe. Nenhuma re
 R$ 6.498.071,30, 15.033 peças e 3.373.251 pontos. As telas de pedidos, atendimentos, clientes, estoque,
 posição em data, devoluções, dashboard e financeiro responderam sem erro com os dados carregados.
 
-## O que fica para depois da carga
+## A carga (`python -m src.migracao_vulto`)
 
-O banco já aceita os dados da Vulto. Estes comportamentos da plataforma ainda tratam tudo como Casa
-Lorenzi e precisam olhar a `marca` quando os dados da Vulto entrarem:
+O código está em `src/migracao_vulto/carga.py` e segue o de/para acima, com as decisões 55 a 66 aplicadas.
+Precisa do repositório da Vulto na máquina e do `openpyxl` (`pip install -r requirements-dev.txt`).
 
-- **Site da Lorenzi:** a vitrine (`/produtos`), a página Lojas (`/lojas`), o checkout e a escolha da loja
-  de expedição devem considerar só a marca LORENZI e as lojas do tipo LOJA.
-- **Estoque zerado automático:** produto novo cria estoque em todas as lojas, e loja nova em todos os
-  produtos. Deve ser só entre lojas e produtos da mesma marca.
-- **Financeiro:** a receita deve somar `total` (com desconto e frete) só de `tipo = VENDA`, e as
-  devoluções sem pedido de origem precisam entrar pela loja.
+```bash
+python -m src.migracao_vulto --origem ../copy.vulto-legado-back --simular   # roda, confere e desfaz
+python -m src.migracao_vulto --origem ../copy.vulto-legado-back             # grava, se tudo bater
+# no banco do Render: DATABASE_URL="<External Database URL>" python -m src.migracao_vulto --origem ...
+```
+
+- Uma transação só. Antes de gravar, confere os três números e as contagens contra a origem; se algo não
+  bater, desfaz tudo e diz o quê.
+- Roda uma vez só: com registros da Vulto no `de_para`, recusa.
+- Grava em lote (cerca de 16 segundos no banco local).
+
+**Conferido no banco local (21/10/2026):** as 130 combinações de mês × loja × canal do faturamento são
+iguais às da origem (Loja física R$ 3.891.612,41 · E-commerce R$ 1.682.985,19 · App R$ 923.473,70); as
+3.388 combinações de loja × SKU do estoque em 01/10 também, e a posição em data passada bate com o histórico;
+o saldo de pontos de cada um dos 3.142 clientes é o da origem.
+
+**Devolução por canal:** o canal da devolução é o da loja em que ela foi registrada (loja física → Loja
+física; CD Cajamar → E-commerce), a mesma regra da Vulto (decisão 7). As 26 devoluções do site não citam a
+venda e ficam no CD; o app não teve devolução.
+
+**Depois da carga:** `python -m src.database.seed --recriar` apaga tudo, inclusive a Vulto. Não rode no banco
+com os dados reais.
+
+## O que já mudou na plataforma
+
+- **Site da Casa Lorenzi só com a marca dele:** visitante e cliente veem só os produtos e as lojas da
+  Lorenzi (`/produtos`, `/produtos/{id}`, `/lojas`); a equipe logada vê as duas marcas. O checkout não
+  vende peça da Vulto, e a expedição sai só de loja da Lorenzi.
+- **Estoque zerado automático só dentro da marca:** produto novo nasce nas lojas da marca dele; loja nova,
+  com as peças da marca dela.
+- **Financeiro:** troca não conta como receita.
+- O número dos pedidos do site continua na sequência `CL-` com `APP-7001205` no banco; e-mail de mais de um
+  cliente não entra nem é reaproveitado em conta nova; pedido e atendimento sem cliente aparecem no painel
+  e na busca; o checkout cobra o preço próprio do SKU.
+
+## O que fica para depois
+
+- **Financeiro com a regra da Vulto:** a tela soma o valor dos itens (sem desconto e sem frete) e só olha as
+  devoluções ligadas a um pedido; o número da diretoria (total com desconto e frete, menos as devoluções pela
+  loja) sai das consultas acima.
 - **Login com CPF** (decisão 53) e a tela de "atualizar cadastro" no primeiro login (decisão 52).
 - **Desempenho:** a lista de pedidos e o financeiro carregam todos os pedidos na memória; com os 18 mil
-  da Vulto, levaram cerca de 3 segundos na carga de teste. Vale filtrar e somar no banco.
+  da Vulto, levam cerca de 3 segundos. Vale filtrar e somar no banco.
 - **Branch `feat/resgate-pontos-vulto-mais`:** cria a mesma tabela `movimentos_pontos` e a coluna
   `pedidos.desconto`. Antes de juntar, a migração dela sai e o código passa a usar as desta.
-
-Já ajustado neste passo, porque quebraria com os dados da Vulto: o número dos pedidos do site continua
-na sequência `CL-` mesmo com `APP-7001205` no banco; e-mail de mais de um cliente não entra nem é
-reaproveitado em conta nova; pedido e atendimento sem cliente aparecem no painel e na busca; o checkout
-cobra o preço próprio do SKU quando ele existe.

@@ -3,6 +3,7 @@ from decimal import Decimal
 from sqlalchemy.orm import Session
 
 from src import models as m
+from src.entities.marca import MARCA_PADRAO
 from src.entities.produto import ESTACAO_PADRAO, ESTACOES, GENEROS
 from src.repositories import cadastro_repository, estoque_repository, produto_repository, sessao
 from src.schemas.produtos import ProdutoEntrada
@@ -13,19 +14,26 @@ from src.utils.erros import Conflito, DadosInvalidos, NaoEncontrado
 from src.utils.texto import chave_texto, corresponde, moeda
 
 
-def listar(db: Session, busca: str | None = None, categoria: str | None = None, ativo: bool | None = None) -> list[m.Produto]:
+def listar(
+    db: Session,
+    busca: str | None = None,
+    categoria: str | None = None,
+    ativo: bool | None = None,
+    marca: str | None = None,
+) -> list[m.Produto]:
+    """marca: só os produtos dessa marca (o site só mostra a da Casa Lorenzi; a equipe vê todas)."""
     produtos = [
         p
         for p in produto_repository.listar(db, categoria=categoria, ativo=ativo)
-        if corresponde(busca, p.nome, p.categoria.nome, *(v.sku for v in p.variacoes))
+        if (not marca or p.marca == marca) and corresponde(busca, p.nome, p.categoria.nome, *(v.sku for v in p.variacoes))
     ]
     produtos.sort(key=lambda p: chave_texto(p.nome))
     return produtos
 
 
-def obter(db: Session, produto_id: int) -> m.Produto:
+def obter(db: Session, produto_id: int, marca: str | None = None) -> m.Produto:
     produto = produto_repository.obter(db, produto_id)
-    if produto is None or produto.removido_em is not None:
+    if produto is None or produto.removido_em is not None or (marca and produto.marca != marca):
         raise NaoEncontrado("Produto não encontrado.")
     return produto
 
@@ -108,7 +116,7 @@ def _salvar_variacoes(db: Session, produto: m.Produto, dados: ProdutoEntrada) ->
         else:
             variacao = m.Variacao(produto=produto, **campos)
             sessao.adicionar(db, variacao)
-            criar_estoques_zerados(db, variacao)
+            criar_estoques_zerados(db, variacao, produto.marca or MARCA_PADRAO)
             alteracoes.append(
                 {
                     "campo": f"Nova variação {campos['sku']}",

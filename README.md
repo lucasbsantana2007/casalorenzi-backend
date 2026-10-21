@@ -261,6 +261,20 @@ são relativas ao momento da carga. Sem `--recriar`, só popula se o banco estiv
 A senha da equipe e dos clientes de demonstração está em `src/database/seed/dados.py`
 (`SENHA_DEMO`). Clientes entram pelo mesmo login (ex.: mariana.costa@gmail.com, CPF 158.813.998-03).
 
+## Carga da Vulto
+
+Os dados da Vulto (rede comprada em 2026) entram uma vez só, com:
+
+```bash
+pip install -r requirements-dev.txt
+python -m src.migracao_vulto --origem ../copy.vulto-legado-back --simular   # roda, confere e desfaz
+python -m src.migracao_vulto --origem ../copy.vulto-legado-back             # grava, se tudo bater
+```
+
+Ela confere o faturamento, o estoque em 01/10/2026 e o passivo de pontos contra a origem antes de gravar, e
+recusa rodar de novo. Detalhes em [docs/banco_uniao_vulto.md](docs/banco_uniao_vulto.md). Depois dela,
+**não rode `python -m src.database.seed --recriar`**: ele apaga todos os dados, inclusive os da Vulto.
+
 ## Migrações (Alembic)
 
 Sempre que mudar algo em `src/models/`:

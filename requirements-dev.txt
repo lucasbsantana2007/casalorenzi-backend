@@ -1,3 +1,5 @@
 -r requirements.txt
 pytest~=9.1.1
 ruff~=0.15.0
+# Só para a carga da Vulto (python -m src.migracao_vulto), que lê as planilhas; a API não usa
+openpyxl~=3.1.5
