@@ -550,3 +550,28 @@ def test_filtro_de_dados_validos_traz_todos_sem_o_limite_da_busca(client, admin)
     _gravar(*(m.Cliente(nome=f"Só sistema {n}", cpf=cpf(400000000 + n)) for n in range(60)))
     assert len(client.get("/api/clientes?busca=Só sistema", headers=admin).json()) == 50
     assert len(client.get("/api/clientes?busca=Só sistema&dadosValidos=false", headers=admin).json()) == 60
+
+
+def test_troca_nao_conta_como_receita(client, admin):
+    """A Vulto lançava a troca como venda nova (decisão 16): ela baixa o estoque, mas não é receita."""
+    hoje = datetime.now(UTC)
+    periodo = f"de={hoje:%Y-%m-%d}&ate={hoje:%Y-%m-%d}&comparar=nenhum"
+    antes = client.get(f"/api/financeiro/resumo?{periodo}", headers=admin).json()
+    with SessionLocal() as db:
+        variacao = db.scalar(select(m.Variacao).limit(1))
+        db.add(
+            m.Pedido(
+                numero="VLT-9",
+                loja_id=1,
+                canal="Loja física",
+                tipo="TROCA",
+                status="ENTREGUE",
+                subtotal=Decimal("100.00"),
+                total=Decimal("100.00"),
+                criado_em=hoje,
+                itens=[m.ItemPedido(variacao_id=variacao.id, quantidade=1, preco_unitario=Decimal("100.00"))],
+            )
+        )
+        db.commit()
+    depois = client.get(f"/api/financeiro/resumo?{periodo}", headers=admin).json()
+    assert (depois["receita"], depois["pedidos"]) == (antes["receita"], antes["pedidos"])

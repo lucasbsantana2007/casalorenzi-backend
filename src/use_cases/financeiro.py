@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 
 from src import models as m
+from src.entities.pedido import TIPOS_SEM_RECEITA
 from src.repositories import (
     atendimento_repository,
     cadastro_repository,
@@ -87,6 +88,8 @@ def resumo(
 
     # Pedido recortado pelos filtros: com filtro de produto, só os itens que batem entram na receita
     def recortar(pedido: m.Pedido) -> dict | None:
+        if pedido.tipo in TIPOS_SEM_RECEITA:  # troca lançada como pedido não é venda (decisão 16 da Vulto)
+            return None
         if filtro_lojas and pedido.loja_id not in filtro_lojas:
             return None
         if filtro_canais and pedido.canal not in filtro_canais:
