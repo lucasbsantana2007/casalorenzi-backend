@@ -3,7 +3,7 @@ from decimal import Decimal
 from sqlalchemy.orm import Session
 
 from src import models as m
-from src.entities.marca import MARCA_PADRAO
+from src.entities.marca import LORENZI, MARCA_PADRAO
 from src.entities.produto import ESTACAO_PADRAO, ESTACOES, GENEROS
 from src.repositories import cadastro_repository, estoque_repository, produto_repository, sessao
 from src.schemas.produtos import ProdutoEntrada
@@ -56,7 +56,7 @@ def imagem(db: Session, produto_id: int) -> m.ImagemProduto:
     return produto.imagem
 
 
-def _validar(db: Session, dados: ProdutoEntrada, produto_id: int | None) -> m.Categoria:
+def _validar(db: Session, dados: ProdutoEntrada, produto_id: int | None, marca: str = LORENZI) -> m.Categoria:
     if not dados.nome.strip():
         raise DadosInvalidos("Informe o nome do produto.")
     if not dados.categoria:
@@ -75,7 +75,7 @@ def _validar(db: Session, dados: ProdutoEntrada, produto_id: int | None) -> m.Ca
         if duplicado.produto.removido_em is not None:
             raise DadosInvalidos(f"O SKU {duplicado.sku} pertence a um produto removido. Use outro SKU.")
         raise DadosInvalidos(f"O SKU {duplicado.sku} já está em uso.")
-    if produto_id is None and not dados.genero:
+    if produto_id is None and not dados.genero and marca == LORENZI:
         raise DadosInvalidos("Selecione a coleção do produto: Masculino ou Feminino.")
     if dados.genero is not None and dados.genero not in GENEROS:
         raise DadosInvalidos("Coleção inválida. Use Masculino ou Feminino.")
@@ -166,9 +166,12 @@ def _campos_log(produto: m.Produto) -> dict:
     }
 
 
-def criar(db: Session, dados: ProdutoEntrada, usuario: m.Usuario) -> m.Produto:
-    categoria = _validar(db, dados, None)
+def criar(db: Session, dados: ProdutoEntrada, usuario: m.Usuario, escopo: str | None = None) -> m.Produto:
+    """escopo: marca do Administrador (a peça é sempre da marca dele); None = grupo, escolhe em dados.marca."""
+    marca = escopo or dados.marca or MARCA_PADRAO
+    categoria = _validar(db, dados, None, marca)
     produto = m.Produto(
+        marca=marca,
         nome=dados.nome.strip(),
         categoria=categoria,
         preco_base=dados.preco_base,
@@ -199,7 +202,7 @@ def atualizar(db: Session, produto_id: int, dados: ProdutoEntrada, usuario: m.Us
     produto = obter(db, produto_id)
     nome_anterior = produto.nome
     antes = _campos_log(produto)
-    produto.categoria = _validar(db, dados, produto.id)
+    produto.categoria = _validar(db, dados, produto.id, produto.marca)
     foto = _aplicar_imagem(produto, dados)
     produto.nome = dados.nome.strip()
     produto.preco_base = dados.preco_base

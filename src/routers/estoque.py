@@ -7,7 +7,8 @@ from sqlalchemy.orm import Session
 
 from src import models as m
 from src.database.connection import get_db
-from src.middlewares.autenticacao import exigir_modulo
+from src.entities.marca import na_marca
+from src.middlewares.autenticacao import conferir_marca, escopo_marca, exigir_modulo
 from src.schemas.estoque import MovimentacaoEntrada, estoque_saida, movimentacao_saida
 from src.use_cases import estoque
 
@@ -24,9 +25,10 @@ def listar_estoque(
     variacaoId: int | None = None,
     db: Session = Depends(get_db),
     _: m.Usuario = Depends(acesso),
+    marca: str | None = Depends(escopo_marca),
 ):
     itens = estoque.listar(db, busca=busca, loja_id=lojaId, categoria=categoria, status=status, variacao_id=variacaoId)
-    return [estoque_saida(e) for e in itens]
+    return [estoque_saida(e) for e in itens if na_marca(marca, e.loja.marca)]
 
 
 @router.get("/estoque/posicao")
@@ -36,15 +38,23 @@ def posicao_em_data(
     busca: str | None = None,
     db: Session = Depends(get_db),
     _: m.Usuario = Depends(acesso),
+    marca: str | None = Depends(escopo_marca),
 ):
     """Saldo de cada item ao final do dia informado (aaaa-mm-dd)."""
     itens = estoque.posicao_em_data(db, data, lojaId, busca)
-    return {"data": data, "itens": [{**estoque_saida(e), "quantidadeNaData": saldo} for e, saldo in itens]}
+    return {
+        "data": data,
+        "itens": [{**estoque_saida(e), "quantidadeNaData": saldo} for e, saldo in itens if na_marca(marca, e.loja.marca)],
+    }
 
 
 @router.get("/estoque/{estoque_id}")
-def obter_estoque(estoque_id: int, db: Session = Depends(get_db), _: m.Usuario = Depends(acesso)):
-    return estoque_saida(estoque.obter(db, estoque_id))
+def obter_estoque(
+    estoque_id: int, db: Session = Depends(get_db), _: m.Usuario = Depends(acesso), marca: str | None = Depends(escopo_marca)
+):
+    item = estoque.obter(db, estoque_id)
+    conferir_marca(marca, item.loja.marca, "Item de estoque não encontrado.")
+    return estoque_saida(item)
 
 
 @router.get("/movimentacoes")
@@ -57,14 +67,21 @@ def listar_movimentacoes(
     busca: str | None = None,
     db: Session = Depends(get_db),
     _: m.Usuario = Depends(acesso),
+    marca: str | None = Depends(escopo_marca),
 ):
     movimentacoes = estoque.listar_movimentacoes(db, estoque_id=estoqueId, loja_id=lojaId, tipo=tipo, de=de, ate=ate, busca=busca)
-    return [movimentacao_saida(mov) for mov in movimentacoes]
+    return [movimentacao_saida(mov) for mov in movimentacoes if na_marca(marca, mov.estoque.loja.marca)]
 
 
 @router.post("/movimentacoes", status_code=201)
-def registrar_movimentacao(dados: MovimentacaoEntrada, db: Session = Depends(get_db), usuario: m.Usuario = Depends(acesso)):
-    """Lançamento manual (entrada, venda, devolução ou ajuste). O autor vem do token."""
+def registrar_movimentacao(
+    dados: MovimentacaoEntrada,
+    db: Session = Depends(get_db),
+    usuario: m.Usuario = Depends(acesso),
+    marca: str | None = Depends(escopo_marca),
+):
+    """Lançamento manual (entrada, venda, devolução ou ajuste). O autor vem do token. Só na marca de quem lança."""
+    conferir_marca(marca, estoque.obter(db, dados.estoque_id).loja.marca, "Item de estoque não encontrado.")
     mov = estoque.registrar_movimentacao(
         db, estoque_id=dados.estoque_id, tipo=dados.tipo, quantidade=dados.quantidade, origem=dados.origem, usuario_id=usuario.id
     )

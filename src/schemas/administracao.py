@@ -10,6 +10,8 @@ class FuncionarioEntrada(Entrada):
     email: str = ""
     papel: str = ""
     loja_id: int | None = None
+    # LORENZI, VULTO ou GRUPO (só Administrador). Lojista e Operador ficam com a marca da loja
+    marca: str | None = None
 
 
 class StatusFuncionarioEntrada(Entrada):
@@ -24,6 +26,8 @@ class LojaEntrada(Entrada):
     telefone: str = ""
     horarios: list[str] = Field(default_factory=list)
     ativa: bool = True
+    # Só no cadastro (depois não muda): do Administrador da marca, sempre a dele
+    marca: str | None = None
 
 
 def funcionario_saida(usuario: m.Usuario) -> dict:
@@ -34,6 +38,7 @@ def funcionario_saida(usuario: m.Usuario) -> dict:
         "nome": usuario.nome,
         "email": usuario.email,
         "papel": usuario.papel,
+        "marca": usuario.marca,
         "lojaId": usuario.loja_id,
         "loja": {"id": loja.id, "nome": loja.nome} if loja else None,
         "ativo": usuario.ativo,

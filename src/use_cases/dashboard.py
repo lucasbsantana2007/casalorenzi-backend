@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from src import models as m
 from src.entities.estoque import status_estoque
+from src.entities.marca import na_marca
 from src.entities.papeis import LOJISTA
 from src.repositories import (
     atendimento_repository,
@@ -24,22 +25,30 @@ MOVIMENTACOES_RECENTES = 8
 ATENDIMENTOS_RECENTES = 5
 
 
-def resumo(db: Session, usuario: m.Usuario, loja_id: int | None) -> dict:
-    """Lojistas veem sempre a própria loja, qualquer que seja o filtro pedido."""
+def resumo(db: Session, usuario: m.Usuario, loja_id: int | None, marca: str | None = None) -> dict:
+    """Lojistas veem sempre a própria loja, qualquer que seja o filtro pedido. marca: só a dessa marca
+    (escopo do funcionário; None = as duas, para o Administrador do grupo)."""
     if usuario.papel == LOJISTA and usuario.loja_id:
         loja_id = usuario.loja_id
 
-    estoques = estoque_repository.listar(db, loja_id=loja_id)
+    estoques = [e for e in estoque_repository.listar(db, loja_id=loja_id) if na_marca(marca, e.loja.marca)]
     ativos = [e for e in estoques if e.variacao.produto.ativo]
     status = {e.id: status_estoque(e.quantidade, e.quantidade_min) for e in ativos}
-    abertos = atendimento_repository.em_aberto(db, loja_id)
-    em_transito = sorted(transferencia_repository.listar(db, status="EM_TRANSITO", loja_id=loja_id), key=lambda t: t.id)
-    pendentes = transferencia_repository.listar(db, status="SOLICITADA", loja_id=loja_id)
+    abertos = [a for a in atendimento_repository.em_aberto(db, loja_id) if na_marca(marca, a.marca)]
+
+    def da_marca(lista):
+        return [t for t in lista if na_marca(marca, t.loja_origem.marca)]
+
+    em_transito = sorted(da_marca(transferencia_repository.listar(db, status="EM_TRANSITO", loja_id=loja_id)), key=lambda t: t.id)
+    pendentes = da_marca(transferencia_repository.listar(db, status="SOLICITADA", loja_id=loja_id))
+    lojas = [
+        loja for loja in cadastro_repository.lojas(db) if (not loja_id or loja.id == loja_id) and na_marca(marca, loja.marca)
+    ]
     momento = agora()
 
     indicadores = {
         "estoqueTotal": sum(e.quantidade for e in ativos),
-        "produtosAtivos": len(produto_repository.listar(db, ativo=True)),
+        "produtosAtivos": sum(1 for p in produto_repository.listar(db, ativo=True) if na_marca(marca, p.marca)),
         "variacoesAtivas": len({e.variacao_id for e in ativos}),
         "itensEstoqueBaixo": sum(1 for e in ativos if status[e.id] == "BAIXO"),
         "itensSemEstoque": sum(1 for e in ativos if status[e.id] == "SEM_ESTOQUE"),
@@ -47,10 +56,13 @@ def resumo(db: Session, usuario: m.Usuario, loja_id: int | None) -> dict:
         "atendimentosSemResponsavel": sum(1 for a in abertos if a.responsavel_id is None),
         "transferenciasEmTransito": len(em_transito),
         "transferenciasPendentes": len(pendentes),
-        "vendas7d": estoque_repository.pecas_vendidas_desde(db, momento - timedelta(days=7), loja_id),
+        "vendas7d": (
+            estoque_repository.pecas_vendidas_desde(db, momento - timedelta(days=7), loja_id)
+            if marca is None
+            else sum(estoque_repository.pecas_vendidas_desde(db, momento - timedelta(days=7), loja.id) for loja in lojas)
+        ),
     }
 
-    lojas = [loja for loja in cadastro_repository.lojas(db) if not loja_id or loja.id == loja_id]
     resumo_por_loja = []
     for loja in lojas:
         itens = [e for e in ativos if e.loja_id == loja.id]
@@ -104,7 +116,11 @@ def resumo(db: Session, usuario: m.Usuario, loja_id: int | None) -> dict:
         "alertas": alertas,
         "movimentacoesRecentes": [
             movimentacao_saida(mov)
-            for mov in estoque_repository.listar_movimentacoes(db, loja_id=loja_id, limite=MOVIMENTACOES_RECENTES)
+            for mov in [
+                mov
+                for mov in estoque_repository.listar_movimentacoes(db, loja_id=loja_id, limite=MOVIMENTACOES_RECENTES * 20)
+                if na_marca(marca, mov.estoque.loja.marca)
+            ][:MOVIMENTACOES_RECENTES]
         ],
         "atendimentosRecentes": [atendimento_saida(a, ultimas.get(a.id)) for a in recentes],
     }

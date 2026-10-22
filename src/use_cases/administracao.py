@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 from src import models as m
 from src.config.settings import LINK_SENHA_NA_RESPOSTA
 from src.entities.cliente import email_valido, normalizar_email
+from src.entities.marca import GRUPO, MARCA_PADRAO, MARCAS, MARCAS_EQUIPE, na_marca
 from src.entities.papeis import ADMINISTRADOR, PAPEIS
 from src.integrations import modelos_email
 from src.integrations.email import enviar as enviar_email
@@ -60,7 +61,12 @@ def listar_funcionarios(
     return lista
 
 
-def _validar_funcionario(db: Session, dados, usuario_id: int | None = None) -> dict:
+NOMES_MARCAS = {"LORENZI": "Casa Lorenzi", "VULTO": "Vulto", "GRUPO": "Grupo (as duas marcas)"}
+
+
+def _validar_funcionario(db: Session, dados, usuario_id: int | None = None, escopo: str | None = None) -> dict:
+    """escopo: marca do Administrador que cadastra (None = grupo). Quem é de uma marca só cadastra
+    funcionários dela, nunca do grupo."""
     nome = (dados.nome or "").strip()
     if not nome:
         raise DadosInvalidos("Informe o nome.")
@@ -78,10 +84,15 @@ def _validar_funcionario(db: Session, dados, usuario_id: int | None = None) -> d
     loja_id = None
     if dados.papel != ADMINISTRADOR:
         loja = cadastro_repository.loja(db, dados.loja_id) if dados.loja_id else None
-        if loja is None:
+        if loja is None or not na_marca(escopo, loja.marca):
             raise DadosInvalidos("Selecione a loja deste funcionário.")
         loja_id = loja.id
-    return {"nome": nome, "email": email, "papel": dados.papel, "loja_id": loja_id}
+        marca = loja.marca  # Lojista e Operador: a marca da loja em que trabalham
+    else:
+        marca = escopo or dados.marca or GRUPO
+        if marca not in MARCAS_EQUIPE:
+            raise DadosInvalidos("Selecione a marca: Casa Lorenzi, Vulto ou as duas (grupo).")
+    return {"nome": nome, "email": email, "papel": dados.papel, "loja_id": loja_id, "marca": marca}
 
 
 def _nome_da_loja(db: Session, loja_id: int | None) -> str:
@@ -95,9 +106,9 @@ def _enviar_convite(usuario: m.Usuario, link: str) -> str | None:
     return link if LINK_SENHA_NA_RESPOSTA else None
 
 
-def criar_funcionario(db: Session, autor: m.Usuario, dados) -> tuple[m.Usuario, str | None]:
+def criar_funcionario(db: Session, autor: m.Usuario, dados, escopo: str | None = None) -> tuple[m.Usuario, str | None]:
     """(funcionário, link do convite só na demonstração)."""
-    campos = _validar_funcionario(db, dados)
+    campos = _validar_funcionario(db, dados, escopo=escopo)
     usuario = m.Usuario(**campos, senha_hash=None, ativo=True, criado_em=agora())
     sessao.adicionar(db, usuario)
     sessao.gerar_ids(db)
@@ -122,18 +133,28 @@ def _funcionario(db: Session, usuario_id: int) -> m.Usuario:
     return usuario
 
 
-def atualizar_funcionario(db: Session, autor: m.Usuario, usuario_id: int, dados) -> m.Usuario:
+def atualizar_funcionario(db: Session, autor: m.Usuario, usuario_id: int, dados, escopo: str | None = None) -> m.Usuario:
     usuario = _funcionario(db, usuario_id)
-    campos = _validar_funcionario(db, dados, usuario.id)
+    campos = _validar_funcionario(db, dados, usuario.id, escopo)
     deixa_de_ser_admin = usuario.papel == ADMINISTRADOR and campos["papel"] != ADMINISTRADOR
     if deixa_de_ser_admin and usuario.ativo and not usuario_repository.administradores_ativos(db, exceto_id=usuario.id):
         raise DadosInvalidos(MINIMO_DE_ADMIN)
-    antes = {"nome": usuario.nome, "email": usuario.email, "papel": usuario.papel, "loja_id": usuario.loja_id}
+    antes = {
+        "nome": usuario.nome,
+        "email": usuario.email,
+        "papel": usuario.papel,
+        "loja_id": usuario.loja_id,
+        "marca": usuario.marca,
+    }
     alteracoes = log_acoes.mudancas(
         antes,
         campos,
-        {"nome": "Nome", "email": "E-mail", "papel": "Cargo", "loja_id": "Loja"},
-        {"papel": lambda v: NOMES_PAPEIS.get(v, "—"), "loja_id": lambda v: _nome_da_loja(db, v)},
+        {"nome": "Nome", "email": "E-mail", "papel": "Cargo", "loja_id": "Loja", "marca": "Marca"},
+        {
+            "papel": lambda v: NOMES_PAPEIS.get(v, "—"),
+            "loja_id": lambda v: _nome_da_loja(db, v),
+            "marca": lambda v: NOMES_MARCAS.get(v, "—"),
+        },
     )
     for campo, valor in campos.items():
         setattr(usuario, campo, valor)
@@ -249,8 +270,12 @@ _ROTULOS_LOJA = {
 _FORMATOS_LOJA = {"ativa": lambda v: "Sim" if v else "Não"}
 
 
-def criar_loja(db: Session, autor: m.Usuario, dados) -> m.Loja:
-    loja = m.Loja(**_validar_loja(db, dados))
+def criar_loja(db: Session, autor: m.Usuario, dados, escopo: str | None = None) -> m.Loja:
+    """escopo: marca do Administrador (a loja é dela); o do grupo escolhe em dados.marca (padrão Casa Lorenzi)."""
+    marca = escopo or dados.marca or MARCA_PADRAO
+    if marca not in MARCAS:
+        raise DadosInvalidos("Selecione a marca da loja.")
+    loja = m.Loja(**_validar_loja(db, dados), marca=marca)
     sessao.adicionar(db, loja)
     sessao.gerar_ids(db)
     # Estoque zerado das variações da mesma marca, para a loja já poder receber transferências

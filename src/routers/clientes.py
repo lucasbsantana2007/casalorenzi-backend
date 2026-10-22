@@ -10,7 +10,8 @@ from sqlalchemy.orm import Session
 
 from src import models as m
 from src.database.connection import get_db
-from src.middlewares.autenticacao import Sessao, exigir_cliente_ou_modulo, exigir_modulo
+from src.entities.marca import na_marca
+from src.middlewares.autenticacao import Sessao, escopo_marca, exigir_cliente_ou_modulo, exigir_modulo
 from src.routers.atendimentos import detalhe_saida, lista_saida
 from src.schemas.clientes import AcessoEntrada, cliente_saida
 from src.schemas.fidelidade import pontos_saida
@@ -65,9 +66,12 @@ def liberar_acesso(cliente_id: str, dados: AcessoEntrada, db: Session = Depends(
 
 
 @router.get("/{cliente_id}/pedidos")
-def listar_pedidos(cliente_id: str, db: Session = Depends(get_db), sessao: Sessao = Depends(acesso)):
+def listar_pedidos(
+    cliente_id: str, db: Session = Depends(get_db), sessao: Sessao = Depends(acesso), marca: str | None = Depends(escopo_marca)
+):
+    """O cliente é um só nas duas marcas; a equipe de uma marca vê só os pedidos dela."""
     cliente = _cliente(db, sessao, cliente_id)
-    return [pedido_saida(p) for p in clientes.pedidos(db, cliente.id)]
+    return [pedido_saida(p) for p in clientes.pedidos(db, cliente.id) if na_marca(marca, p.loja.marca)]
 
 
 @router.get("/{cliente_id}/pedidos/{numero}")
@@ -78,9 +82,11 @@ def consultar_pedido(cliente_id: str, numero: str, db: Session = Depends(get_db)
 
 
 @router.get("/{cliente_id}/atendimentos")
-def listar_atendimentos(cliente_id: str, db: Session = Depends(get_db), sessao: Sessao = Depends(acesso)):
+def listar_atendimentos(
+    cliente_id: str, db: Session = Depends(get_db), sessao: Sessao = Depends(acesso), marca: str | None = Depends(escopo_marca)
+):
     cliente = _cliente(db, sessao, cliente_id)
-    return lista_saida(db, clientes.atendimentos(db, cliente.id))
+    return lista_saida(db, [a for a in clientes.atendimentos(db, cliente.id) if na_marca(marca, a.marca)])
 
 
 @router.get("/{cliente_id}/atendimentos/{atendimento_id}")

@@ -66,8 +66,10 @@ def resumo(
     canais: str | None,
     categorias: str | None,
     generos: str | None,
+    marca: str | None = None,
 ) -> dict:
-    """Filtros em listas separadas por vírgula (ex.: lojas=1,3&canais=E-commerce)."""
+    """Filtros em listas separadas por vírgula (ex.: lojas=1,3&canais=E-commerce). marca: só as lojas
+    dessa marca (escopo do funcionário; None = as duas)."""
     dia_inicial = ler_data(de, "de") or hoje() - timedelta(days=29)
     dia_final = ler_data(ate, "ate") or hoje()
     if dia_final < dia_inicial:
@@ -79,6 +81,10 @@ def resumo(
         filtro_lojas = [int(x) for x in lista_csv(lojas)]
     except ValueError:
         raise DadosInvalidos("Lista de lojas inválida.") from None
+    if marca:
+        da_marca = [loja.id for loja in cadastro_repository.lojas(db, marca=marca)]
+        filtro_lojas = [x for x in filtro_lojas if x in da_marca] if filtro_lojas else da_marca
+        filtro_lojas = filtro_lojas or [0]  # nenhuma loja da marca no filtro: nada entra
     filtro_canais = lista_csv(canais)
     filtro_categorias = lista_csv(categorias)
     filtro_generos = lista_csv(generos)

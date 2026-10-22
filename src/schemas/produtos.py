@@ -1,3 +1,5 @@
+from typing import Literal
+
 from pydantic import Field
 
 from src import models as m
@@ -23,6 +25,9 @@ class ProdutoEntrada(Entrada):
     # ou Atemporal (padrão). Na edição, só mudam se forem enviadas
     genero: str | None = None
     estacao: str | None = None
+    # Marca da peça, só no cadastro (depois não muda). Administrador da marca: sempre a dele;
+    # Administrador do grupo escolhe (sem ela, Casa Lorenzi). A Vulto não separa por coleção (gênero)
+    marca: Literal["LORENZI", "VULTO"] | None = None
     # Textos da página do produto: na edição, só mudam se forem enviados
     descricao: str | None = None
     composicao: str | None = None

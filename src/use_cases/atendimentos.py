@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from src import models as m
 from src.entities.atendimento import DESCRICAO_MINIMA, EM_ABERTO, protocolo, status_apos_mensagem
 from src.entities.cliente import cpf_do_id
+from src.entities.marca import MARCA_PADRAO, MARCAS
 from src.entities.papeis import EQUIPE
 from src.repositories import (
     atendimento_repository,
@@ -118,14 +119,18 @@ def abrir_para_cliente(
         if pedido is None or pedido.cliente_id != cliente.id:
             raise DadosInvalidos("Pedido não encontrado entre os pedidos do cliente.")
 
+    # Marca do chamado: a do pedido; sem pedido, a de quem abriu pela equipe (o grupo e o próprio
+    # cliente abrem na Casa Lorenzi, a loja do site). Sem pedido na Vulto: atendimento central (sem loja)
+    marca = pedido.loja.marca if pedido else (aberto_por.marca if aberto_por and aberto_por.marca in MARCAS else MARCA_PADRAO)
     momento = agora()
     atendimento = m.Atendimento(
+        marca=marca,
         protocolo=f"TMP-{uuid.uuid4().hex[:12]}",  # trocado pelo protocolo definitivo assim que o id existe
         cliente_id=cliente.id,
         tipo_solicitacao_id=tipo.id,
         status="ABERTO",
         pedido_id=pedido.id if pedido else None,
-        loja_id=pedido.loja_id if pedido else (cliente.loja_preferida_id or 1),
+        loja_id=pedido.loja_id if pedido else ((cliente.loja_preferida_id or 1) if marca == MARCA_PADRAO else None),
         criado_em=momento,
         atualizado_em=momento,
     )

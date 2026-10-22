@@ -5,9 +5,11 @@ from sqlalchemy.orm import Session
 
 from src import models as m
 from src.database.connection import get_db
+from src.entities.marca import GRUPO
 from src.middlewares.autenticacao import exigir_modulo
 from src.schemas.comum import Entrada
 from src.use_cases import frete
+from src.utils.erros import SemPermissao
 
 router = APIRouter(prefix="/frete", tags=["Frete"])
 acesso_admin = exigir_modulo("administracao")
@@ -33,6 +35,8 @@ def obter_config(db: Session = Depends(get_db), _: m.Usuario = Depends(acesso_ad
 @router.put("/config")
 def salvar_config(dados: dict = Body(...), db: Session = Depends(get_db), usuario: m.Usuario = Depends(acesso_admin)):
     """Administrador. Valida tudo antes de gravar; cada valor alterado vai para o log."""
+    if usuario.marca != GRUPO:
+        raise SemPermissao("O frete vale para o site das duas marcas: só o Administrador do grupo altera.")
     return frete.salvar(db, usuario, dados)
 
 
