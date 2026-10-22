@@ -150,6 +150,7 @@ Todas sob o prefixo `/api`. As rotas internas exigem `Authorization: Bearer <tok
 | POST | `/auth/cadastro` (conta do cliente; já devolve a sessão), `/auth/esqueci-senha`, `/auth/redefinir-senha` | público |
 | GET | `/lojas` (com endereço, telefone, horários e `ativa`), `/categorias`, `/tipos-solicitacao` | público |
 | GET, PUT · PUT · POST | `/conta` · `/conta/senha` · `/conta/exclusao` (configurações da conta) | o próprio cliente |
+| GET | `/conta/pontos` (Vulto+: saldo, categoria, valor em R$, próximos vencimentos e extrato) | o próprio cliente |
 | GET | `/frete/condicoes` (valores e prazos, sem custo) | público |
 | GET, PUT | `/frete/config` · POST `/frete/simulacao` | administrador |
 | GET, POST | `/admin/funcionarios` · PUT `/admin/funcionarios/{id}` · PATCH `/admin/funcionarios/{id}/status` · POST `/admin/funcionarios/{id}/convite` | administrador |
@@ -163,7 +164,7 @@ Todas sob o prefixo `/api`. As rotas internas exigem `Authorization: Bearer <tok
 | GET | `/estoque/posicao?data&lojaId&busca` | equipe |
 | GET, POST | `/movimentacoes` (filtros: `estoqueId&lojaId&tipo&de&ate&busca`) | equipe |
 | GET, POST | `/transferencias` · PATCH `/transferencias/{id}` (status) | administrador, operador |
-| POST | `/checkout` (o cliente vem do token) | cliente logado |
+| POST | `/checkout` (o cliente vem do token; `pontos` usa o saldo Vulto+ como desconto) | cliente logado |
 | GET | `/pedidos?status&lojaId&canal&busca`, `/pedidos/{id}` | equipe |
 | PATCH | `/pedidos/{id}` (loja de expedição ou status) | equipe |
 | GET | `/pedidos/{id}/pagamentos` | equipe |
@@ -172,7 +173,7 @@ Todas sob o prefixo `/api`. As rotas internas exigem `Authorization: Bearer <tok
 | POST | `/atendimentos` (cliente: abre para si; equipe: em nome do cliente), `/atendimentos/{id}/mensagens` (aceita `anexo`) | administrador, lojista, cliente dono |
 | POST | `/clientes/{id}/acesso` (cadastra o e-mail do cliente sem e-mail e manda o link para criar a senha) | administrador, lojista |
 | GET | `/clientes?busca&dadosValidos` (`dadosValidos=false`: todos com cadastro a corrigir, com o motivo) | administrador, lojista |
-| GET | `/clientes/{id}`, `/clientes/{id}/pedidos`, `/clientes/{id}/pedidos/{numero}`, `/clientes/{id}/atendimentos`, `/clientes/{id}/atendimentos/{aid}` | administrador, lojista, o próprio cliente |
+| GET | `/clientes/{id}`, `/clientes/{id}/pedidos`, `/clientes/{id}/pedidos/{numero}`, `/clientes/{id}/atendimentos`, `/clientes/{id}/atendimentos/{aid}`, `/clientes/{id}/pontos` | administrador, lojista, o próprio cliente |
 | GET | `/dashboard/resumo?lojaId` | equipe |
 | GET | `/financeiro/resumo?de&ate&comparar&agrupar&lojas&canais&categorias&generos` | administrador |
 
@@ -261,6 +262,20 @@ são relativas ao momento da carga. Sem `--recriar`, só popula se o banco estiv
 
 A senha da equipe e dos clientes de demonstração está em `src/database/seed/dados.py`
 (`SENHA_DEMO`). Clientes entram pelo mesmo login (ex.: mariana.costa@gmail.com, CPF 158.813.998-03).
+
+## Vulto+ (pontos)
+
+Regras em `src/entities/fidelidade.py`, decisões 67 a 69 em `docs/registro_decisoes_uniao.md`:
+
+- **Ganho:** R$ 1 em produtos = 1 ponto na loja física e 2 no site e no app (o frete não conta), mais o
+  bônus da categoria antes da compra: Ouro +25%, Vip +50%. Compras da Casa Lorenzi também ganham.
+- **Quando:** só com o pagamento aprovado. Pedido cancelado perde os pontos ganhos e devolve os usados;
+  devolução tira os pontos das peças devolvidas (o saldo nunca fica negativo).
+- **Resgate no checkout:** 100 pontos = R$ 5,00, a partir de 100 e em múltiplos de 100, sem passar do
+  saldo nem do valor dos produtos, e só com pelo menos R$ 500 em produtos (sem o frete).
+- **Vencimento:** 12 meses em todas as categorias; o resgate gasta primeiro os mais antigos. O que vence
+  é lançado como `VENCIMENTO` na primeira consulta ou compra do cliente depois da data.
+- **Categoria** pelo saldo válido: Bronze até 1.500, Prata até 5.000, Ouro até 9.999, Vip a partir de 10.000.
 
 ## Carga da Vulto
 
