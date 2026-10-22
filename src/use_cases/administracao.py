@@ -39,7 +39,7 @@ UFS = (
     "AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG", "PA",
     "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO",
 )  # fmt: skip
-MINIMO_DE_ADMIN = "É preciso manter pelo menos um Administrador ativo."
+MINIMO_DE_ADMIN = "É preciso manter pelo menos um Administrador do grupo ativo."
 
 
 # ---------- Funcionários ----------
@@ -136,7 +136,12 @@ def _funcionario(db: Session, usuario_id: int) -> m.Usuario:
 def atualizar_funcionario(db: Session, autor: m.Usuario, usuario_id: int, dados, escopo: str | None = None) -> m.Usuario:
     usuario = _funcionario(db, usuario_id)
     campos = _validar_funcionario(db, dados, usuario.id, escopo)
-    deixa_de_ser_admin = usuario.papel == ADMINISTRADOR and campos["papel"] != ADMINISTRADOR
+    # Deixa de ser Administrador do grupo: muda de cargo ou passa a cuidar de uma marca só
+    deixa_de_ser_admin = (
+        usuario.papel == ADMINISTRADOR
+        and usuario.marca == GRUPO
+        and (campos["papel"] != ADMINISTRADOR or campos["marca"] != GRUPO)
+    )
     if deixa_de_ser_admin and usuario.ativo and not usuario_repository.administradores_ativos(db, exceto_id=usuario.id):
         raise DadosInvalidos(MINIMO_DE_ADMIN)
     antes = {
@@ -177,7 +182,12 @@ def alterar_status_funcionario(db: Session, autor: m.Usuario, usuario_id: int, a
     usuario = _funcionario(db, usuario_id)
     if not ativo and usuario.id == autor.id:
         raise DadosInvalidos("Você não pode desativar a sua própria conta.")
-    if not ativo and usuario.papel == ADMINISTRADOR and not usuario_repository.administradores_ativos(db, exceto_id=usuario.id):
+    if (
+        not ativo
+        and usuario.papel == ADMINISTRADOR
+        and usuario.marca == GRUPO
+        and not usuario_repository.administradores_ativos(db, exceto_id=usuario.id)
+    ):
         raise DadosInvalidos(MINIMO_DE_ADMIN)
     if usuario.ativo == ativo:
         return usuario
