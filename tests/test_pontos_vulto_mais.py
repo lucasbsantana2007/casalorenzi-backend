@@ -75,6 +75,7 @@ def test_compra_no_site_ganha_o_dobro_sobre_os_produtos(client, mariana):
     pontos = _pontos(client, mariana)
     esperado = round(sacola[2] * 2)  # site = dobro; o frete não conta; sem categoria, sem bônus
     assert pontos["saldo"] == esperado
+    assert pedido["pontosGanhos"] == esperado
     assert pontos["categoria"] in ("Bronze", "Prata", "Ouro", "Vip")
     credito = pontos["extrato"][0]
     assert credito["tipo"] == "CREDITO" and credito["quantidade"] == esperado
