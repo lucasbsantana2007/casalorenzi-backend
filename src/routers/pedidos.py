@@ -6,8 +6,10 @@ from sqlalchemy.orm import Session
 
 from src import models as m
 from src.database.connection import get_db
+from src.entities.marca import na_marca
 from src.entities.papeis import ADMINISTRADOR
-from src.middlewares.autenticacao import exigir_modulo
+from src.middlewares.autenticacao import conferir_marca, escopo_marca, exigir_modulo
+from src.repositories import cadastro_repository
 from src.schemas.pedidos import PedidoAtualizacao, pedido_admin_saida
 from src.use_cases import pedidos
 
@@ -27,24 +29,41 @@ def listar(
     busca: str | None = None,
     db: Session = Depends(get_db),
     usuario: m.Usuario = Depends(acesso),
+    marca: str | None = Depends(escopo_marca),
 ):
     """busca: número do pedido, nome ou e-mail do cliente. Mais recentes primeiro.
     Lojista e Operador recebem só os pedidos que a própria loja expede (o lojaId é ignorado)."""
-    return [_saida(db, p, usuario) for p in pedidos.listar(db, usuario, status=status, loja_id=lojaId, canal=canal, busca=busca)]
+    lista = pedidos.listar(db, usuario, status=status, loja_id=lojaId, canal=canal, busca=busca)
+    return [_saida(db, p, usuario) for p in lista if na_marca(marca, p.loja.marca)]
 
 
 @router.get("/{pedido_id}")
-def obter(pedido_id: int, db: Session = Depends(get_db), usuario: m.Usuario = Depends(acesso)):
-    """O custo do frete só vem para o Administrador. Pedido de outra loja (Lojista e Operador): 404."""
-    return _saida(db, pedidos.obter(db, pedido_id, usuario), usuario)
+def obter(
+    pedido_id: int, db: Session = Depends(get_db), usuario: m.Usuario = Depends(acesso), marca: str | None = Depends(escopo_marca)
+):
+    """O custo do frete só vem para o Administrador. Pedido de outra loja (Lojista e Operador) ou de
+    outra marca: 404."""
+    pedido = pedidos.obter(db, pedido_id, usuario)
+    conferir_marca(marca, pedido.loja.marca, "Pedido não encontrado.")
+    return _saida(db, pedido, usuario)
 
 
 @router.patch("/{pedido_id}")
-def atualizar(pedido_id: int, dados: PedidoAtualizacao, db: Session = Depends(get_db), usuario: m.Usuario = Depends(acesso)):
+def atualizar(
+    pedido_id: int,
+    dados: PedidoAtualizacao,
+    db: Session = Depends(get_db),
+    usuario: m.Usuario = Depends(acesso),
+    marca: str | None = Depends(escopo_marca),
+):
     """{ lojaId } troca a loja de expedição (só o Administrador, antes do envio; os demais: 403).
     { status: 'ENVIADO', codigoRastreio }
     exige todas as peças na loja e baixa o estoque. { status: 'ENTREGUE' } e { status: 'CANCELADO' }
     (estorna o pagamento). Fora do fluxo: 409."""
+    conferir_marca(marca, pedidos.obter(db, pedido_id, usuario).loja.marca, "Pedido não encontrado.")
+    if dados.loja_id is not None:
+        loja = cadastro_repository.loja(db, dados.loja_id)
+        conferir_marca(marca, loja.marca if loja else None, "Loja não encontrada.")
     pedido = pedidos.atualizar(
         db, pedido_id, usuario, loja_id=dados.loja_id, status=dados.status, codigo_rastreio=dados.codigo_rastreio
     )

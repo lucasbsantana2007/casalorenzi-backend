@@ -70,7 +70,7 @@ def test_funcionario_novo_entra_so_depois_de_criar_a_senha_pelo_convite(client, 
     depois = _login(client, "paula.vieira@casalorenzi.com.br", "senha-nova")
     assert depois.status_code == 200 and depois.json()["usuario"]["papel"] == "LOJISTA"
 
-    lista = client.get("/api/admin/funcionarios?busca=paula", headers=admin).json()
+    lista = client.get("/api/admin/funcionarios?busca=paula.vieira", headers=admin).json()
     assert [f["convitePendente"] for f in lista] == [False]
     # Já criou a senha: não há convite para reenviar
     assert client.post(f"/api/admin/funcionarios/{funcionario['id']}/convite", headers=admin).status_code == 422

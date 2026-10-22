@@ -67,7 +67,12 @@ USUARIOS = [
     (6, "Diego Almeida", "diego.almeida@casalorenzi.com.br", "OPERADOR", 1),
     (7, "Carla Nunes", "carla.nunes@casalorenzi.com.br", "OPERADOR", 3),
     (8, "Marina Duarte", "marina.duarte@casalorenzi.com.br", "LOJISTA", 5),
+    # Administradora da Vulto: só vê e altera a Vulto (as lojas e a equipe da Vulto entram pela carga)
+    (9, "Paula Ferraz", "paula.ferraz@vulto.com.br", "ADMINISTRADOR", None),
 ]
+
+# Marca de quem não segue o padrão (Administrador = grupo; o resto = Casa Lorenzi)
+MARCA_DOS_USUARIOS = {9: "VULTO"}
 
 # id, nome, email, telefone, cliente desde, loja preferida
 # (id, cpf, nome, e-mail, telefone, cliente desde, loja preferida) — mesmos CPFs do frontend

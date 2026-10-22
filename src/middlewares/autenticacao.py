@@ -7,15 +7,16 @@ O token diz se a sessão é da equipe (papéis de src/entities/papeis.py) ou de 
 
 from dataclasses import dataclass
 
-from fastapi import Depends
+from fastapi import Depends, Header
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
 from src import models as m
 from src.database.connection import get_db
+from src.entities.marca import marca_do_escopo, na_marca
 from src.entities.papeis import ACESSO, CLIENTE
 from src.repositories import cliente_repository, usuario_repository
-from src.utils.erros import NaoAutenticado, SemPermissao
+from src.utils.erros import NaoAutenticado, NaoEncontrado, SemPermissao
 from src.utils.seguranca import ler_token
 
 _bearer = HTTPBearer(auto_error=False)
@@ -104,3 +105,20 @@ def exigir_cliente_ou_modulo(modulo: str):
         return sessao
 
     return verificar
+
+
+def escopo_marca(
+    sessao: Sessao = Depends(sessao_atual),
+    x_marca: str | None = Header(default=None, alias="X-Marca"),
+) -> str | None:
+    """Marca que o funcionário enxerga (src/entities/marca.py): a dele; o Administrador do grupo vê as
+    duas (None) ou a escolhida no seletor do painel (cabeçalho X-Marca). Cliente: None (vê o que é dele)."""
+    if sessao.usuario is None:
+        return None
+    return marca_do_escopo(sessao.usuario.marca, x_marca)
+
+
+def conferir_marca(escopo: str | None, marca: str | None, mensagem: str = "Registro não encontrado.") -> None:
+    """Dado de outra marca fica invisível para o funcionário: 404, como se não existisse."""
+    if not na_marca(escopo, marca):
+        raise NaoEncontrado(mensagem)

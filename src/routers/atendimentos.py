@@ -6,7 +6,8 @@ from sqlalchemy.orm import Session
 
 from src import models as m
 from src.database.connection import get_db
-from src.middlewares.autenticacao import Sessao, exigir_cliente_ou_modulo, exigir_modulo
+from src.entities.marca import na_marca
+from src.middlewares.autenticacao import Sessao, conferir_marca, escopo_marca, exigir_cliente_ou_modulo, exigir_modulo
 from src.repositories import atendimento_repository
 from src.schemas.atendimentos import (
     AtendimentoAtualizacao,
@@ -39,12 +40,13 @@ def listar(
     lojaId: int | None = None,
     db: Session = Depends(get_db),
     _: m.Usuario = Depends(acesso_painel),
+    marca: str | None = Depends(escopo_marca),
 ):
     """responsavelId='nenhum' lista os atendimentos sem responsável."""
     lista = atendimentos.listar(
         db, busca=busca, tipo_solicitacao_id=tipoSolicitacaoId, responsavel_id=responsavelId, loja_id=lojaId
     )
-    return lista_saida(db, lista)
+    return lista_saida(db, [a for a in lista if na_marca(marca, a.marca)])
 
 
 @router.post("", status_code=201)
@@ -65,14 +67,26 @@ def abrir(dados: SolicitacaoEntrada, db: Session = Depends(get_db), sessao: Sess
 
 
 @router.get("/{atendimento_id}")
-def obter(atendimento_id: int, db: Session = Depends(get_db), _: m.Usuario = Depends(acesso_painel)):
-    return detalhe_saida(db, atendimentos.carregar(db, atendimento_id))
+def obter(
+    atendimento_id: int,
+    db: Session = Depends(get_db),
+    _: m.Usuario = Depends(acesso_painel),
+    marca: str | None = Depends(escopo_marca),
+):
+    a = atendimentos.carregar(db, atendimento_id)
+    conferir_marca(marca, a.marca, "Atendimento não encontrado.")
+    return detalhe_saida(db, a)
 
 
 @router.patch("/{atendimento_id}")
 def atualizar(
-    atendimento_id: int, dados: AtendimentoAtualizacao, db: Session = Depends(get_db), _: m.Usuario = Depends(acesso_painel)
+    atendimento_id: int,
+    dados: AtendimentoAtualizacao,
+    db: Session = Depends(get_db),
+    _: m.Usuario = Depends(acesso_painel),
+    marca: str | None = Depends(escopo_marca),
 ):
+    conferir_marca(marca, atendimentos.carregar(db, atendimento_id).marca, "Atendimento não encontrado.")
     a = atendimentos.atualizar(
         db,
         atendimento_id,
@@ -84,11 +98,18 @@ def atualizar(
 
 
 @router.post("/{atendimento_id}/mensagens", status_code=201)
-def enviar_mensagem(atendimento_id: int, dados: MensagemEntrada, db: Session = Depends(get_db), sessao: Sessao = Depends(acesso)):
+def enviar_mensagem(
+    atendimento_id: int,
+    dados: MensagemEntrada,
+    db: Session = Depends(get_db),
+    sessao: Sessao = Depends(acesso),
+    marca: str | None = Depends(escopo_marca),
+):
     """Resposta com imagem opcional em `anexo` ({ nome, tipo, conteudoBase64 }, até 2 MB).
     O autor vem do token (autorId/autorTipo do corpo são ignorados): cliente só responde os próprios chamados."""
     if sessao.cliente is not None:
         a = atendimentos.responder_como_cliente(db, atendimento_id, sessao.cliente, dados.conteudo, dados.anexo)
     else:
+        conferir_marca(marca, atendimentos.carregar(db, atendimento_id).marca, "Atendimento não encontrado.")
         a = atendimentos.enviar_mensagem(db, atendimento_id, sessao.usuario, dados.conteudo, dados.anexo)
     return detalhe_saida(db, a)

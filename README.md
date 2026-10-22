@@ -121,7 +121,7 @@ O diagrama das tabelas, com o que a união mudou, está em [docs/diagrama_banco.
 
 | Módulo | Tabelas |
 | --- | --- |
-| Núcleo | `lojas` (endereço, telefone, horários, `ativa`, `marca` e `tipo`: LOJA ou CD), `usuarios` (só a equipe: ADMINISTRADOR, LOJISTA, OPERADOR; sem senha enquanto o convite está pendente) |
+| Núcleo | `lojas` (endereço, telefone, horários, `ativa`, `marca` e `tipo`: LOJA ou CD), `usuarios` (só a equipe: ADMINISTRADOR, LOJISTA, OPERADOR, com a `marca`: LORENZI, VULTO ou GRUPO; sem senha enquanto o convite está pendente) |
 | Clientes | `clientes` (CPF único; e-mail opcional e não único; senha só como hash; consentimento de marketing), `tokens_senha` |
 | Catálogo | `categorias`, `fornecedores`, `produtos` (com descrição, composição, cuidados, marca, código do modelo e coleção), `variacoes` (SKU, com `preco_custo`, EAN, código do CD, preço próprio e situação no catálogo), `imagens_produto` (foto enviada no cadastro) |
 | Estoque | `estoques` (saldo por **loja + SKU**, nunca negativo), `movimentacoes` (histórico com sinal, inclusive saldo inicial, inventário e avaria), `transferencias` (com `pedido_id` quando atendem um pedido) |
@@ -179,6 +179,14 @@ Todas sob o prefixo `/api`. As rotas internas exigem `Authorization: Bearer <tok
 
 ## Regras importantes
 
+- **Marca da equipe (`usuarios.marca`):** LORENZI, VULTO ou GRUPO (só Administrador, vê as duas).
+  Quem é de uma marca não vê nem altera nada da outra: produtos, estoque, movimentações, pedidos,
+  devoluções, transferências, atendimentos, dashboard, financeiro, funcionários, lojas e log (dado da
+  outra marca responde 404, como se não existisse). O Administrador do grupo pode filtrar uma marca
+  com o cabeçalho `X-Marca: LORENZI | VULTO` (seletor do painel). Peça, loja e funcionário novos do
+  Administrador de uma marca são sempre dela; Lojista e Operador ficam com a marca da loja. O frete
+  vale para o site das duas marcas: só o grupo altera. Regra em `src/entities/marca.py` e
+  `escopo_marca`/`conferir_marca` em `src/middlewares/autenticacao.py`.
 - **Conta do cliente e checkout:** só compra quem está logado com conta de cliente (conta da equipe
   recebe 401). Preço e frete são sempre recalculados no servidor. O cliente só vê os próprios
   pedidos e chamados: o id de outro cliente responde 404. CPF ou e-mail já usados (inclusive por

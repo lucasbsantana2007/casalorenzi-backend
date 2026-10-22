@@ -7,6 +7,7 @@ from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, String, f
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.database.connection import Base
+from src.entities.marca import MARCA_PADRAO, MARCAS_EQUIPE
 from src.entities.papeis import PAPEIS
 from src.models._restricoes import valor_em
 
@@ -19,7 +20,12 @@ class Usuario(Base):
     Funcionário novo nasce sem senha e a cria pelo convite enviado por e-mail."""
 
     __tablename__ = "usuarios"
-    __table_args__ = (CheckConstraint(valor_em("papel", PAPEIS), name="ck_usuarios_papel"),)
+    __table_args__ = (
+        CheckConstraint(valor_em("papel", PAPEIS), name="ck_usuarios_papel"),
+        CheckConstraint(valor_em("marca", MARCAS_EQUIPE), name="ck_usuarios_marca"),
+        # Só o Administrador pode ser do grupo (as duas marcas)
+        CheckConstraint("marca <> 'GRUPO' OR papel = 'ADMINISTRADOR'", name="ck_usuarios_grupo_so_admin"),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     nome: Mapped[str] = mapped_column(String(120))
@@ -28,6 +34,8 @@ class Usuario(Base):
     senha_hash: Mapped[str | None] = mapped_column(String(255))
     papel: Mapped[str] = mapped_column(String(20))
     ativo: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
+    # Marca com que trabalha (src/entities/marca.py): LORENZI, VULTO ou GRUPO (Administrador das duas)
+    marca: Mapped[str] = mapped_column(String(10), default=MARCA_PADRAO, server_default=MARCA_PADRAO)
     # Loja em que o membro da equipe trabalha (nulo para administradores)
     loja_id: Mapped[int | None] = mapped_column(ForeignKey("lojas.id"))
     criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

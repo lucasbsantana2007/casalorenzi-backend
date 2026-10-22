@@ -1,4 +1,5 @@
-"""Textos dos e-mails da Casa Lorenzi. Cada função devolve o e-mail pronto (texto puro e HTML).
+"""Textos dos e-mails do grupo (Casa Lorenzi e Vulto), num modelo único e neutro com as duas logos.
+Cada função devolve o e-mail pronto (texto puro e HTML).
 
 Os links levam ao site (URL_FRONTEND), não à API."""
 
@@ -14,18 +15,39 @@ def _link(caminho: str) -> str:
     return f"{URL_FRONTEND}{caminho}"
 
 
+MARCAS = "Casa Lorenzi e Vulto"
+RODAPE = "Casa Lorenzi · Vulto — uma conta, duas marcas, os mesmos pontos Vulto+."
+
+
 def _html(paragrafos: list[str], botao: tuple[str, str] | None = None) -> str:
-    corpo = "".join(f'<p style="margin:0 0 16px">{p}</p>' for p in paragrafos)
+    """Modelo único das duas marcas: neutro (branco e grafite), com as duas logos no topo. As logos são
+    imagens do site (public/email); se o programa de e-mail bloquear imagens, aparecem os nomes."""
+    corpo = "".join(f'<p style="margin:0 0 16px;font-size:15px;line-height:1.6">{p}</p>' for p in paragrafos)
     if botao:
         texto, url = botao
         corpo += (
-            f'<p style="margin:24px 0"><a href="{escape(url)}" style="background:#1f2a44;color:#fff;'
-            f'padding:12px 20px;text-decoration:none;border-radius:4px">{escape(texto)}</a></p>'
-            f'<p style="margin:0 0 16px;font-size:13px;color:#666">Se o botão não abrir, copie o endereço: {escape(url)}</p>'
+            f'<p style="margin:28px 0"><a href="{escape(url)}" style="background:#1c1d21;color:#ffffff;'
+            "padding:13px 24px;text-decoration:none;font-size:13px;letter-spacing:2px;text-transform:uppercase;"
+            f'display:inline-block">{escape(texto)}</a></p>'
+            f'<p style="margin:0 0 16px;font-size:12px;color:#8a8984">Se o botão não abrir, copie o endereço: {escape(url)}</p>'
         )
+    logos = (
+        '<table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 32px"><tr>'
+        f'<td style="padding-right:14px"><img src="{_link("/email/casa-lorenzi.png")}" alt="CASA LORENZI" height="30" '
+        'style="display:block;height:30px;border:0;font-family:Georgia,serif;font-size:18px;letter-spacing:2px;color:#1c1d21"></td>'
+        '<td style="border-left:1px solid #d6d3cc;padding-left:14px">'
+        f'<img src="{_link("/email/vulto.png")}" alt="VULTO" height="18" '
+        'style="display:block;height:18px;border:0;font-family:Arial,sans-serif;font-size:18px;font-weight:bold;color:#1c1d21"></td>'
+        "</tr></table>"
+    )
     return (
-        '<div style="font-family:Georgia,serif;color:#1f2a44;max-width:560px;margin:0 auto;padding:24px">'
-        f'<p style="font-size:20px;letter-spacing:2px;margin:0 0 24px">CASA LORENZI</p>{corpo}</div>'
+        '<div style="background:#f3f2ef;padding:32px 12px">'
+        '<div style="max-width:560px;margin:0 auto;background:#ffffff;padding:36px 32px;'
+        'font-family:Helvetica,Arial,sans-serif;color:#1c1d21">'
+        f"{logos}{corpo}"
+        '<p style="margin:32px 0 0;padding-top:16px;border-top:1px solid #ebeae7;font-size:12px;color:#8a8984">'
+        f"{escape(RODAPE)}</p>"
+        "</div></div>"
     )
 
 
@@ -40,7 +62,7 @@ def nova_senha(email: str, nome: str, caminho_link: str) -> Email:
     aviso = "Se não foi você, ignore este e-mail: a sua senha continua a mesma."
     return Email(
         para=email,
-        assunto="Casa Lorenzi · Crie uma nova senha",
+        assunto=f"{MARCAS} · Crie uma nova senha",
         texto=f"{saudacao}\n\n{pedido}\n\n{url}\n\n{aviso}",
         html=_html([escape(saudacao), escape(pedido), escape(aviso)], ("Criar nova senha", url)),
     )
@@ -49,11 +71,14 @@ def nova_senha(email: str, nome: str, caminho_link: str) -> Email:
 def convite_funcionario(email: str, nome: str, cargo: str, caminho_link: str) -> Email:
     url = _link(caminho_link)
     saudacao = f"Olá, {_primeiro_nome(nome)}."
-    convite = f"Você foi cadastrado(a) no painel da Casa Lorenzi como {cargo}. Crie a sua senha de acesso pelo link abaixo."
+    convite = (
+        f"Você foi cadastrado(a) no painel de gestão da Casa Lorenzi e da Vulto como {cargo}. "
+        "Crie a sua senha de acesso pelo link abaixo."
+    )
     validade = "O link vale por 7 dias e pode ser usado uma vez."
     return Email(
         para=email,
-        assunto="Casa Lorenzi · Crie sua senha de acesso",
+        assunto=f"{MARCAS} · Crie sua senha de acesso",
         texto=f"{saudacao}\n\n{convite}\n\n{url}\n\n{validade}",
         html=_html([escape(saudacao), escape(convite), escape(validade)], ("Criar minha senha", url)),
     )
@@ -69,7 +94,7 @@ def pedido_confirmado(email: str, nome: str, numero: str, total: Decimal) -> Ema
     )
     return Email(
         para=email,
-        assunto=f"Casa Lorenzi · Pedido {numero} confirmado",
+        assunto=f"{MARCAS} · Pedido {numero} confirmado",
         texto=f"{saudacao}\n\n{recebido}\n\n{acompanhar}\n\n{url}",
         html=_html([escape(saudacao), escape(recebido), escape(acompanhar)], ("Ver meus pedidos", url)),
     )

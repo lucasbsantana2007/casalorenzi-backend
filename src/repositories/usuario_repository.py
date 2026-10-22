@@ -17,7 +17,10 @@ def todos(db: Session) -> list[m.Usuario]:
 
 
 def administradores_ativos(db: Session, exceto_id: int | None = None) -> int:
-    consulta = select(func.count(m.Usuario.id)).where(m.Usuario.papel == "ADMINISTRADOR", m.Usuario.ativo.is_(True))
+    """Administradores do grupo (os que veem as duas marcas) ativos: a rede nunca fica sem um."""
+    consulta = select(func.count(m.Usuario.id)).where(
+        m.Usuario.papel == "ADMINISTRADOR", m.Usuario.marca == "GRUPO", m.Usuario.ativo.is_(True)
+    )
     if exceto_id is not None:
         consulta = consulta.where(m.Usuario.id != exceto_id)
     return db.scalar(consulta) or 0

@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from src import models as m
 from src.database.connection import get_db
-from src.middlewares.autenticacao import exigir_modulo
+from src.middlewares.autenticacao import escopo_marca, exigir_modulo
 from src.use_cases import financeiro
 
 router = APIRouter(prefix="/financeiro", tags=["Financeiro"])
@@ -23,8 +23,18 @@ def obter_resumo(
     generos: str | None = None,
     db: Session = Depends(get_db),
     _: m.Usuario = Depends(exigir_modulo("financeiro")),
+    marca: str | None = Depends(escopo_marca),
 ):
     """Filtros em listas separadas por vírgula (ex.: lojas=1,3&canais=E-commerce)."""
     return financeiro.resumo(
-        db, de=de, ate=ate, comparar=comparar, agrupar=agrupar, lojas=lojas, canais=canais, categorias=categorias, generos=generos
+        db,
+        de=de,
+        ate=ate,
+        comparar=comparar,
+        agrupar=agrupar,
+        lojas=lojas,
+        canais=canais,
+        categorias=categorias,
+        generos=generos,
+        marca=marca,
     )

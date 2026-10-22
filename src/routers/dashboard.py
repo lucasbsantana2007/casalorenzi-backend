@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 
 from src import models as m
 from src.database.connection import get_db
-from src.middlewares.autenticacao import exigir_modulo
+from src.middlewares.autenticacao import escopo_marca, exigir_modulo
 from src.use_cases import dashboard
 
 router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
@@ -11,7 +11,10 @@ router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
 
 @router.get("/resumo")
 def obter_resumo(
-    lojaId: int | None = None, db: Session = Depends(get_db), usuario: m.Usuario = Depends(exigir_modulo("dashboard"))
+    lojaId: int | None = None,
+    db: Session = Depends(get_db),
+    usuario: m.Usuario = Depends(exigir_modulo("dashboard")),
+    marca: str | None = Depends(escopo_marca),
 ):
     """Indicadores da tela inicial do painel. Lojistas veem sempre a própria loja."""
-    return dashboard.resumo(db, usuario, lojaId)
+    return dashboard.resumo(db, usuario, lojaId, marca)

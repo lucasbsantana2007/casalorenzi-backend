@@ -45,7 +45,8 @@ URL_PUBLICA_API = (os.getenv("URL_PUBLICA_API") or os.getenv("RENDER_EXTERNAL_UR
 RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
 # Remetente: precisa ser de um domínio verificado no Resend. onboarding@resend.dev só entrega para o
 # e-mail dono da conta do Resend (bom para testar).
-EMAIL_REMETENTE = os.getenv("EMAIL_REMETENTE", "Casa Lorenzi <onboarding@resend.dev>")
+# Nome que aparece como remetente: o das duas marcas (no Render, o domínio verificado no Resend)
+EMAIL_REMETENTE = os.getenv("EMAIL_REMETENTE", "Casa Lorenzi e Vulto <onboarding@resend.dev>")
 # Endereço do site, usado nos links dos e-mails (ex.: https://casalorenzi.vercel.app)
 URL_FRONTEND = os.getenv("URL_FRONTEND", "http://localhost:5173").rstrip("/")
 

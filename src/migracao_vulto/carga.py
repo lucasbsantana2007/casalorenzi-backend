@@ -53,6 +53,26 @@ LOJAS = {
     4: ("Vulto Batel", "Curitiba", "PR", "LOJA"),
     7: ("CD Cajamar", "Cajamar", "SP", "CD"),
 }
+# Endereço, telefone e horários (a Vulto só guardava nome e cidade): dados de demonstração do case, para a
+# página Lojas do site (/vulto/lojas). A migration b7a1c3d9e2f4 completa as lojas já carregadas.
+CONTATO_LOJAS = {
+    1: (
+        "Rua dos Pinheiros, 1037 - Pinheiros, São Paulo - SP",
+        "+55 11 94102-3381",
+        ["Segunda a sábado: 10:00–21:00", "Domingo: 12:00–19:00"],
+    ),
+    2: (
+        "Av. Rebouças, 3970, Piso Térreo - Pinheiros, São Paulo - SP",
+        "+55 11 94102-3392",
+        ["Segunda a sábado: 10:00–22:00", "Domingo: 14:00–20:00"],
+    ),
+    3: ("Rua Pernambuco, 1000 - Savassi, Belo Horizonte - MG", "+55 31 98820-4410", ["Segunda a sábado: 10:00–20:00"]),
+    4: (
+        "Av. do Batel, 1550 - Batel, Curitiba - PR",
+        "+55 41 99731-2207",
+        ["Segunda a sábado: 10:00–20:00", "Domingo: 12:00–18:00"],
+    ),
+}
 LOJA_PELO_NOME = {"Pinheiros": 1, "Eldorado": 2, "Savassi": 3, "Batel": 4, "CD Cajamar": 7}
 CD = 7
 CANAL_PELA_LOJA = {5: "E-commerce", 6: "App"}
@@ -310,7 +330,18 @@ class Carga:
 
     def lojas(self) -> None:
         for vid, (nome, cidade, uf, tipo) in LOJAS.items():
-            loja = m.Loja(nome=nome, cidade=cidade, uf=uf, marca=VULTO, tipo=tipo, ativa=True)
+            endereco, telefone, horarios = CONTATO_LOJAS.get(vid, ("", "", []))
+            loja = m.Loja(
+                nome=nome,
+                cidade=cidade,
+                uf=uf,
+                marca=VULTO,
+                tipo=tipo,
+                ativa=True,
+                endereco=endereco,
+                telefone=telefone,
+                horarios=list(horarios),
+            )
             self.db.add(loja)
             self.db.flush()
             self.loja[vid] = loja.id
