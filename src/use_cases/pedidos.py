@@ -15,12 +15,10 @@ from sqlalchemy.orm import Session
 
 from src import models as m
 from src.entities.frete import uf_do_cep
-from src.entities.loja import LOJA
-from src.entities.marca import MARCA_DO_SITE
 from src.entities.papeis import ADMINISTRADOR, loja_do_escopo, ve_pedido_da_loja
 from src.entities.pedido import STATUS_PEDIDO, pode_mudar, pontuar_loja
 from src.entities.transferencia import pode_mudar as transferencia_pode_mudar
-from src.repositories import cadastro_repository, estoque_repository, pedido_repository, sessao
+from src.repositories import cadastro_repository, estoque_repository, pedido_repository, produto_repository, sessao
 from src.use_cases import fidelidade, log_acoes, transferencias
 from src.use_cases.estoque import aplicar_movimentacao
 from src.use_cases.pagamentos import estornar_aprovados
@@ -69,7 +67,8 @@ def disponiveis_na_rede(db: Session, variacao_ids: list[int]) -> dict[int, int]:
 
 def escolher_loja_expedicao(db: Session, itens: list[tuple[int, int]], cep: str) -> m.Loja:
     """Loja que tem mais itens da sacola livres (não prometidos a outro pedido); empate → mesma UF do
-    CEP; depois, a de menor id. itens: (variacao_id, quantidade)."""
+    CEP; depois, a de menor id. Só lojas (e o CD) da marca das peças; sacola com as duas marcas → todas.
+    itens: (variacao_id, quantidade)."""
     uf = uf_do_cep(cep)
     livres = estoque_repository.livres_por_loja(db, [variacao_id for variacao_id, _ in itens])
 
@@ -77,8 +76,9 @@ def escolher_loja_expedicao(db: Session, itens: list[tuple[int, int]], cep: str)
         cobertos = sum(1 for variacao_id, quantidade in itens if livres.get((loja.id, variacao_id), 0) >= quantidade)
         return pontuar_loja(cobertos, loja.uf == uf)
 
-    # Só lojas ativas da marca do site despacham (loja desativada, CD e lojas da Vulto ficam de fora)
-    lojas = cadastro_repository.lojas(db, somente_ativas=True, marca=MARCA_DO_SITE, tipo=LOJA)
+    # Loja desativada não despacha. A Vulto vende online pelo CD, então o CD dela também expede
+    marcas = {produto_repository.variacao(db, variacao_id).produto.marca for variacao_id, _ in itens}
+    lojas = [loja for loja in cadastro_repository.lojas(db, somente_ativas=True) if loja.marca in marcas]
     if not lojas:
         raise Conflito("Nenhuma loja disponível para expedir o pedido.")
     return max(lojas, key=lambda loja: (pontos(loja), -loja.id))
