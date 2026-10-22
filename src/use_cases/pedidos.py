@@ -24,7 +24,6 @@ from src.use_cases.estoque import aplicar_movimentacao
 from src.use_cases.pagamentos import estornar_aprovados
 from src.utils.datas import agora
 from src.utils.erros import Conflito, DadosInvalidos, NaoEncontrado, SemPermissao
-from src.utils.texto import corresponde
 
 RASTREIO_MAX = 40
 
@@ -143,6 +142,10 @@ def conferir_acesso(usuario: m.Usuario, pedido: m.Pedido | None) -> m.Pedido:
     return pedido
 
 
+# Pedidos que a lista do painel mostra de uma vez (os mais recentes)
+LIMITE_LISTA = 300
+
+
 def listar(
     db: Session,
     usuario: m.Usuario,
@@ -151,22 +154,19 @@ def listar(
     loja_id: int | None = None,
     canal: str | None = None,
     busca: str | None = None,
+    marca: str | None = None,
 ) -> list[m.Pedido]:
-    """Lojista e Operador recebem só os pedidos da própria loja, qualquer que seja o lojaId pedido."""
+    """Lojista e Operador recebem só os pedidos da própria loja, qualquer que seja o lojaId pedido.
+    marca: só os dessa marca. No máximo os LIMITE_LISTA mais recentes (a Vulto trouxe dezenas de milhares);
+    a busca procura no banco inteiro."""
     if status and status not in STATUS_PEDIDO:
         raise DadosInvalidos("Status de pedido inválido.")
     escopo = loja_do_escopo(usuario.papel, usuario.loja_id)
     if escopo is not None:
         loja_id = escopo
-    pedidos = pedido_repository.listar(db, status=status, loja_id=loja_id, canal=canal)
-    return [p for p in pedidos if corresponde(busca, p.numero, *_textos_do_cliente(p))]
-
-
-def _textos_do_cliente(pedido: m.Pedido) -> tuple[str, ...]:
-    """Nome e e-mail do cliente para a busca; venda sem cadastro (Vulto) busca pelo contato digitado."""
-    if pedido.cliente is None:
-        return (pedido.cliente_contato or "",)
-    return pedido.cliente.nome, pedido.cliente.email or ""
+    return pedido_repository.listar(
+        db, status=status, loja_id=loja_id, canal=canal, marca=marca, busca=busca, limite=LIMITE_LISTA
+    )
 
 
 def obter(db: Session, pedido_id: int, usuario: m.Usuario) -> m.Pedido:

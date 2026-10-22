@@ -6,7 +6,6 @@ from sqlalchemy.orm import Session
 
 from src import models as m
 from src.database.connection import get_db
-from src.entities.marca import na_marca
 from src.entities.papeis import ADMINISTRADOR
 from src.middlewares.autenticacao import conferir_marca, escopo_marca, exigir_modulo
 from src.repositories import cadastro_repository
@@ -31,10 +30,10 @@ def listar(
     usuario: m.Usuario = Depends(acesso),
     marca: str | None = Depends(escopo_marca),
 ):
-    """busca: número do pedido, nome ou e-mail do cliente. Mais recentes primeiro.
+    """busca: número do pedido, nome ou e-mail do cliente. Os 300 mais recentes (a busca procura em todos).
     Lojista e Operador recebem só os pedidos que a própria loja expede (o lojaId é ignorado)."""
-    lista = pedidos.listar(db, usuario, status=status, loja_id=lojaId, canal=canal, busca=busca)
-    return [_saida(db, p, usuario) for p in lista if na_marca(marca, p.loja.marca)]
+    lista = pedidos.listar(db, usuario, status=status, loja_id=lojaId, canal=canal, busca=busca, marca=marca)
+    return [_saida(db, p, usuario) for p in lista]
 
 
 @router.get("/{pedido_id}")
