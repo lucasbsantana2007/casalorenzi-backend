@@ -43,4 +43,12 @@ def usuario_resumo(usuario: m.Usuario | None) -> dict | None:
 
 def usuario_saida(usuario: m.Usuario) -> dict:
     """Nunca inclui o hash da senha."""
-    return {"id": usuario.id, "nome": usuario.nome, "email": usuario.email, "papel": usuario.papel, "lojaId": usuario.loja_id}
+    return {
+        "id": usuario.id,
+        "nome": usuario.nome,
+        "email": usuario.email,
+        "papel": usuario.papel,
+        "lojaId": usuario.loja_id,
+        # LORENZI, VULTO ou GRUPO: o painel usa a identidade da marca (o grupo vê as duas)
+        "marca": usuario.marca,
+    }

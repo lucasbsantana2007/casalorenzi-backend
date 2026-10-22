@@ -17,6 +17,7 @@ def test_login_devolve_token_e_usuario(client):
         "email": "helena@casalorenzi.com.br",
         "papel": "ADMINISTRADOR",
         "lojaId": None,
+        "marca": "GRUPO",
     }
 
 
