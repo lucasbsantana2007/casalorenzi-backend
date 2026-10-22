@@ -8,7 +8,8 @@ from src import models as m
 from src.database.connection import get_db
 from src.middlewares.autenticacao import cliente_atual
 from src.schemas.conta import DadosContaEntrada, ExclusaoContaEntrada, TrocaSenhaEntrada, conta_saida
-from src.use_cases import conta
+from src.schemas.fidelidade import pontos_saida
+from src.use_cases import conta, fidelidade
 
 router = APIRouter(prefix="/conta", tags=["Conta do cliente"])
 
@@ -25,6 +26,12 @@ def atualizar(dados: DadosContaEntrada, db: Session = Depends(get_db), cliente: 
     return conta_saida(
         conta.atualizar(db, cliente, nome=dados.nome, email=dados.email, telefone=dados.telefone, senha_atual=dados.senha_atual)
     )
+
+
+@router.get("/pontos")
+def pontos(db: Session = Depends(get_db), cliente: m.Cliente = Depends(cliente_atual)):
+    """Vulto+ do cliente logado: { saldo, valorEmReais, categoria, bonus, aVencer, extrato, regras }."""
+    return pontos_saida(fidelidade.resumo(db, cliente))
 
 
 @router.put("/senha", status_code=204, response_class=Response)
