@@ -23,6 +23,7 @@ from src.database.seed.dados import (
     CUSTO_DEMO,
     DETALHES_PRODUTOS,
     LOJAS,
+    MARCA_DOS_USUARIOS,
     PRODUTOS,
     SENHA_DEMO,
     TIPOS_SOLICITACAO,
@@ -105,10 +106,16 @@ def popular(db: Session) -> None:
     _popular_frete(db)
     db.add_all(m.Categoria(id=i, nome=nome) for i, nome in enumerate(CATEGORIAS, start=1))
     db.flush()
-    # A Administradora da demonstração é do grupo (vê as duas marcas); o resto da equipe é da Casa Lorenzi
+    # Helena (Administradora) é do grupo e vê as duas marcas; Paula, só a Vulto; o resto, a Casa Lorenzi
     db.add_all(
         m.Usuario(
-            id=i, nome=n, email=e, papel=p, loja_id=loja, senha_hash=senha, marca="GRUPO" if p == "ADMINISTRADOR" else "LORENZI"
+            id=i,
+            nome=n,
+            email=e,
+            papel=p,
+            loja_id=loja,
+            senha_hash=senha,
+            marca=MARCA_DOS_USUARIOS.get(i, "GRUPO" if p == "ADMINISTRADOR" else "LORENZI"),
         )
         for i, n, e, p, loja in USUARIOS
     )
