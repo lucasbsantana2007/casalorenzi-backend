@@ -43,6 +43,11 @@ def todos(db: Session) -> list[m.Atendimento]:
     return list(db.scalars(select(m.Atendimento)))
 
 
+def no_periodo(db: Session, desde, ate) -> list[m.Atendimento]:
+    """Atendimentos abertos em [desde, ate)."""
+    return list(db.scalars(select(m.Atendimento).where(m.Atendimento.criado_em >= desde, m.Atendimento.criado_em < ate)))
+
+
 def do_cliente(db: Session, cliente_id: int) -> list[m.Atendimento]:
     return list(
         db.scalars(

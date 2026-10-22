@@ -109,7 +109,10 @@ def resumo(
         valor = sum(float(i.preco_unitario) * i.quantidade for i in itens) if filtra_produto else float(pedido.total)
         return {"loja_id": pedido.loja_id, "status": pedido.status, "criado_em": pedido.criado_em, "itens": itens, "total": valor}
 
-    pedidos = pedido_repository.todos(db)
+    # Só a janela do período e da comparação (a base da Vulto tem dezenas de milhares de pedidos)
+    comp = None if comparar == "nenhum" else intervalo_comparacao(inicio, fim, comparar)
+    janela = (min(inicio, comp[0]) if comp else inicio, max(fim, comp[1]) if comp else fim)
+    pedidos = pedido_repository.no_periodo(db, *janela, lojas=filtro_lojas or None)
     por_id = {p.id: p for p in pedidos}
     recortados = [r for r in map(recortar, pedidos) if r]
     validos = [p for p in recortados if p["status"] != "CANCELADO"]
@@ -124,7 +127,6 @@ def resumo(
         return sum(i.quantidade for p in lista for i in p["itens"])
 
     atual = entre(validos, inicio, fim)
-    comp = None if comparar == "nenhum" else intervalo_comparacao(inicio, fim, comparar)
     anterior = entre(validos, *comp) if comp else []
 
     # Estoque é uma foto do momento: respeita loja, categoria e gênero, mas não o período
@@ -186,7 +188,12 @@ def resumo(
 
     # Pós-venda: trocas e devoluções; com filtro de canal/produto, só as ligadas a um pedido que bate
     pos_venda = []
-    for a in atendimento_repository.todos(db):
+    atendimentos = atendimento_repository.no_periodo(db, *janela)
+    # Atendimento sobre um pedido anterior à janela: o pedido vem à parte (só com filtro de canal ou produto)
+    if filtro_canais or filtra_produto:
+        faltando = {a.pedido_id for a in atendimentos if a.pedido_id and a.pedido_id not in por_id}
+        por_id.update({p.id: p for p in pedido_repository.por_ids(db, faltando)})
+    for a in atendimentos:
         tipo = a.tipo_solicitacao.conta_pos_venda
         if tipo not in TIPOS_POS_VENDA:
             continue

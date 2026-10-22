@@ -24,6 +24,18 @@ def todos(db: Session) -> list[m.Pedido]:
     return list(db.scalars(com_itens()))
 
 
+def no_periodo(db: Session, desde, ate, lojas: list[int] | None = None) -> list[m.Pedido]:
+    """Pedidos criados em [desde, ate), só das lojas pedidas (o financeiro não carrega a base inteira)."""
+    consulta = com_itens().where(m.Pedido.criado_em >= desde, m.Pedido.criado_em < ate)
+    if lojas:
+        consulta = consulta.where(m.Pedido.loja_id.in_(lojas))
+    return list(db.scalars(consulta).unique())
+
+
+def por_ids(db: Session, ids: set[int]) -> list[m.Pedido]:
+    return list(db.scalars(com_itens().where(m.Pedido.id.in_(ids))).unique()) if ids else []
+
+
 def contar_do_cliente(db: Session, cliente_id: int) -> int:
     return db.scalar(select(func.count()).where(m.Pedido.cliente_id == cliente_id))
 
