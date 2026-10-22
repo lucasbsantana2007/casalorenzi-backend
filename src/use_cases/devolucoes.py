@@ -9,6 +9,8 @@ Uma devolução, numa única transação:
    da própria devolução (é o que o financeiro soma em devolucoesValor).
 """
 
+from decimal import Decimal
+
 from sqlalchemy.orm import Session
 
 from src import models as m
@@ -28,6 +30,7 @@ from src.repositories import (
     pedido_repository,
     sessao,
 )
+from src.use_cases import fidelidade
 from src.use_cases.atendimentos import registrar_evento
 from src.use_cases.estoque import aplicar_movimentacao
 from src.use_cases.pagamentos import estornar_aprovados
@@ -125,11 +128,17 @@ def registrar(
         loja_id=loja_id,
         movimentacao_id=mov.id,
         quantidade=quantidade,
-        valor_devolvido=valor_devolvido(item.preco_unitario, quantidade),
+        valor_devolvido=valor_devolvido(item.preco_unitario, quantidade, pedido.desconto, pedido.subtotal),
         motivo=motivo,
         criada_em=momento,
     )
     sessao.adicionar(db, devolucao)
+
+    # Vulto+: as peças devolvidas levam os pontos que geraram, na proporção do preço
+    if pedido.subtotal:
+        fracao = Decimal(item.preco_unitario) * quantidade / Decimal(pedido.subtotal)
+        motivo_pontos = f"Devolução de {quantidade} un. de {item.variacao.sku} do pedido {pedido.numero}"
+        fidelidade.estornar_compra(db, pedido, momento, fracao=fracao, motivo=motivo_pontos)
 
     devolvido[item.id] = devolvido.get(item.id, 0) + quantidade
     if pedido_totalmente_devolvido({i.id: i.quantidade for i in pedido.itens}, devolvido):

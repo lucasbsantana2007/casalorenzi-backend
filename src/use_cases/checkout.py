@@ -5,6 +5,8 @@ pagamento e itens.
 Numa única transação: confere os dados, recalcula preços e frete no servidor (nada de valor
 vem do navegador), escolhe a loja de expedição, grava pedido, itens e pagamento (aprovado:
 pagamento simulado na demonstração) e cria as transferências das peças que faltam na loja.
+Vulto+: o resgate de pontos vira desconto nos produtos e a compra aprovada ganha pontos
+(regras em src/entities/fidelidade.py).
 As peças só saem do estoque no envio (painel de pedidos), mas ficam reservadas desde a compra:
 o disponível para venda desconta os pedidos ainda não enviados.
 """
@@ -23,8 +25,8 @@ from src.integrations import modelos_email
 from src.integrations.email import enviar as enviar_email
 from src.repositories import estoque_repository, pedido_repository, produto_repository, sessao
 from src.schemas.pedidos import CheckoutEntrada
+from src.use_cases import fidelidade, pagamentos
 from src.use_cases import frete as frete_config
-from src.use_cases import pagamentos
 from src.use_cases.pedidos import disponiveis_na_rede, escolher_loja_expedicao, planejar_transferencias, registrar_evento
 from src.utils.datas import agora
 from src.utils.erros import Conflito, DadosInvalidos
@@ -93,6 +95,9 @@ def finalizar_compra(db: Session, cliente: m.Cliente, dados: CheckoutEntrada) ->
         raise DadosInvalidos("Escolha a forma de pagamento.")
     parcelas = min(max(dados.pagamento.parcelas or 1, 1), PARCELAS_MAX) if metodo == "CARTAO" else 1
 
+    # Resgate Vulto+: confere saldo e regras e trava o cliente até o fim da compra
+    desconto = fidelidade.conferir_resgate(db, cliente, subtotal, dados.pontos)
+
     loja = escolher_loja_expedicao(db, [(v.id, q) for v, q, _ in itens], cep)
     momento = agora()
     pedido = m.Pedido(
@@ -102,7 +107,8 @@ def finalizar_compra(db: Session, cliente: m.Cliente, dados: CheckoutEntrada) ->
         canal="E-commerce",
         status="PROCESSANDO",
         subtotal=subtotal,
-        total=subtotal + frete_valor,
+        desconto=desconto,
+        total=subtotal - desconto + frete_valor,
         frete_tipo=dados.frete_tipo,
         frete_valor=frete_valor,
         frete_prazo_dias=prazo,
@@ -121,6 +127,11 @@ def finalizar_compra(db: Session, cliente: m.Cliente, dados: CheckoutEntrada) ->
     pagamentos.novo(db, pedido, metodo=metodo, valor=pedido.total, parcelas=parcelas, quando=momento)
     registrar_evento(db, pedido, "PROCESSANDO", observacao=f"Pagamento aprovado · expedição: {loja.nome}", quando=momento)
     sessao.gerar_ids(db)
+    # Pagamento aprovado: os pontos usados saem e os da compra entram (sobre os produtos, sem o frete)
+    fidelidade.travar(db, cliente.id)
+    if dados.pontos:
+        fidelidade.registrar_resgate(db, cliente, pedido, dados.pontos, momento)
+    fidelidade.creditar_compra(db, cliente, pedido, momento)
     planejar_transferencias(db, pedido)
     sessao.confirmar(db, pedido)
 

@@ -13,8 +13,9 @@ from src.database.connection import get_db
 from src.middlewares.autenticacao import Sessao, exigir_cliente_ou_modulo, exigir_modulo
 from src.routers.atendimentos import detalhe_saida, lista_saida
 from src.schemas.clientes import AcessoEntrada, cliente_saida
+from src.schemas.fidelidade import pontos_saida
 from src.schemas.pedidos import pedido_saida
-from src.use_cases import clientes
+from src.use_cases import clientes, fidelidade
 from src.utils.erros import NaoEncontrado
 
 router = APIRouter(prefix="/clientes", tags=["Clientes"])
@@ -48,6 +49,12 @@ def obter(cliente_id: str, db: Session = Depends(get_db), sessao: Sessao = Depen
     cliente = _cliente(db, sessao, cliente_id)
     total_pedidos, total_atendimentos = clientes.totais(db, cliente.id)
     return {**cliente_saida(cliente), "totalPedidos": total_pedidos, "totalAtendimentos": total_atendimentos}
+
+
+@router.get("/{cliente_id}/pontos")
+def pontos(cliente_id: str, db: Session = Depends(get_db), sessao: Sessao = Depends(acesso)):
+    """Vulto+ do cliente (equipe de atendimento ou o próprio cliente): saldo, categoria e extrato."""
+    return pontos_saida(fidelidade.resumo(db, _cliente(db, sessao, cliente_id)))
 
 
 @router.post("/{cliente_id}/acesso")

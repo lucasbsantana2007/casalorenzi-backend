@@ -90,7 +90,7 @@ def test_no_mesmo_instante_entradas_vem_antes_das_saidas():
 
 def test_registro_da_uniao_esta_no_formato_da_carga():
     decisoes = ler_decisoes_do_markdown(REGISTRO)
-    assert [int(d["numero"]) for d in decisoes] == list(range(55, 67))
+    assert [int(d["numero"]) for d in decisoes] == list(range(55, 70))
     assert {d["tipo"] for d in decisoes} <= {"automático", "padrão assumido", "negócio"}
 
 

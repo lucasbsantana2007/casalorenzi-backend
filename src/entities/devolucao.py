@@ -22,8 +22,15 @@ def saldo_devolvivel(comprado: int, ja_devolvido: int) -> int:
     return max(comprado - ja_devolvido, 0)
 
 
-def valor_devolvido(preco_unitario: Decimal, quantidade: int) -> Decimal:
-    return (Decimal(preco_unitario) * quantidade).quantize(Decimal("0.01"))
+def valor_devolvido(
+    preco_unitario: Decimal, quantidade: int, desconto: Decimal = Decimal("0"), subtotal: Decimal | None = None
+) -> Decimal:
+    """Reembolso das peças: o preço pago menos a parte delas no desconto do pedido (ex.: resgate Vulto+),
+    na proporção do preço. O frete não volta."""
+    bruto = Decimal(preco_unitario) * quantidade
+    if desconto and subtotal:
+        bruto -= Decimal(desconto) * bruto / Decimal(subtotal)
+    return bruto.quantize(Decimal("0.01"))
 
 
 def pedido_totalmente_devolvido(comprado_por_item: dict[int, int], devolvido_por_item: dict[int, int]) -> bool:
