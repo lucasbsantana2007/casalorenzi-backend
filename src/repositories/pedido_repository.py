@@ -1,4 +1,4 @@
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session, selectinload
 
 from src import models as m
@@ -28,16 +28,36 @@ def contar_do_cliente(db: Session, cliente_id: int) -> int:
     return db.scalar(select(func.count()).where(m.Pedido.cliente_id == cliente_id))
 
 
-def listar(db: Session, *, status: str | None = None, loja_id: int | None = None, canal: str | None = None) -> list[m.Pedido]:
-    """Mais recentes primeiro."""
+def listar(
+    db: Session,
+    *,
+    status: str | None = None,
+    loja_id: int | None = None,
+    canal: str | None = None,
+    marca: str | None = None,
+    busca: str | None = None,
+    limite: int | None = None,
+) -> list[m.Pedido]:
+    """Mais recentes primeiro. marca: só os das lojas dessa marca. busca: número do pedido, nome ou e-mail
+    do cliente ou o contato digitado na venda sem cadastro (no banco inteiro, antes do limite)."""
     consulta = com_itens().order_by(m.Pedido.criado_em.desc(), m.Pedido.id.desc())
+    if marca:
+        consulta = consulta.where(m.Pedido.loja_id.in_(select(m.Loja.id).where(m.Loja.marca == marca)))
+    if busca and busca.strip():
+        termo = f"%{busca.strip()}%"
+        clientes = select(m.Cliente.id).where(or_(m.Cliente.nome.ilike(termo), m.Cliente.email.ilike(termo)))
+        consulta = consulta.where(
+            or_(m.Pedido.numero.ilike(termo), m.Pedido.cliente_contato.ilike(termo), m.Pedido.cliente_id.in_(clientes))
+        )
     if status:
         consulta = consulta.where(m.Pedido.status == status)
     if loja_id:
         consulta = consulta.where(m.Pedido.loja_id == loja_id)
     if canal:
         consulta = consulta.where(m.Pedido.canal == canal)
-    return list(db.scalars(consulta))
+    if limite:
+        consulta = consulta.limit(limite)
+    return list(db.scalars(consulta).unique())
 
 
 def do_cliente_por_numero(db: Session, cliente_id: int, numero: str) -> m.Pedido | None:
