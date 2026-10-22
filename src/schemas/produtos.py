@@ -49,6 +49,8 @@ def produto_resumo(produto: m.Produto) -> dict:
         "ativo": produto.ativo,
         "imagemUrl": imagem_url(produto),
         "marca": produto.marca,
+        # A loja liga as fotos do catálogo da Vulto pelo código do modelo (pedidos, sacola, solicitações)
+        "codigoModelo": produto.codigo_modelo,
     }
 
 
