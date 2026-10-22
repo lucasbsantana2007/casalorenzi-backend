@@ -1,5 +1,6 @@
-"""O site da Casa Lorenzi (vitrine, página Lojas, checkout e expedição) só mostra e vende a marca dele;
-a equipe vê as duas marcas no painel. E o estoque zerado automático fica dentro da mesma marca."""
+"""O site é um só para as duas marcas, cada uma com a sua vitrine: a vitrine e a página Lojas pedem a marca
+(sem ela, o visitante recebe a Casa Lorenzi), o checkout vende as duas e a peça sai de uma loja da marca
+dela. A equipe vê as duas marcas no painel. E o estoque zerado automático fica dentro da mesma marca."""
 
 from decimal import Decimal
 
@@ -24,25 +25,36 @@ def _vulto_no_banco():
         return loja.id, cd.id, produto.id, variacao.id
 
 
-def test_site_nao_mostra_lojas_nem_produtos_da_vulto(client, admin):
+def test_cada_marca_tem_a_sua_vitrine_e_as_suas_lojas(client, admin):
     loja_id, cd_id, produto_id, _ = _vulto_no_banco()
+    # Sem marca: o início do site (Casa Lorenzi), como antes
     publicas = client.get("/api/lojas").json()
     assert {loja["marca"] for loja in publicas} == {"LORENZI"} and {loja["tipo"] for loja in publicas} == {"LOJA"}
-    assert {loja_id, cd_id} <= {loja["id"] for loja in client.get("/api/lojas", headers=admin).json()}
-
     assert all(p["marca"] == "LORENZI" for p in client.get("/api/produtos").json())
-    assert client.get(f"/api/produtos/{produto_id}").status_code == 404
+
+    # /vulto: só a Vulto, e só as lojas físicas (o CD não aparece no site)
+    assert [loja["id"] for loja in client.get("/api/lojas?marca=VULTO").json()] == [loja_id]
+    vitrine = client.get("/api/produtos?marca=VULTO").json()
+    assert [p["id"] for p in vitrine] == [produto_id] and vitrine[0]["marca"] == "VULTO"
+    assert client.get(f"/api/produtos/{produto_id}").json()["marca"] == "VULTO"
+    assert client.get("/api/produtos?marca=OUTRA").status_code == 422
+
+    # A equipe continua vendo as duas marcas e o CD
+    assert {loja_id, cd_id} <= {loja["id"] for loja in client.get("/api/lojas", headers=admin).json()}
     assert produto_id in {p["id"] for p in client.get("/api/produtos", headers=admin).json()}
-    assert client.get(f"/api/produtos/{produto_id}", headers=admin).json()["marca"] == "VULTO"
+    assert {loja["marca"] for loja in client.get("/api/lojas?marca=VULTO", headers=admin).json()} == {"VULTO"}
 
 
-def test_checkout_nao_vende_peca_da_vulto_nem_expede_de_loja_da_vulto(client, novo_cliente):
+def test_checkout_vende_a_vulto_e_cada_peca_sai_de_uma_loja_da_marca_dela(client, novo_cliente):
     from tests.test_loja_pedidos import _variacao_com_estoque
 
     loja_id, cd_id, _, variacao_vulto = _vulto_no_banco()
     headers, _ = novo_cliente
     r = client.post("/api/checkout", json=_compra(variacao_vulto), headers=headers)
-    assert r.status_code == 422 and "não está mais disponível" in r.json()["detail"]
+    assert r.status_code == 201, r.text
+    with SessionLocal() as db:
+        pedido = db.scalar(select(m.Pedido).where(m.Pedido.numero == r.json()["numero"]))
+        assert pedido.loja_id in {loja_id, cd_id} and pedido.loja.marca == "VULTO"
 
     # Peça da Lorenzi para CEP de SP: a Vulto Pinheiros e o CD (SP) nunca expedem
     variacao_lorenzi, _ = _variacao_com_estoque(client)

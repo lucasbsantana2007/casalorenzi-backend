@@ -223,9 +223,10 @@ com os dados reais.
 
 ## O que já mudou na plataforma
 
-- **Site da Casa Lorenzi só com a marca dele:** visitante e cliente veem só os produtos e as lojas da
-  Lorenzi (`/produtos`, `/produtos/{id}`, `/lojas`); a equipe logada vê as duas marcas. O checkout não
-  vende peça da Vulto, e a expedição sai só de loja da Lorenzi.
+- **Um site, uma vitrine por marca:** a Casa Lorenzi fica no início e a Vulto em `/vulto`. A vitrine e a
+  página Lojas pedem a marca (`/produtos?marca=VULTO`, `/lojas?marca=VULTO`); sem ela, o visitante
+  recebe a Lorenzi, e a equipe logada, as duas. A página da peça abre as duas marcas. Sacola, login,
+  checkout e Vulto+ são compartilhados; a peça sai de uma loja (ou do CD) da marca dela.
 - **Estoque zerado automático só dentro da marca:** produto novo nasce nas lojas da marca dele; loja nova,
   com as peças da marca dela.
 - **Financeiro com a regra da diretoria:** receita = total dos pedidos de venda não cancelados (itens −

@@ -18,12 +18,16 @@ router = APIRouter(tags=["Cadastros"])
 
 
 @router.get("/lojas")
-def listar_lojas(db: Session = Depends(get_db), sessao: Sessao | None = Depends(sessao_opcional)):
-    """Pública: a página Lojas do site mostra só as lojas da Casa Lorenzi. A equipe logada recebe todas
-    (as duas marcas e o CD), com marca e tipo, para os filtros do painel."""
+def listar_lojas(
+    marca: Literal["LORENZI", "VULTO"] | None = None,
+    db: Session = Depends(get_db),
+    sessao: Sessao | None = Depends(sessao_opcional),
+):
+    """Pública: a página Lojas de cada marca pede a sua (?marca=; sem ela, as da Casa Lorenzi), só lojas
+    físicas. A equipe logada recebe todas (as duas marcas e o CD), com marca e tipo, para os filtros do painel."""
     if sessao is not None and sessao.usuario is not None:
-        return [loja_saida(loja) for loja in cadastro_repository.lojas(db)]
-    return [loja_saida(loja) for loja in cadastro_repository.lojas(db, marca=MARCA_DO_SITE, tipo=LOJA)]
+        return [loja_saida(loja) for loja in cadastro_repository.lojas(db, marca=marca)]
+    return [loja_saida(loja) for loja in cadastro_repository.lojas(db, marca=marca or MARCA_DO_SITE, tipo=LOJA)]
 
 
 @router.get("/categorias")

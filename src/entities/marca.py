@@ -11,6 +11,7 @@ VULTO = "VULTO"
 MARCAS = (LORENZI, VULTO)
 MARCA_PADRAO = LORENZI
 
-# O site (vitrine, página Lojas, checkout e expedição) é o da Casa Lorenzi: visitante e cliente só
-# veem a marca do site; a equipe vê as duas no painel.
+# O site é um só para as duas marcas, cada uma com a sua vitrine (/ = Casa Lorenzi, /vulto = Vulto):
+# a vitrine e a página Lojas pedem a marca (?marca=); sem ela, o visitante recebe a do início do site.
+# Sacola, login, checkout e Vulto+ são compartilhados; a peça sai de uma loja da marca dela.
 MARCA_DO_SITE = LORENZI

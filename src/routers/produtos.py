@@ -1,3 +1,5 @@
+from typing import Literal
+
 from fastapi import APIRouter, Depends, Response
 from sqlalchemy.orm import Session
 
@@ -17,8 +19,10 @@ def _ve_custo(sessao: Sessao | None) -> bool:
     return sessao is not None and sessao.usuario is not None and sessao.usuario.papel == ADMINISTRADOR
 
 
-def _marca_visivel(sessao: Sessao | None) -> str | None:
-    """Visitante e cliente veem só a marca do site; a equipe vê as duas."""
+def _marca_visivel(sessao: Sessao | None, marca: str | None) -> str | None:
+    """A vitrine de cada marca pede a sua; sem marca, o visitante recebe a do início do site e a equipe, as duas."""
+    if marca:
+        return marca
     return None if sessao is not None and sessao.usuario is not None else MARCA_DO_SITE
 
 
@@ -33,12 +37,13 @@ def listar(
     busca: str | None = None,
     categoria: str | None = None,
     ativo: bool | None = None,
+    marca: Literal["LORENZI", "VULTO"] | None = None,
     db: Session = Depends(get_db),
     sessao: Sessao | None = Depends(sessao_opcional),
 ):
     """Pública: alimenta também a vitrine da loja. estoqueTotal é o físico; disponivel desconta as peças
     reservadas por pedidos ainda não enviados. precoCusto das variações só para o Administrador."""
-    lista = produtos.listar(db, busca, categoria, ativo, _marca_visivel(sessao))
+    lista = produtos.listar(db, busca, categoria, ativo, _marca_visivel(sessao, marca))
     totais = produtos.totais_de_estoque(db, lista)
     disponiveis = produtos.disponiveis_para_venda(db, lista)
     com_custo = _ve_custo(sessao)
@@ -47,7 +52,8 @@ def listar(
 
 @router.get("/{produto_id}")
 def obter(produto_id: int, db: Session = Depends(get_db), sessao: Sessao | None = Depends(sessao_opcional)):
-    return _saida(db, produtos.obter(db, produto_id, _marca_visivel(sessao)), _ve_custo(sessao))
+    """Pública: a página da peça abre as das duas marcas."""
+    return _saida(db, produtos.obter(db, produto_id), _ve_custo(sessao))
 
 
 @router.get("/{produto_id}/imagem", response_class=Response)
