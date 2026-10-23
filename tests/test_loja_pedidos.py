@@ -39,7 +39,8 @@ def _compra(variacao_id, *, quantidade=1, **extra):
 def _pedido_no_painel(client, headers, numero):
     lista = client.get(f"/api/pedidos?busca={numero}", headers=headers).json()
     assert len(lista) == 1
-    return lista[0]
+    # A lista traz o resumo; o histórico e o saldo das peças vêm no detalhe
+    return client.get(f"/api/pedidos/{lista[0]['id']}", headers=headers).json()
 
 
 # ---------- Checkout ----------

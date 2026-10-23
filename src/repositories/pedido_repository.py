@@ -6,7 +6,8 @@ from src.entities.pedido import PREFIXO_NUMERO
 
 
 def com_itens():
-    return select(m.Pedido).options(selectinload(m.Pedido.itens))
+    """Pedido com os itens, a peça e o produto de cada um numa consulta só (listas com centenas de pedidos)."""
+    return select(m.Pedido).options(selectinload(m.Pedido.itens).joinedload(m.ItemPedido.variacao).joinedload(m.Variacao.produto))
 
 
 def obter(db: Session, pedido_id: int, travar: bool = False) -> m.Pedido | None:
