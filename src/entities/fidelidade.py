@@ -7,11 +7,11 @@ cliente é o saldo_resultante do último movimento dele.
 Regras (sistema e planilhas da Vulto, com as decisões do time no registro de decisões da Vulto):
 - 100 pontos = R$ 5,00 desde mar/2025 (config.valor_ponto = 0.05);
 - os pontos vencem 12 meses depois de ganhos, em todas as categorias, e o resgate gasta primeiro os mais
-  antigos (decisões 22 e 69);
+  antigos (decisões 22 e 80);
 - a categoria vem do saldo válido (decisão 21): 0 sem categoria, 1 a 1.500 Bronze,
   1.501 a 5.000 Prata, 5.001 a 9.999 Ouro e 10.000 ou mais Vip.
 
-Ganho (aba LEIA ISSO da Vulto, com as decisões 67 e 68 da união):
+Ganho (aba LEIA ISSO da Vulto, com as decisões 78 e 79 da união):
 - R$ 1 em produtos = 1 ponto na loja física e 2 no site e no app (o frete não conta);
 - bônus pela categoria do cliente na hora da compra: Ouro +25% e Vip +50%;
 - só depois do pagamento aprovado; compra cancelada perde os pontos dela (estorno);
@@ -41,7 +41,7 @@ VALIDADE_MESES = 12
 
 # Pontos por real em produtos, pelo canal da venda
 PONTOS_POR_REAL = {"Loja física": 1, "E-commerce": 2, "App": 2}
-# Bônus pela categoria na hora da compra (decisão 68: Ouro +25% e Vip +50%)
+# Bônus pela categoria na hora da compra (decisão 79: Ouro +25% e Vip +50%)
 BONUS_CATEGORIA = {"OURO": Decimal("0.25"), "VIP": Decimal("0.50")}
 
 RESGATE_MULTIPLO = 100

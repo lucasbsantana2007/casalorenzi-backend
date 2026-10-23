@@ -32,7 +32,7 @@ class Variacao(Base):
     cor: Mapped[str] = mapped_column(String(40))
     # Quanto a peça custa para a loja (último custo de nota). Só o Administrador vê (margem no cadastro e no financeiro)
     preco_custo: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))
-    # Sem nota fiscal do SKU, o custo foi estimado (mesmo modelo e cor, % da categoria...): decisões do catálogo e 59
+    # Sem nota fiscal do SKU, o custo foi estimado (mesmo modelo e cor, % da categoria...): decisões do catálogo e 70
     custo_estimado: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     # Preço próprio do SKU quando difere do preço do produto (Vulto: peças da lista de 2024 com o último
     # preço vendido, decisão 39). Nulo = vale o preco_base do produto

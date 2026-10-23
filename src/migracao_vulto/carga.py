@@ -3,10 +3,10 @@
 Fonte: o repositório da Vulto consertado pelo time (copy.vulto-legado-back), passado em --origem:
 - data/vulto_corrigido.db: vendas, itens, pontos (pontos_mov), estoque em 01/10/2026 e entradas;
 - data/vulto.db, tabelas padronizadas: catálogo, clientes, tipo e status das vendas, atendimentos,
-  histórico do estoque e o registro de decisões 1 a 54;
+  histórico do estoque e o registro de decisões 1 a 65;
 - migracao/entrada/: a aba Resgates da planilha de fidelidade (desconto em reais de cada resgate,
-  decisão 57) e a planilha manual da Batel (forma de pagamento das vendas feitas sem sistema).
-Do próprio repositório vêm as decisões 55 em diante (docs/registro_decisoes_uniao.md).
+  decisão 68) e a planilha manual da Batel (forma de pagamento das vendas feitas sem sistema).
+Do próprio repositório vêm as decisões 66 em diante (docs/registro_decisoes_uniao.md).
 
 Como cada dado vira dado da plataforma está em docs/banco_uniao_vulto.md (de/para).
 
@@ -84,10 +84,10 @@ STATUS_VARIACAO = {
     "Só histórico": "SO_HISTORICO",
     "Criado na migração (contado sem cadastro)": "FORA_DO_CATALOGO",
 }
-# Decisão 59: margem mínima de 50% com o custo de nota (preço do modelo inteiro)
-REAJUSTE_DECISAO_59 = {"ACE-004": "149.90", "CAL-008": "329.90", "CAL-020": "269.90", "CMS-003": "249.90"}
+# Decisão 70: margem mínima de 50% com o custo de nota (preço do modelo inteiro)
+REAJUSTE_DECISAO_70 = {"ACE-004": "149.90", "CAL-008": "329.90", "CAL-020": "269.90", "CMS-003": "249.90"}
 
-# Status da venda na Vulto → (status do pedido, status do pagamento). Decisão 62.
+# Status da venda na Vulto → (status do pedido, status do pagamento). Decisão 73.
 STATUS_VENDA = {
     "Concluída": ("ENTREGUE", "APROVADO"),
     "Sem status": ("ENTREGUE", "APROVADO"),
@@ -144,9 +144,19 @@ AREA_DECISAO = {
     52: "CLIENTES",
     53: "CLIENTES",
     54: "ESTOQUE",
-    **dict.fromkeys(range(55, 58), "FIDELIDADE"),
-    **dict.fromkeys(range(58, 61), "CATALOGO"),
+    # 55 a 65: equipe (acesso, cargos e contas), e-mail de cliente e regras do catálogo
+    **dict.fromkeys(range(55, 61), "GERAL"),
     61: "CLIENTES",
+    **dict.fromkeys(range(62, 66), "CATALOGO"),
+    # 66 em diante: registro da união (docs/registro_decisoes_uniao.md)
+    **dict.fromkeys(range(66, 69), "FIDELIDADE"),
+    **dict.fromkeys(range(69, 72), "CATALOGO"),
+    72: "CLIENTES",
+    73: "VENDAS",
+    74: "VENDAS",
+    75: "GERAL",
+    76: "VENDAS",
+    **dict.fromkeys(range(77, 81), "FIDELIDADE"),
 }
 
 
@@ -234,7 +244,7 @@ def movimento_de_pontos(tipo: str, quantidade: int, obs: str) -> tuple[str, int]
 
 def ordem_dos_pontos(cpf: str, quando: str, quantidade: int, ident: int) -> tuple:
     """No mesmo instante, entradas antes das saídas: o ajuste "resgate maior que o saldo" tem o horário do
-    resgate, e na ordem do id o saldo ficaria negativo por um instante (decisão 66)."""
+    resgate, e na ordem do id o saldo ficaria negativo por um instante (decisão 77)."""
     return cpf, quando, quantidade < 0, ident
 
 
@@ -358,7 +368,7 @@ class Carga:
                 "status, obs from produtos_padronizados order by rowid"
             )
         ]
-        # Decisão 59: custo estimado → último custo de nota do próprio SKU; margem mínima → +R$ 10 em 4 modelos
+        # Decisão 70: custo estimado → último custo de nota do próprio SKU; margem mínima → +R$ 10 em 4 modelos
         notas = {}
         for sku, custo in self.C.execute(
             "select sku, custo_unit from entradas_estoque where custo_unit not in ('', 'NaN') and custo_unit is not null "
@@ -371,13 +381,13 @@ class Carga:
             if "Custo estimado" in obs or "Custo de refer" in obs:
                 nota = notas.get(linha[0])
                 if nota is not None:
-                    linha[13] = f"{obs} · Custo de nota do próprio SKU: R$ {nota} (era R$ {linha[8]}, decisão 59)".strip(" ·")
+                    linha[13] = f"{obs} · Custo de nota do próprio SKU: R$ {nota} (era R$ {linha[8]}, decisão 70)".strip(" ·")
                     linha[8] = float(nota)
                 else:
                     linha[14] = True
-            if linha[2] in REAJUSTE_DECISAO_59 and linha[12] == "Ativo":
-                novo = REAJUSTE_DECISAO_59[linha[2]]
-                linha[13] = f"{linha[13] or ''} · Preço de R$ {linha[7]:.2f} para R$ {novo} (margem mínima, decisão 59)".strip(
+            if linha[2] in REAJUSTE_DECISAO_70 and linha[12] == "Ativo":
+                novo = REAJUSTE_DECISAO_70[linha[2]]
+                linha[13] = f"{linha[13] or ''} · Preço de R$ {linha[7]:.2f} para R$ {novo} (margem mínima, decisão 70)".strip(
                     " ·"
                 )
                 linha[7] = float(novo)
@@ -601,7 +611,7 @@ class Carga:
         linhas, origem = [], []
         devolvido_por_item = Counter()
         for vid, chave, loja, total, status, criado, obs, original in devolucoes:
-            if status == "Estornada":  # não conta no faturamento (decisão 63)
+            if status == "Estornada":  # não conta no faturamento (decisão 74)
                 self.rel.avisos["devolução estornada, não entra"] += 1
                 continue
             pecas = itens[vid]
@@ -697,7 +707,7 @@ class Carga:
         return [(*r,) for r in livro[aba].iter_rows(min_row=inicio, values_only=True)]
 
     def pontos(self) -> None:
-        # Resgates anotados pelas lojas: o desconto em reais e a loja de cada resgate (decisão 57)
+        # Resgates anotados pelas lojas: o desconto em reais e a loja de cada resgate (decisão 68)
         resgates = []
         for numero, linha in enumerate(self._planilha(self.arquivos["fidelidade"], "Resgates", inicio=2), start=2):
             data, cpf, _nome, pts, lancado, regra, _dif, loja = linha[:8]

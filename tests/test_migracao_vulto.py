@@ -90,7 +90,7 @@ def test_no_mesmo_instante_entradas_vem_antes_das_saidas():
 
 def test_registro_da_uniao_esta_no_formato_da_carga():
     decisoes = ler_decisoes_do_markdown(REGISTRO)
-    assert [int(d["numero"]) for d in decisoes] == list(range(55, 70))
+    assert [int(d["numero"]) for d in decisoes] == list(range(66, 81))
     assert {d["tipo"] for d in decisoes} <= {"automático", "padrão assumido", "negócio"}
 
 
@@ -114,7 +114,7 @@ def test_carga_completa_bate_os_tres_numeros_e_roda_uma_vez_so(client, admin):
 
     with SessionLocal() as db:
         assert db.scalar(select(func.count()).select_from(m.Loja).where(m.Loja.marca == "VULTO")) == 5
-        assert db.scalar(select(func.count()).select_from(m.DecisaoMigracao)) == 66
+        assert db.scalar(select(func.count()).select_from(m.DecisaoMigracao)) == 80
         # Vendas do app: canal App, expedidas pelo CD, com o status original guardado
         app = db.scalar(select(m.Pedido).where(m.Pedido.numero == "APP-7001205"))
         assert (app.canal, app.loja.nome, app.status, app.status_origem) == (
@@ -134,7 +134,7 @@ def test_carga_completa_bate_os_tres_numeros_e_roda_uma_vez_so(client, admin):
         # Venda manual da Batel com a forma de pagamento da planilha (BATEL-4: Crédito 2x)
         batel = db.scalar(select(m.Pedido).where(m.Pedido.numero == "BATEL-4"))
         assert (batel.pagamentos[0].metodo, batel.pagamentos[0].parcelas) == ("CARTAO", 2)
-        # Decisão 59: preço da Calça Cargo Comfort subiu para R$ 329,90
+        # Decisão 70: preço da Calça Cargo Comfort subiu para R$ 329,90
         assert {
             v.preco_vigente
             for v in db.scalars(
