@@ -15,6 +15,7 @@ from src.entities.cliente import problemas_do_cadastro
 from src.entities.fidelidade import categoria_pelo_saldo, valor_em_reais
 from src.entities.pedido import proximo_numero
 from src.entities.produto import ean_interno
+from src.utils.datas import agora, hoje
 from tests.conftest import CLIENTE_DEMO_ID
 
 AGORA = datetime(2026, 9, 15, 15, 0, tzinfo=UTC)
@@ -554,8 +555,10 @@ def test_filtro_de_dados_validos_traz_todos_sem_o_limite_da_busca(client, admin)
 
 def test_troca_nao_conta_como_receita(client, admin):
     """A Vulto lançava a troca como venda nova (decisão 16): ela baixa o estoque, mas não é receita."""
-    hoje = datetime.now(UTC)
-    periodo = f"de={hoje:%Y-%m-%d}&ate={hoje:%Y-%m-%d}&comparar=nenhum"
+    # Data no fuso da plataforma (o financeiro lê de/ate no horário de Brasília); com a data em UTC, o
+    # teste falhava das 21h à meia-noite, quando em UTC já é o dia seguinte
+    agora_utc, dia = agora(), hoje()
+    periodo = f"de={dia:%Y-%m-%d}&ate={dia:%Y-%m-%d}&comparar=nenhum"
     antes = client.get(f"/api/financeiro/resumo?{periodo}", headers=admin).json()
     with SessionLocal() as db:
         variacao = db.scalar(select(m.Variacao).limit(1))
@@ -568,7 +571,7 @@ def test_troca_nao_conta_como_receita(client, admin):
                 status="ENTREGUE",
                 subtotal=Decimal("100.00"),
                 total=Decimal("100.00"),
-                criado_em=hoje,
+                criado_em=agora_utc,
                 itens=[m.ItemPedido(variacao_id=variacao.id, quantidade=1, preco_unitario=Decimal("100.00"))],
             )
         )
@@ -579,18 +582,27 @@ def test_troca_nao_conta_como_receita(client, admin):
 
 def test_financeiro_soma_o_total_e_desconta_as_devolucoes_sem_pedido(client, admin):
     """Receita = total do pedido (itens − desconto + frete); devolução sem pedido entra pela loja dela."""
-    hoje = datetime.now(UTC)
-    periodo = f"de={hoje:%Y-%m-%d}&ate={hoje:%Y-%m-%d}&comparar=nenhum"
+    agora_utc, dia = agora(), hoje()  # período no fuso da plataforma (ver test_troca_nao_conta_como_receita)
+    periodo = f"de={dia:%Y-%m-%d}&ate={dia:%Y-%m-%d}&comparar=nenhum"
     antes = client.get(f"/api/financeiro/resumo?{periodo}", headers=admin).json()
     with SessionLocal() as db:
         cd = _loja_vulto(db, tipo="CD")
         variacao = _variacao_do_seed(db)
         # Itens R$ 279,80 − desconto R$ 27,98 + frete R$ 14,90 = R$ 266,72
         _venda_vulto(
-            db, cd, variacao, numero="APP-1", canal="App", frete_valor=Decimal("14.90"), total=Decimal("266.72"), criado_em=hoje
+            db,
+            cd,
+            variacao,
+            numero="APP-1",
+            canal="App",
+            frete_valor=Decimal("14.90"),
+            total=Decimal("266.72"),
+            criado_em=agora_utc,
         )
         db.add(
-            m.Devolucao(variacao_id=variacao.id, loja_id=cd.id, quantidade=1, valor_devolvido=Decimal("119.90"), criada_em=hoje)
+            m.Devolucao(
+                variacao_id=variacao.id, loja_id=cd.id, quantidade=1, valor_devolvido=Decimal("119.90"), criada_em=agora_utc
+            )
         )
         db.commit()
     depois = client.get(f"/api/financeiro/resumo?{periodo}", headers=admin).json()
