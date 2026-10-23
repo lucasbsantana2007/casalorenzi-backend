@@ -226,7 +226,7 @@ def resumo(
     # loja e canal do pedido de origem (não a loja que recebeu a peça) e categoria/gênero do produto.
 
     def devolucao_conta(d: m.Devolucao) -> bool:
-        pedido = por_id.get(d.pedido_id) if d.pedido_id else None
+        pedido = d.pedido  # o pedido de origem pode ser de outra loja ou de antes do período carregado
         if pedido is not None and pedido.tipo in TIPOS_SEM_RECEITA:
             return False
         loja_id = pedido.loja_id if pedido else d.loja_id
