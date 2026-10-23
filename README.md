@@ -273,7 +273,7 @@ A senha da equipe e dos clientes de demonstração está em `src/database/seed/d
 
 ## Vulto+ (pontos)
 
-Regras em `src/entities/fidelidade.py`, decisões 67 a 69 em `docs/registro_decisoes_uniao.md`:
+Regras em `src/entities/fidelidade.py`, decisões 78 a 80 em `docs/registro_decisoes_uniao.md`:
 
 - **Ganho:** R$ 1 em produtos = 1 ponto na loja física e 2 no site e no app (o frete não conta), mais o
   bônus da categoria antes da compra: Ouro +25%, Vip +50%. Compras da Casa Lorenzi também ganham.

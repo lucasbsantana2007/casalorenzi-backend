@@ -12,7 +12,7 @@ from src.models._restricoes import valor_em
 
 class DecisaoMigracao(Base):
     """Registro de decisões da migração da Vulto, com as colunas pedidas pela diretoria. numero segue o
-    registro da Vulto (migracao/registro_decisoes.md, 1 a 54); as decisões da carga na plataforma
+    registro da Vulto (migracao/registro_decisoes.md, 1 a 65); as decisões da carga na plataforma
     continuam a numeração."""
 
     __tablename__ = "decisoes_migracao"

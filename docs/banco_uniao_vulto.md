@@ -10,7 +10,7 @@ A fonte da carga é o repositório `copy.vulto-legado-back` (branch `main`):
 - tabelas `*_padronizadas` do `data/vulto.db`: o que não existe no banco consertado (catálogo, clientes,
   atendimentos, histórico do estoque, registro de decisões).
 
-As decisões tomadas na preparação (55 a 61), que fecham as pendências das planilhas, estão em
+As decisões tomadas na preparação (66 a 72), que fecham as pendências das planilhas, estão em
 [registro_decisoes_uniao.md](registro_decisoes_uniao.md).
 
 ## O que mudou, em uma frase por tabela
@@ -18,7 +18,7 @@ As decisões tomadas na preparação (55 a 61), que fecham as pendências das pl
 **De 23 para 27 tabelas.** Nenhuma tabela foi apagada: todas as 23 da Casa Lorenzi continuam com papel
 na plataforma unificada, e cada domínio da Vulto (catálogo, estoque, vendas, clientes, atendimento) cabe
 nelas com colunas novas. Só o Vulto+ e o controle da migração precisaram de tabelas novas. Não há tabela
-de pendências: cada pendência das planilhas virou uma decisão (55 a 61).
+de pendências: cada pendência das planilhas virou uma decisão (66 a 72).
 
 ### Tabelas novas (4)
 
@@ -35,7 +35,7 @@ de pendências: cada pendência das planilhas virou uma decisão (55 a 61).
 | --- | --- | --- |
 | `lojas` | `marca` (LORENZI, VULTO), `tipo` (LOJA, CD) | O CD Cajamar guarda estoque, mas não atende o público. Site e app **não** viram lojas (eram as "lojas" 5 e 6 de estoque fantasma, decisão 32) |
 | `produtos` | `marca`, `codigo_modelo`, `colecao`, `fornecedor_id`, `fornecedor_estimado` | Catálogo da Vulto por modelo e coleção. O código do modelo não é único: a Vulto reaproveitou MOL-002 e TRI-001 em peças diferentes |
-| `variacoes` | `ean` (único, 13 dígitos), `codigo_cd` (único), `preco` (preço próprio do SKU), `custo_estimado`, `status` (ATIVO, DESCONTINUADO, FORA_DO_CATALOGO, SO_HISTORICO), `observacao` | Código do CD e EAN de cada SKU (31 EAN internos, que começam com 2: decisão 60); 30 custos sem nota, estimados (decisão 59); peças de 2024 com o último preço vendido por SKU (decisão 39); o "DIVERSO" só de histórico (decisão 37) |
+| `variacoes` | `ean` (único, 13 dígitos), `codigo_cd` (único), `preco` (preço próprio do SKU), `custo_estimado`, `status` (ATIVO, DESCONTINUADO, FORA_DO_CATALOGO, SO_HISTORICO), `observacao` | Código do CD e EAN de cada SKU (31 EAN internos, que começam com 2: decisão 71); 30 custos sem nota, estimados (decisão 70); peças de 2024 com o último preço vendido por SKU (decisão 39); o "DIVERSO" só de histórico (decisão 37) |
 | `clientes` | e-mail opcional e **não único**; `canal_cadastro`, `aceita_marketing`, `atualizar_cadastro`, `observacao` | 765 clientes sem e-mail; 20 e-mails usados por 2 pessoas da mesma família (decisão 53); consentimento LGPD (decisão 20); CPF inválido obriga a atualizar o cadastro no próximo login (decisão 52) |
 | `pedidos` | canal `App`; `cliente_id` opcional; `tipo` (VENDA, TROCA); `desconto`; `status_origem`; `vendedor_nome`; `cliente_contato`; `observacao`; o banco confere `total = subtotal − desconto + frete` | Venda de balcão sem cliente ("consumidor"); troca não é receita (decisão 16); "Sem status" conta como venda (decisão 15); vendedor ambíguo "Rafael Lima ou Rafaela Couto" (decisão 13) |
 | `itens_pedido` | quantidade > 0 e preço ≥ 0 | A devolução da Vulto era item negativo; aqui ela vai para `devolucoes` |
@@ -68,9 +68,9 @@ valores (`CheckConstraint`).
 | `fornecedor` | `fornecedores` (6) |
 | um produto por (`modelo`, `produto`) — 176 | `produtos`: `nome`, `codigo_modelo`, `colecao`, `fornecedor_id`, marca VULTO; `preco_base` = preço do modelo; `estacao` pela coleção (Verão 26 → Verão, Atemporais → Atemporal) |
 | um SKU por linha — 866 + `DIVERSO` | `variacoes`: `sku`, `tamanho`, `cor`, `preco_custo` (custo), `ean`, `codigo_cd`, `status`, `observacao` (obs); `preco` só quando difere do produto |
-| obs "Custo estimado / de referência" | com nota do próprio SKU em `vulto_corrigido.db:entradas_estoque` (96): `preco_custo` = último custo de nota; sem nota (30): o estimado, com `custo_estimado = true` (decisão 59) |
-| preço de ACE-004, CAL-008, CAL-020 e CMS-003 | R$ 10 a mais em todo o modelo, para a margem mínima de 50% com o custo de nota (decisão 59) |
-| obs "Código CD provisório" | o código vale como está: já era usado nas vendas e na contagem (decisão 58) |
+| obs "Custo estimado / de referência" | com nota do próprio SKU em `vulto_corrigido.db:entradas_estoque` (96): `preco_custo` = último custo de nota; sem nota (30): o estimado, com `custo_estimado = true` (decisão 70) |
+| preço de ACE-004, CAL-008, CAL-020 e CMS-003 | R$ 10 a mais em todo o modelo, para a margem mínima de 50% com o custo de nota (decisão 70) |
+| obs "Código CD provisório" | o código vale como está: já era usado nas vendas e na contagem (decisão 69) |
 | obs "Fornecedor estimado" | `produtos.fornecedor_estimado = true` |
 | status Ativo / Descontinuado / Fora do catálogo 2026 / Só histórico | ATIVO / DESCONTINUADO / FORA_DO_CATALOGO / SO_HISTORICO |
 
@@ -86,7 +86,7 @@ valores (`CheckConstraint`).
 | origem "CPF inválido" ou nome "(sem cadastro na planilha)" | `atualizar_cadastro = true` |
 | `obs` | `observacao` |
 | `categoria` | não é gravada: sai do saldo (`categoria_pelo_saldo` em `src/entities/fidelidade.py`) |
-| "Dados válidos" (Sim/Não) | não é gravado: sai do CPF, do e-mail e do telefone (`dadosValidos` e `problemasCadastro` na API; decisão 61) |
+| "Dados válidos" (Sim/Não) | não é gravado: sai do CPF, do e-mail e do telefone (`dadosValidos` e `problemasCadastro` na API; decisão 72) |
 
 ### Vendas (`vulto_corrigido.db:vendas` + `itens_venda`; tipo e status de `vulto.db:vendas_padronizadas`)
 
@@ -130,14 +130,14 @@ Pedidos de teste, gravações duplicadas e relançamentos da Batel já não est�
 | --- | --- |
 | `cpf` | `cliente_id` |
 | C (crédito) | `CREDITO`, `vence_em` = 12 meses depois |
-| D (resgate, gravado positivo) | `RESGATE`, quantidade negativa; `valor_desconto` = o desconto da venda do cliente no dia, quando ela existe; sem venda, o lançado na aba Resgates (decisão 57) |
+| D (resgate, gravado positivo) | `RESGATE`, quantidade negativa; `valor_desconto` = o desconto da venda do cliente no dia, quando ela existe; sem venda, o lançado na aba Resgates (decisão 68) |
 | E (estorno) | `ESTORNO` |
 | AJ "saldo da planilha congelado em 01/01/2025" | `SALDO_INICIAL` |
 | AJ "pontos vencidos em 01/10/2026" | `VENCIMENTO` |
 | outros AJ (cortesia, bônus, resgate maior que o saldo) | `AJUSTE` |
 | `compra_id` | `pedido_id` (pela venda ligada à compra) |
 | saldo | `saldo_resultante`, acumulado por cliente em ordem de data e, **no mesmo instante, entradas antes das saídas**: o ajuste "resgate maior que o saldo" tem o mesmo horário do resgate, e na ordem do id o saldo ficaria negativo por um instante em 36 movimentos (31 clientes), o que o banco recusa |
-| resgates sem cliente (aba Pendências) | não entram no extrato de ninguém: decisões 55 e 56 (o passivo não muda) |
+| resgates sem cliente (aba Pendências) | não entram no extrato de ninguém: decisões 66 e 67 (o passivo não muda) |
 
 ### Atendimento (`vulto.db:atendimentos_padronizados`, 1.647)
 
@@ -185,17 +185,17 @@ SELECT SUM(saldo_resultante) AS pontos, SUM(saldo_resultante) * 0.05 AS reais FR
 ```
 
 A carga está certa quando esses números baterem com os do banco consertado: **R$ 6.498.071,30**,
-**15.033 peças** e **3.373.251 pontos (R$ 168.662,55)**.
+**15.033 peças** e **4.015.759 pontos (R$ 200.787,95)**.
 
 **Carga de teste (21/10/2026).** Os dados reais da Vulto foram carregados num banco temporário com
 este schema e o de/para acima, para provar que a estrutura os recebe. Nenhuma restrição recusou dado
 (fora a ordem dos pontos, já descrita na tabela do Vulto+), e as três consultas deram exatamente
-R$ 6.498.071,30, 15.033 peças e 3.373.251 pontos. As telas de pedidos, atendimentos, clientes, estoque,
+R$ 6.498.071,30, 15.033 peças e 4.015.759 pontos. As telas de pedidos, atendimentos, clientes, estoque,
 posição em data, devoluções, dashboard e financeiro responderam sem erro com os dados carregados.
 
 ## A carga (`python -m src.migracao_vulto`)
 
-O código está em `src/migracao_vulto/carga.py` e segue o de/para acima, com as decisões 55 a 66 aplicadas.
+O código está em `src/migracao_vulto/carga.py` e segue o de/para acima, com as decisões 66 a 77 aplicadas.
 Precisa do repositório da Vulto na máquina e do `openpyxl` (`pip install -r requirements-dev.txt`).
 
 ```bash
