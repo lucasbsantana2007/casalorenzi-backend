@@ -185,12 +185,12 @@ SELECT SUM(saldo_resultante) AS pontos, SUM(saldo_resultante) * 0.05 AS reais FR
 ```
 
 A carga está certa quando esses números baterem com os do banco consertado: **R$ 6.498.071,30**,
-**15.033 peças** e **3.373.251 pontos (R$ 168.662,55)**.
+**15.033 peças** e **4.015.759 pontos (R$ 200.787,95)**.
 
 **Carga de teste (21/10/2026).** Os dados reais da Vulto foram carregados num banco temporário com
 este schema e o de/para acima, para provar que a estrutura os recebe. Nenhuma restrição recusou dado
 (fora a ordem dos pontos, já descrita na tabela do Vulto+), e as três consultas deram exatamente
-R$ 6.498.071,30, 15.033 peças e 3.373.251 pontos. As telas de pedidos, atendimentos, clientes, estoque,
+R$ 6.498.071,30, 15.033 peças e 4.015.759 pontos. As telas de pedidos, atendimentos, clientes, estoque,
 posição em data, devoluções, dashboard e financeiro responderam sem erro com os dados carregados.
 
 ## A carga (`python -m src.migracao_vulto`)

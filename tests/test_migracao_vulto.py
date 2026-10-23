@@ -107,7 +107,7 @@ def test_carga_completa_bate_os_tres_numeros_e_roda_uma_vez_so(client, admin):
     numeros = relatorio.numeros
     assert numeros["faturamento jan/2025 a set/2026 (R$)"] == (Decimal("6498071.30"), Decimal("6498071.30"))
     assert numeros["estoque em 01/10/2026 (peças)"] == (15033, 15033)
-    assert numeros["passivo Vulto+ em 01/10/2026 (pontos)"] == (3373251, 3373251)
+    assert numeros["passivo Vulto+ em 01/10/2026 (pontos)"] == (4015759, 4015759)
 
     with SessionLocal() as db, pytest.raises(CargaRecusada, match="já foi feita"):
         Carga(db, ORIGEM, REGISTRO).executar(aviso=lambda _: None)

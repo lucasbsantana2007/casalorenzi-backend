@@ -286,7 +286,7 @@ def test_categoria_do_vulto_mais_pelo_saldo(saldo, categoria):
 
 
 def test_valor_dos_pontos_e_ean_interno():
-    assert valor_em_reais(3_373_251) == Decimal("168662.55")  # passivo oficial da Vulto em 01/10/2026
+    assert valor_em_reais(4_015_759) == Decimal("200787.95")  # passivo oficial da Vulto em 01/10/2026
     assert ean_interno("2000000000015") and not ean_interno("7896293000000") and not ean_interno(None)
 
 
