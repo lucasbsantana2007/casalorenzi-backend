@@ -241,3 +241,10 @@ def test_cancelar_estorna_e_cancela_transferencias_pendentes(client, admin, mari
     assert all(t["status"] == "CANCELADA" for t in cancelado["transferencias"])
     # Cancelado não troca de loja
     assert client.patch(f"/api/pedidos/{pedido['id']}", headers=admin, json={"lojaId": 1}).status_code == 409
+
+
+def test_lista_do_painel_traz_o_status_das_transferencias(client, admin):
+    """A lista do painel marca "Aguardando transferência": cada pedido vem com o status das transferências."""
+    lista = client.get("/api/pedidos", headers=admin).json()
+    assert lista and all(isinstance(p["transferencias"], list) for p in lista)
+    assert all(set(t) == {"id", "status"} for p in lista for t in p["transferencias"])
