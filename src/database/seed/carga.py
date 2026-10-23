@@ -106,7 +106,8 @@ def popular(db: Session) -> None:
     _popular_frete(db)
     db.add_all(m.Categoria(id=i, nome=nome) for i, nome in enumerate(CATEGORIAS, start=1))
     db.flush()
-    # Helena (Administradora) é do grupo e vê as duas marcas; Paula, só a Vulto; o resto, a Casa Lorenzi
+    # Helena (Administradora) é do grupo e vê as duas marcas; Paula, só a Vulto; Otávio e o resto, só a
+    # Casa Lorenzi. A equipe das lojas da Vulto entra depois da carga da Vulto (equipe_vulto.py)
     db.add_all(
         m.Usuario(
             id=i,

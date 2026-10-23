@@ -38,4 +38,4 @@ def test_seed_funciona_logo_depois_das_migracoes():
 
         assert _contar(db, m.ConfigFrete) == 1
         assert _contar(db, m.FreteRegiao) == 6
-        assert _contar(db, m.Usuario) == 9 and _contar(db, m.Produto) == 13
+        assert _contar(db, m.Usuario) == 10 and _contar(db, m.Produto) == 13

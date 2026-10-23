@@ -264,9 +264,16 @@ são relativas ao momento da carga. Sem `--recriar`, só popula se o banco estiv
 
 | Perfil | E-mail | Acesso |
 | --- | --- | --- |
-| Administrador | helena@casalorenzi.com.br | tudo |
-| Lojista | rafael.monteiro@casalorenzi.com.br | dashboard (só a própria loja), pedidos, estoque, atendimento |
-| Operador | diego.almeida@casalorenzi.com.br | dashboard, pedidos, estoque, transferências |
+| Administradora do grupo (ADM geral) | helena@casalorenzi.com.br | tudo, das duas marcas (no painel, escolhe Todas, Casa Lorenzi ou Vulto) |
+| Administrador da Casa Lorenzi | otavio.vasconcelos@casalorenzi.com.br | tudo, só da Casa Lorenzi (o frete é do grupo) |
+| Lojista da Casa Lorenzi (Oscar Freire) | rafael.monteiro@casalorenzi.com.br | dashboard (só a própria loja), pedidos, estoque, atendimento |
+| Operador da Casa Lorenzi (Oscar Freire) | diego.almeida@casalorenzi.com.br | dashboard, pedidos, estoque, transferências |
+| Administradora da Vulto | paula.ferraz@vulto.com.br | tudo, só da Vulto (o frete é do grupo) |
+| Lojista da Vulto (Vulto Pinheiros) | lia.okada@vulto.com.br | o do Lojista, na Vulto |
+| Operador da Vulto (CD Cajamar) | bruno.sales@vulto.com.br | o do Operador, na Vulto |
+
+A Lia e o Bruno trabalham em lojas da Vulto, que só existem depois da carga: entram com
+`python -m src.database.seed.equipe_vulto` (veja [Carga da Vulto](#carga-da-vulto)).
 
 A senha da equipe e dos clientes de demonstração está em `src/database/seed/dados.py`
 (`SENHA_DEMO`). Clientes entram pelo mesmo login (ex.: mariana.costa@gmail.com, CPF 158.813.998-03).
@@ -293,11 +300,14 @@ Os dados da Vulto (rede comprada em 2026) entram uma vez só, com:
 pip install -r requirements-dev.txt
 python -m src.migracao_vulto --origem ../copy.vulto-legado-back --simular   # roda, confere e desfaz
 python -m src.migracao_vulto --origem ../copy.vulto-legado-back             # grava, se tudo bater
+python -m src.database.seed.equipe_vulto                                    # equipe das lojas da Vulto
 ```
 
 Ela confere o faturamento, o estoque em 01/10/2026 e o passivo de pontos contra a origem antes de gravar, e
 recusa rodar de novo. Detalhes em [docs/banco_uniao_vulto.md](docs/banco_uniao_vulto.md). Depois dela,
-**não rode `python -m src.database.seed --recriar`**: ele apaga todos os dados, inclusive os da Vulto.
+`python -m src.database.seed --recriar` apaga todos os dados, inclusive os da Vulto, os pedidos feitos no
+site e as contas criadas. Para refazer tudo do zero, rode os três na ordem: `python -m src.database.seed
+--recriar`, a carga (sem `--simular`) e `python -m src.database.seed.equipe_vulto`.
 
 ## Migrações (Alembic)
 
@@ -358,11 +368,14 @@ Os e-mails (nova senha, convite e confirmação do pedido) saem de verdade pelo 
 apontam para `URL_FRONTEND`. Os dados ainda são de **demonstração** (contas com a senha de
 demonstração): antes de um uso real, troque as senhas e, no frontend, defina `VITE_MODO_DEMO=false`.
 
-Para recarregar os dados de demonstração do banco do Render (apaga tudo), rode do seu computador
-com a "External Database URL" que o Render mostra na página do banco:
+Para recarregar os dados de demonstração e da Vulto no banco do Render (apaga tudo), rode do seu
+computador com a "External Database URL" que o Render mostra na página do banco:
 
 ```bash
-DATABASE_URL="postgresql://..." .venv/bin/python -m src.database.seed --recriar
+export DATABASE_URL="postgresql+psycopg://..."
+.venv/bin/python -m src.database.seed --recriar
+.venv/bin/python -m src.migracao_vulto --origem ../copy.vulto-legado-back
+.venv/bin/python -m src.database.seed.equipe_vulto
 ```
 
 No plano grátis, a API "dorme" sem uso e o primeiro acesso seguinte demora perto de um minuto.
