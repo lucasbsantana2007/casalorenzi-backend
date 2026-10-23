@@ -34,8 +34,9 @@ def listar(
     Lojista e Operador recebem só os pedidos que a própria loja expede (o lojaId é ignorado)."""
     lista = pedidos.listar(db, usuario, status=status, loja_id=lojaId, canal=canal, busca=busca, marca=marca)
     # A lista do painel usa só o resumo (número, cliente, itens, total, loja, status, canal e data); o
-    # histórico, as transferências e o saldo de cada peça na loja vêm no detalhe (GET /pedidos/{id})
-    return [pedido_saida(p) for p in lista]
+    # status das transferências (para o aviso "Aguardando transferência"); o histórico, as transferências
+    # completas e o saldo de cada peça na loja vêm no detalhe (GET /pedidos/{id})
+    return [{**pedido_saida(p), "transferencias": [{"id": t.id, "status": t.status} for t in p.transferencias]} for p in lista]
 
 
 @router.get("/{pedido_id}")

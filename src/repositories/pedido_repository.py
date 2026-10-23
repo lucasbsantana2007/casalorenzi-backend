@@ -53,7 +53,8 @@ def listar(
 ) -> list[m.Pedido]:
     """Mais recentes primeiro. marca: só os das lojas dessa marca. busca: número do pedido, nome ou e-mail
     do cliente ou o contato digitado na venda sem cadastro (no banco inteiro, antes do limite)."""
-    consulta = com_itens().order_by(m.Pedido.criado_em.desc(), m.Pedido.id.desc())
+    # A lista do painel marca "Aguardando transferência": as transferências vêm numa consulta só
+    consulta = com_itens().options(selectinload(m.Pedido.transferencias)).order_by(m.Pedido.criado_em.desc(), m.Pedido.id.desc())
     if marca:
         consulta = consulta.where(m.Pedido.loja_id.in_(select(m.Loja.id).where(m.Loja.marca == marca)))
     if busca and busca.strip():
