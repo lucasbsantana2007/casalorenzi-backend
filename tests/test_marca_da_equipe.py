@@ -4,6 +4,7 @@ tela). O Administrador do grupo vê as duas e pode filtrar uma pelo cabeçalho X
 from src import models as m
 from src.database.connection import SessionLocal
 from src.database.seed import SENHA_DEMO
+from src.database.seed.equipe_vulto import criar_equipe_da_vulto
 from src.utils.seguranca import gerar_hash
 from tests.conftest import _entrar
 from tests.test_api import _novo_produto
@@ -117,3 +118,36 @@ def test_funcionarios_lojas_e_frete_respeitam_a_marca(client, admin, lojista):
     )
     assert client.get("/api/frete/config", headers=admin_vulto).status_code == 200
     assert client.put("/api/frete/config", headers=admin_vulto, json={}).status_code == 403
+
+
+def test_equipe_de_demonstracao_de_cada_marca(client):
+    """Helena (grupo) vê as duas marcas; cada marca tem Administrador, Lojista e Operador que só veem a
+    deles. A equipe das lojas da Vulto entra depois da carga, que é quando as lojas existem."""
+    with SessionLocal() as db:
+        assert criar_equipe_da_vulto(db) == []
+    loja_id, cd_id, produto_vulto, _ = _vulto_no_banco()
+    with SessionLocal() as db:
+        assert criar_equipe_da_vulto(db) == ["Lia Okada (Vulto Pinheiros)", "Bruno Sales (CD Cajamar)"]
+        db.commit()
+    with SessionLocal() as db:
+        assert criar_equipe_da_vulto(db) == []  # rodar de novo não cria ninguém em dobro
+
+    equipe = {
+        "otavio.vasconcelos@casalorenzi.com.br": ("ADMINISTRADOR", "LORENZI", None),
+        "paula.ferraz@vulto.com.br": ("ADMINISTRADOR", "VULTO", None),
+        "lia.okada@vulto.com.br": ("LOJISTA", "VULTO", loja_id),
+        "bruno.sales@vulto.com.br": ("OPERADOR", "VULTO", cd_id),
+    }
+    for email, esperado in equipe.items():
+        r = client.post("/api/auth/login", json={"email": email, "senha": SENHA_DEMO})
+        assert r.status_code == 200, r.text
+        usuario = r.json()["usuario"]
+        assert (usuario["papel"], usuario["marca"], usuario["lojaId"]) == esperado
+
+    # O Administrador da Casa Lorenzi não vê a Vulto, nem pedindo pelo seletor do painel (X-Marca)
+    otavio = _entrar(client, "otavio.vasconcelos@casalorenzi.com.br")
+    produtos = client.get("/api/produtos", headers={**otavio, "X-Marca": "VULTO"}).json()
+    assert {p["marca"] for p in produtos} == {"LORENZI"}
+    assert client.get(f"/api/produtos/{produto_vulto}", headers=otavio).status_code == 404
+    assert {f["marca"] for f in client.get("/api/admin/funcionarios", headers=otavio).json()} == {"LORENZI"}
+    assert {loja["marca"] for loja in client.get("/api/admin/lojas", headers=otavio).json()} == {"LORENZI"}
