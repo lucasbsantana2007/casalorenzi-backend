@@ -48,3 +48,10 @@ def total_no_pedido(db: Session, pedido_id: int, tipo: str) -> int:
             select(m.MovimentoPontos.quantidade).where(m.MovimentoPontos.pedido_id == pedido_id, m.MovimentoPontos.tipo == tipo)
         )
     )
+
+
+def movimentos_de_todos(db: Session) -> list:
+    """(cliente_id, quantidade, vence_em, criado_em) de todo o extrato, em ordem de cliente e data: base dos
+    números do programa (pontos válidos, a vencer, clientes por categoria). Só as colunas que a conta usa."""
+    mov = m.MovimentoPontos
+    return list(db.execute(select(mov.cliente_id, mov.quantidade, mov.vence_em, mov.criado_em).order_by(mov.cliente_id, *_ORDEM)))
