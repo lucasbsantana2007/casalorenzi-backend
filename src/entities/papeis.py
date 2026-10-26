@@ -23,6 +23,9 @@ ACESSO = {
     "financeiro": (ADMINISTRADOR,),
     # Central administrativa: funcionários, lojas, frete e log de ações
     "administracao": (ADMINISTRADOR,),
+    # Inteligência de Negócios (copiloto de IA e alertas): toda a equipe abre a tela, mas cada consulta
+    # confere o módulo do assunto (vendas = financeiro, estoque = estoque...). Ver src/use_cases/assistente
+    "inteligencia": (ADMINISTRADOR, LOJISTA, OPERADOR),
 }
 
 
