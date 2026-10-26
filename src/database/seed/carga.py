@@ -12,7 +12,7 @@ import argparse
 from datetime import date
 from decimal import ROUND_HALF_UP, Decimal
 
-from sqlalchemy import delete, func, select, text
+from sqlalchemy import Integer, delete, func, select, text
 from sqlalchemy.orm import Session
 
 from src import models as m
@@ -45,6 +45,10 @@ def _ajustar_sequencias(db: Session) -> None:
     if db.get_bind().dialect.name != "postgresql":
         return
     for tabela in Base.metadata.sorted_tables:
+        # Só tabelas com id inteiro têm sequência (a das conversas do assistente usa um uuid em texto)
+        coluna = tabela.c.get("id")
+        if coluna is None or not isinstance(coluna.type, Integer):
+            continue
         db.execute(
             text(
                 f"SELECT setval(pg_get_serial_sequence('{tabela.name}', 'id'), "
