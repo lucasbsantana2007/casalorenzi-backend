@@ -15,6 +15,7 @@ if not URL_TESTE:
     pytest.skip("Defina TEST_DATABASE_URL para rodar os testes.", allow_module_level=True)
 os.environ["DATABASE_URL"] = URL_TESTE  # precisa vir antes de importar o app
 os.environ["RESEND_API_KEY"] = ""  # testes nunca mandam e-mail de verdade (sem chave, vai para o log)
+os.environ["ANTHROPIC_API_KEY"] = ""  # testes nunca chamam o modelo de verdade (usam tests/ia_falsa.py)
 
 from alembic.config import Config  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
@@ -23,6 +24,7 @@ from alembic import command  # noqa: E402
 from src.app import app  # noqa: E402
 from src.database.connection import SessionLocal  # noqa: E402
 from src.database.seed import SENHA_DEMO, apagar_tudo, popular  # noqa: E402
+from src.integrations import ia  # noqa: E402
 from src.middlewares import limite  # noqa: E402
 
 
@@ -38,6 +40,14 @@ def banco_limpo(migrar):
         apagar_tudo(db)
         popular(db)
         db.commit()
+
+
+@pytest.fixture(autouse=True)
+def sem_modelo():
+    """Por padrão, os assistentes respondem pelas regras (sem LLM); o teste troca por um ProvedorFalso."""
+    ia.definir_provedor(None)
+    yield
+    ia.restaurar_provedor()
 
 
 @pytest.fixture

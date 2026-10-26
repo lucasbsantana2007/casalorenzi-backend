@@ -53,3 +53,41 @@ URL_FRONTEND = os.getenv("URL_FRONTEND", "http://localhost:5173").rstrip("/")
 # "Esqueci a senha" e convite de funcionário: true devolve o link também na resposta da API, para
 # testar o fluxo na demonstração. Nunca true em produção.
 LINK_SENHA_NA_RESPOSTA = os.getenv("LINK_SENHA_NA_RESPOSTA", "false").lower() == "true"
+
+# ---------- Assistentes de IA (docs/assistente_ia.md) ----------
+# Chave da API da Anthropic (Claude). Sem ela, os assistentes respondem só pelas regras
+# determinísticas (sem LLM). Nunca vai para o frontend nem para o git.
+ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
+# Modelo do Claude. Padrão econômico: Haiku 5.5. Trocar o modelo não exige mudar o código.
+IA_MODELO = os.getenv("IA_MODELO", "claude-haiku-5-5")
+# Quanto o modelo pensa antes de responder: low (chat, mais barato), medium ou high
+IA_ESFORCO = os.getenv("IA_ESFORCO", "low")
+# Teto de tokens de saída por chamada (inclui o raciocínio do modelo)
+IA_MAX_TOKENS = int(os.getenv("IA_MAX_TOKENS", "2048"))
+# Tempo máximo de cada chamada ao modelo e quantas vezes o SDK tenta de novo (429, 5xx, rede)
+IA_TIMEOUT_SEGUNDOS = float(os.getenv("IA_TIMEOUT_SEGUNDOS", "25"))
+IA_MAX_TENTATIVAS = int(os.getenv("IA_MAX_TENTATIVAS", "1"))
+# Mensagens anteriores enviadas ao modelo (o resto da conversa fica no banco, fora do contexto)
+IA_HISTORICO_MENSAGENS = int(os.getenv("IA_HISTORICO_MENSAGENS", "12"))
+# Por mensagem do usuário: idas e voltas com o modelo e consultas (ferramentas) no máximo
+IA_MAX_RODADAS = int(os.getenv("IA_MAX_RODADAS", "4"))
+IA_MAX_FERRAMENTAS = int(os.getenv("IA_MAX_FERRAMENTAS", "6"))
+# Conversa parada há mais que isso recomeça do zero (a memória da conversa expira)
+IA_CONVERSA_EXPIRA_HORAS = int(os.getenv("IA_CONVERSA_EXPIRA_HORAS", "24"))
+# Retenção: conversas sem atividade há mais que isso são apagadas pela automação de limpeza
+IA_RETENCAO_DIAS = int(os.getenv("IA_RETENCAO_DIAS", "90"))
+# Respostas prontas (sem LLM) para mensagens simples: saudação, agradecimento, pedido de atendente
+IA_RESPOSTAS_DIRETAS = os.getenv("IA_RESPOSTAS_DIRETAS", "true").lower() == "true"
+
+# Banco só de leitura para o copiloto e as automações (opcional): um usuário do Postgres só com SELECT.
+# Vazio: usa DATABASE_URL, e cada consulta roda numa transação READ ONLY com tempo máximo.
+DATABASE_URL_LEITURA = os.getenv("DATABASE_URL_LEITURA", "") or DATABASE_URL
+CONSULTA_TIMEOUT_MS = int(os.getenv("CONSULTA_TIMEOUT_MS", "8000"))
+
+# Automações (python -m src.automacoes): limites dos alertas operacionais
+# Estoque baixo só vira alerta se a peça vendeu no local nos últimos N dias (evita milhares de alertas)
+ALERTA_ESTOQUE_BAIXO_JANELA_DIAS = int(os.getenv("ALERTA_ESTOQUE_BAIXO_JANELA_DIAS", "60"))
+# Estoque parado: peça com saldo e sem venda no local há N dias ou mais
+ALERTA_ESTOQUE_PARADO_DIAS = int(os.getenv("ALERTA_ESTOQUE_PARADO_DIAS", "90"))
+# Pontos Vulto+ que vencem nos próximos N dias
+ALERTA_PONTOS_DIAS = int(os.getenv("ALERTA_PONTOS_DIAS", "30"))
