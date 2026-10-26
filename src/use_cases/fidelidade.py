@@ -95,6 +95,12 @@ def _lotes_em_aberto(movimentos: list[m.MovimentoPontos]) -> list[_Lote]:
     return lotes
 
 
+def lotes_em_aberto(movimentos) -> list[tuple[date, int]]:
+    """(vencimento, pontos) do que ainda não foi gasto de cada entrada, pela regra acima. Só calcula: não
+    lança nada. movimentos: do extrato de um cliente, em ordem (com quantidade, vence_em e criado_em)."""
+    return [(lote.vence_em, lote.restante) for lote in _lotes_em_aberto(movimentos)]
+
+
 def vencer(db: Session, cliente_id: int, hoje: date | None = None) -> int:
     """Lança como VENCIMENTO o que sobrou das entradas vencidas. Devolve quantos pontos venceram.
     Quem chama já travou o cliente."""

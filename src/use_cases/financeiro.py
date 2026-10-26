@@ -4,14 +4,16 @@ Receita = o total dos pedidos de venda não cancelados (itens − desconto + fre
 faturamento da diretoria. Troca não é receita. Com filtro de categoria ou gênero, só os itens que batem
 entram (desconto e frete não se dividem por item).
 devolucoesValor soma o valor reembolsado no período; receitaLiquida = receita − devoluções. Devolução sem
-pedido de origem (Vulto) entra pela loja em que foi registrada: loja física → Loja física, CD → E-commerce."""
+pedido de origem (Vulto) entra pela loja em que foi registrada: loja física → Loja física, CD → E-commerce.
+porLoja e porCanal trazem também as devoluções e a receitaLiquida de cada um, com a mesma atribuição (a soma
+das lojas, e a dos canais, fecha com o total)."""
 
 from datetime import datetime, timedelta
 
 from sqlalchemy.orm import Session
 
 from src import models as m
-from src.entities.pedido import TIPOS_SEM_RECEITA
+from src.entities.pedido import CANAIS, TIPOS_SEM_RECEITA
 from src.repositories import (
     atendimento_repository,
     cadastro_repository,
@@ -107,7 +109,14 @@ def resumo(
         if not itens:
             return None
         valor = sum(float(i.preco_unitario) * i.quantidade for i in itens) if filtra_produto else float(pedido.total)
-        return {"loja_id": pedido.loja_id, "status": pedido.status, "criado_em": pedido.criado_em, "itens": itens, "total": valor}
+        return {
+            "loja_id": pedido.loja_id,
+            "canal": pedido.canal,
+            "status": pedido.status,
+            "criado_em": pedido.criado_em,
+            "itens": itens,
+            "total": valor,
+        }
 
     # Só a janela do período e da comparação (a base da Vulto tem dezenas de milhares de pedidos)
     comp = None if comparar == "nenhum" else intervalo_comparacao(inicio, fim, comparar)
@@ -225,12 +234,18 @@ def resumo(
     # Valor reembolsado em devoluções (tabela devolucoes). Respeita os mesmos filtros da receita:
     # loja e canal do pedido de origem (não a loja que recebeu a peça) e categoria/gênero do produto.
 
-    def devolucao_conta(d: m.Devolucao) -> bool:
-        pedido = d.pedido  # o pedido de origem pode ser de outra loja ou de antes do período carregado
-        if pedido is not None and pedido.tipo in TIPOS_SEM_RECEITA:
-            return False
+    def origem_devolucao(d: m.Devolucao) -> tuple[int, str]:
+        """Loja e canal a que a devolução pertence: os do pedido de origem (que pode ser de outra loja ou de
+        antes do período carregado); sem pedido, a loja em que foi registrada."""
+        pedido = d.pedido
         loja_id = pedido.loja_id if pedido else d.loja_id
         canal = pedido.canal if pedido else ("Loja física" if d.loja.tipo == "LOJA" else "E-commerce")
+        return loja_id, canal
+
+    def devolucao_conta(d: m.Devolucao) -> bool:
+        if d.pedido is not None and d.pedido.tipo in TIPOS_SEM_RECEITA:
+            return False
+        loja_id, canal = origem_devolucao(d)
         if filtro_lojas and loja_id not in filtro_lojas:
             return False
         if filtro_canais and canal not in filtro_canais:
@@ -238,16 +253,40 @@ def resumo(
         return not filtra_produto or produto_valido(d.variacao.produto)
 
     devolvido = [
-        (d.criada_em, float(d.valor_devolvido))
+        (d.criada_em, float(d.valor_devolvido), *origem_devolucao(d))
         for d in devolucao_repository.listar(db, desde=min(inicio, comp[0]) if comp else inicio, ate=fim)
         if devolucao_conta(d)
     ]
 
-    def valor_devolvido(a: datetime, b: datetime) -> float:
-        return sum(valor for quando, valor in devolvido if a <= quando < b)
+    def valor_devolvido(a: datetime, b: datetime, loja_id: int | None = None, canal: str | None = None) -> float:
+        return sum(
+            valor
+            for quando, valor, loja, canal_dev in devolvido
+            if a <= quando < b and (loja_id is None or loja == loja_id) and (canal is None or canal_dev == canal)
+        )
 
     devolvido_atual = valor_devolvido(inicio, fim)
     devolvido_anterior = valor_devolvido(*comp) if comp else None
+
+    # Faturamento líquido de cada loja e de cada canal, com a mesma atribuição das devoluções
+    for linha in por_loja:
+        linha["devolucoes"] = valor_devolvido(inicio, fim, loja_id=linha["loja"]["id"])
+        linha["receitaLiquida"] = linha["receita"] - linha["devolucoes"]
+    por_canal = []
+    for canal in CANAIS:
+        if filtro_canais and canal not in filtro_canais:
+            continue
+        do_canal = [p for p in atual if p["canal"] == canal]
+        devolvido_canal = valor_devolvido(inicio, fim, canal=canal)
+        por_canal.append(
+            {
+                "canal": canal,
+                "receita": soma(do_canal),
+                "pedidos": len(do_canal),
+                "devolucoes": devolvido_canal,
+                "receitaLiquida": soma(do_canal) - devolvido_canal,
+            }
+        )
     return {
         "receita": soma(atual),
         "receitaAnterior": soma(anterior) if comp else None,
@@ -264,6 +303,7 @@ def resumo(
         "devolucoesValor": devolvido_atual,
         "devolucoesValorAnterior": devolvido_anterior,
         "porLoja": por_loja,
+        "porCanal": por_canal,
         "porCategoria": por_categoria,
         "serie": serie,
         "posVenda": pos_venda_serie,

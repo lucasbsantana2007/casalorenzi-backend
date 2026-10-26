@@ -13,12 +13,15 @@ from src.config.settings import CORS_ORIGINS, LOG_LEVEL
 from src.middlewares import requisicoes
 from src.routers import (
     administracao,
+    alertas,
+    assistente,
     atendimentos,
     autenticacao,
     cadastros,
     checkout,
     clientes,
     conta,
+    copiloto,
     dashboard,
     devolucoes,
     estoque,
@@ -79,6 +82,9 @@ for modulo in (
     financeiro,
     frete,
     administracao,
+    assistente,
+    copiloto,
+    alertas,
 ):
     api.include_router(modulo.router)
 

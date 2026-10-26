@@ -8,3 +8,5 @@ pyjwt~=2.15.1
 bcrypt~=5.0.0
 httpx~=0.28.1
 truststore~=0.10.4
+# Assistentes de IA: SDK oficial da Anthropic (Claude). Sem ANTHROPIC_API_KEY, a API funciona sem LLM
+anthropic~=2.3.0

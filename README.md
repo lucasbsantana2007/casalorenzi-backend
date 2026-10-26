@@ -130,6 +130,7 @@ O diagrama das tabelas, com o que a união mudou, está em [docs/diagrama_banco.
 | Atendimento | `tipos_solicitacao`, `atendimentos` (site, WhatsApp, Instagram ou e-mail; com cliente ou só o contato), `mensagens`, `anexos` (foto) |
 | Administração | `config_frete` e `frete_regioes` (frete configurável), `log_acoes` (quem fez o quê) |
 | Migração da Vulto | `decisoes_migracao` (registro de decisões: os 54 da Vulto e os da união, em [docs/registro_decisoes_uniao.md](docs/registro_decisoes_uniao.md)), `de_para` (origem de cada registro migrado) |
+| Assistentes de IA | `conversas_assistente`, `mensagens_assistente` (conversas do site e do copiloto), `chamadas_ferramenta` (auditoria das consultas), `consumo_ia` (tokens e custo), `alertas` e `execucoes_automacao` (automações). Ver [docs/assistente_ia.md](docs/assistente_ia.md) |
 
 **Um login só para equipe e clientes.** O cliente cria a conta no checkout (nome, CPF, e-mail,
 telefone e senha) e entra pelo mesmo `POST /auth/login`; o token traz o papel `CLIENTE`, que só
@@ -175,7 +176,14 @@ Todas sob o prefixo `/api`. As rotas internas exigem `Authorization: Bearer <tok
 | GET | `/clientes?busca&dadosValidos` (`dadosValidos=false`: todos com cadastro a corrigir, com o motivo) | administrador, lojista |
 | GET | `/clientes/{id}`, `/clientes/{id}/pedidos`, `/clientes/{id}/pedidos/{numero}`, `/clientes/{id}/atendimentos`, `/clientes/{id}/atendimentos/{aid}`, `/clientes/{id}/pontos` | administrador, lojista, o próprio cliente |
 | GET | `/dashboard/resumo?lojaId` | equipe |
-| GET | `/financeiro/resumo?de&ate&comparar&agrupar&lojas&canais&categorias&generos` | administrador |
+| GET | `/financeiro/resumo?de&ate&comparar&agrupar&lojas&canais&categorias&generos` (`porLoja` e `porCanal` com devoluções e receita líquida) | administrador |
+| POST · GET | `/assistente/conversas` (devolve a `chave`) · `/assistente/conversas/{id}` (cabeçalho `X-Conversa-Chave`) | público (sem login: quem tem a chave; com login de cliente: só o dono) |
+| POST | `/assistente/conversas/{id}/mensagens` (`texto`, `idCliente`, `acao`), `/eventos` (sacola), `/encerrar` | o dono da conversa |
+| POST | `/assistente/conversas/{id}/atendimento` (abre um chamado com o resumo) | o cliente dono da conversa |
+| GET · GET, POST | `/copiloto/sugestoes` · `/copiloto/conversas` · GET `/copiloto/conversas/{id}` · POST `/copiloto/conversas/{id}/mensagens` | equipe (cada consulta confere o módulo do assunto e a marca) |
+| GET | `/copiloto/uso?dias` (uso e custo da IA) | administrador |
+| GET · PATCH | `/alertas?tipo&status&lojaId` · `/alertas/{id}` (RESOLVIDO ou DESCARTADO) | equipe (cada tipo pede o módulo do assunto) |
+| GET · POST · GET | `/automacoes` · `/automacoes/{nome\|todas}/executar` · `/automacoes/execucoes` | administrador |
 
 ## Regras importantes
 
@@ -292,6 +300,22 @@ Regras em `src/entities/fidelidade.py`, decisões 78 a 80 em `docs/registro_deci
   é lançado como `VENCIMENTO` na primeira consulta ou compra do cliente depois da data.
 - **Categoria** pelo saldo válido: Bronze até 1.500, Prata até 5.000, Ouro até 9.999, Vip a partir de 10.000.
 
+## Assistentes de IA (Entrega 4)
+
+Detalhes em [docs/assistente_ia.md](docs/assistente_ia.md), custos em [docs/custos_ia.md](docs/custos_ia.md) e o
+roteiro para a banca em [docs/roteiro_demonstracao.md](docs/roteiro_demonstracao.md).
+
+- **Assistente do site** (`/assistente`): busca peças no catálogo real, disponibilidade no site e por loja, memória da
+  conversa, Vulto+ e pedidos do cliente logado, botão "Adicionar à sacola" (o cliente confirma) e encaminhamento para o
+  atendimento com o resumo da conversa.
+- **Copiloto gerencial** (`/copiloto`, tela Assistente IA do painel): vendas, estoque, transferências e Vulto+ em
+  linguagem natural, com as regras oficiais (o faturamento é o do Financeiro) e período, filtros e definição em cada
+  resposta. Cada consulta confere o papel e a marca do token; as consultas rodam em transação somente leitura.
+- **Automações** (`python -m src.automacoes`): alertas de estoque baixo, estoque parado, sugestões de transferência e
+  pontos a vencer, sem duplicar, e a limpeza das conversas (retenção de 90 dias).
+- **Modelo:** Claude Haiku 5.5 pelo SDK oficial (`ANTHROPIC_API_KEY`, `IA_MODELO`). Sem chave, os assistentes respondem
+  por regras determinísticas com as mesmas consultas; se o modelo cair, as regras assumem.
+
 ## Carga da Vulto
 
 Os dados da Vulto (rede comprada em 2026) entram uma vez só, com:
@@ -332,6 +356,9 @@ pytest
 ```
 
 Rode os testes antes de cada commit. Toda regra nova ganha teste.
+
+Os testes dos assistentes de IA nunca chamam a API do modelo: o `conftest.py` zera a `ANTHROPIC_API_KEY` e cada teste
+usa as regras ou um modelo simulado (`tests/ia_falsa.py`).
 
 ## Padrão de código e commits
 

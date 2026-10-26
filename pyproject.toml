@@ -25,6 +25,10 @@ testpaths = ["tests"]
 # Tabelas de dados de demonstração e testes ficam mais legíveis em linhas longas
 "src/database/seed/*" = ["E501"]
 "tests/*" = ["E501"]
+# Textos das respostas dos assistentes (em português) ficam inteiros, mais fáceis de revisar
+"src/use_cases/assistente/*" = ["E501"]
+"src/use_cases/automacoes.py" = ["E501"]
+"src/automacoes/*" = ["E501"]
 
 [tool.ruff.format]
 quote-style = "double"

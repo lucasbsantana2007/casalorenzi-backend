@@ -5,15 +5,20 @@
     alembic upgrade head
 """
 
+from src.models.alerta import Alerta
 from src.models.anexo import Anexo
 from src.models.atendimento import Atendimento
 from src.models.categoria import Categoria
+from src.models.chamada_ferramenta import ChamadaFerramenta
 from src.models.cliente import Cliente
+from src.models.consumo_ia import ConsumoIA
+from src.models.conversa_assistente import ConversaAssistente
 from src.models.de_para import DePara
 from src.models.decisao_migracao import DecisaoMigracao
 from src.models.devolucao import Devolucao
 from src.models.estoque import Estoque
 from src.models.evento_pedido import EventoPedido
+from src.models.execucao_automacao import ExecucaoAutomacao
 from src.models.fornecedor import Fornecedor
 from src.models.frete import ConfigFrete, FreteRegiao
 from src.models.imagem_produto import ImagemProduto
@@ -21,6 +26,7 @@ from src.models.item_pedido import ItemPedido
 from src.models.log_acao import LogAcao
 from src.models.loja import Loja
 from src.models.mensagem import Mensagem
+from src.models.mensagem_assistente import MensagemAssistente
 from src.models.movimentacao import Movimentacao
 from src.models.movimento_pontos import MovimentoPontos
 from src.models.pagamento import Pagamento
@@ -60,4 +66,10 @@ __all__ = [
     "LogAcao",
     "DecisaoMigracao",
     "DePara",
+    "ConversaAssistente",
+    "MensagemAssistente",
+    "ChamadaFerramenta",
+    "ConsumoIA",
+    "Alerta",
+    "ExecucaoAutomacao",
 ]
