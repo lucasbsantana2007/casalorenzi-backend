@@ -38,7 +38,7 @@ class CheckoutEntrada(Entrada):
     frete_tipo: Literal["PADRAO", "EXPRESSO"] = "PADRAO"
     pagamento: PagamentoCheckoutEntrada = PagamentoCheckoutEntrada()
     itens: list[ItemCheckoutEntrada] = []
-    # Pontos Vulto+ usados como desconto (0 = nenhum). Regras em src/entities/fidelidade.py
+    # Pontos Helo usados como desconto (0 = nenhum). Regras em src/entities/fidelidade.py
     pontos: int = 0
 
 

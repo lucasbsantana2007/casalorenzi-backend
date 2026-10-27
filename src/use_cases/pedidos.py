@@ -262,7 +262,7 @@ def atualizar(
     else:  # CANCELADO
         _cancelar_transferencias_pendentes(pedido)
         estornar_aprovados(db, pedido, momento)
-        # Vulto+: a compra cancelada perde os pontos ganhos e devolve os que foram usados nela
+        # Helo: a compra cancelada perde os pontos ganhos e devolve os que foram usados nela
         fidelidade.estornar_compra(db, pedido, momento, motivo=f"Pedido {pedido.numero} cancelado")
         fidelidade.devolver_resgate(db, pedido, momento)
         pedido.status = status

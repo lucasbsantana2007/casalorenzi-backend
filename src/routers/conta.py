@@ -30,7 +30,7 @@ def atualizar(dados: DadosContaEntrada, db: Session = Depends(get_db), cliente: 
 
 @router.get("/pontos")
 def pontos(db: Session = Depends(get_db), cliente: m.Cliente = Depends(cliente_atual)):
-    """Vulto+ do cliente logado: { saldo, valorEmReais, categoria, bonus, aVencer, extrato, regras }."""
+    """Helo do cliente logado: { saldo, valorEmReais, categoria, bonus, aVencer, extrato, regras }."""
     return pontos_saida(fidelidade.resumo(db, cliente))
 
 

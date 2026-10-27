@@ -134,7 +134,7 @@ def registrar(
     )
     sessao.adicionar(db, devolucao)
 
-    # Vulto+: as peças devolvidas levam os pontos que geraram, na proporção do preço
+    # Helo: as peças devolvidas levam os pontos que geraram, na proporção do preço
     if pedido.subtotal:
         fracao = Decimal(item.preco_unitario) * quantidade / Decimal(pedido.subtotal)
         motivo_pontos = f"Devolução de {quantidade} un. de {item.variacao.sku} do pedido {pedido.numero}"

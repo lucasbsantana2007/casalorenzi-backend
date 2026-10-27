@@ -3,7 +3,7 @@
 - estoque_baixo: item no mínimo ou zerado que vendeu no local na janela (ALERTA_ESTOQUE_BAIXO_JANELA_DIAS);
 - estoque_parado: por loja, os itens com saldo e sem venda há ALERTA_ESTOQUE_PARADO_DIAS dias ou mais;
 - sugestoes_transferencia: sobra num local, falta com demanda em outro da mesma marca (só sugestão);
-- pontos_a_vencer: pontos Vulto+ que vencem em ALERTA_PONTOS_DIAS dias (números agregados, para a equipe);
+- pontos_a_vencer: pontos Helo que vencem em ALERTA_PONTOS_DIAS dias (números agregados, para a equipe);
 - aviso_pontos: e-mail a cada cliente 30 dias antes de os pontos vencerem (decisão 82; use_cases/avisos_pontos.py).
   Desligado por padrão (AVISO_PONTOS_ENVIAR). Aqui "criados" é o número de avisos enviados;
 - limpeza_conversas: apaga as conversas dos assistentes sem atividade além da retenção (IA_RETENCAO_DIAS).
@@ -229,7 +229,7 @@ def _pontos_a_vencer(db: Session) -> Placar:
         desejados.append(
             Desejado(
                 chave=f"{regra.ALERTA_PONTOS}:{dias}d",
-                titulo=f"{numero(r['clientesAVencer'])} clientes têm {numero(r['pontosAVencer'])} pontos Vulto+ vencendo em {dias} dias",
+                titulo=f"{numero(r['clientesAVencer'])} clientes têm {numero(r['pontosAVencer'])} pontos Helo vencendo em {dias} dias",
                 descricao=(
                     f"{brl(r['valorAVencer'])} em desconto vencem até {(r['referencia'] + timedelta(days=dias)):%d/%m/%Y}. "
                     f"{numero(aceitam)} desses clientes aceitam receber mensagens de marketing. "
@@ -277,7 +277,7 @@ DESCRICOES = {
     "estoque_baixo": "Itens no mínimo ou zerados que venderam no local na janela",
     "estoque_parado": "Por loja, itens com saldo e sem venda há muitos dias",
     "sugestoes_transferencia": "Sobra num local e falta com demanda em outro (só sugestão)",
-    "pontos_a_vencer": "Pontos Vulto+ que vencem em breve (números agregados)",
+    "pontos_a_vencer": "Pontos Helo que vencem em breve (números agregados)",
     "aviso_pontos": "E-mail aos clientes 30 dias antes de os pontos vencerem (desligado por padrão)",
     "limpeza_conversas": "Apaga conversas dos assistentes além da retenção",
 }

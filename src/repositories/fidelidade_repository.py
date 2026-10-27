@@ -1,4 +1,4 @@
-"""Extrato de pontos do Vulto+ (movimentos_pontos)."""
+"""Extrato de pontos do Helo (movimentos_pontos)."""
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
