@@ -2,11 +2,11 @@
 
 Dois assistentes integrados à plataforma existente, mais automações operacionais:
 
-1. **Assistente do site, a Márcia** (clientes; decisão 89): busca peças no catálogo real, mostra a disponibilidade no site e em
-   cada loja, mantém o contexto da conversa, consulta pontos Helo e pedidos do cliente logado, prepara a
+1. **Assistente do site, a Lúcia** (clientes; decisão 89): busca peças no catálogo real, mostra a disponibilidade no site e em
+   cada loja, mantém o contexto da conversa, consulta pontos Lupe+ e pedidos do cliente logado, prepara a
    peça para a sacola (o cliente confirma no botão) e encaminha para o atendimento humano com o resumo da conversa.
 2. **Copiloto gerencial** (equipe): "Inteligência de Negócios — Assistente IA" no painel. Responde perguntas
-   sobre vendas, estoque, transferências e Helo com consultas controladas, sempre com período, filtros,
+   sobre vendas, estoque, transferências e Lupe+ com consultas controladas, sempre com período, filtros,
    definição da métrica e a data dos dados.
 3. **Automações**: alertas de estoque baixo, estoque parado, sugestões de transferência e pontos a vencer,
    idempotentes, com log de execução; mais a limpeza das conversas pela política de retenção.
@@ -29,7 +29,7 @@ Usuário ─► API (token: quem é, que papel, que marca)
             │        │       parâmetros batem com o contrato (Pydantic, sem campo extra)?
             │        │       o papel/marca/login permitem? ─► consulta (sessão READ ONLY, com tempo máximo)
             │        │                               │      usando as regras que já existem (financeiro,
-            │        │                               │      estoque, Helo, vitrine)
+            │        │                               │      estoque, Lupe+, vitrine)
             │        ◄──────── resultado (valores já formatados) ◄┘
             │        └─► texto final (no máximo 4 idas e voltas e 6 consultas por mensagem)
             │
@@ -104,8 +104,8 @@ Nenhuma biblioteca nova no frontend. No backend, uma: o SDK oficial `anthropic` 
 | `buscar_produtos` | Peças por tipo, cor, tamanho, preço, marca, gênero, loja e palavras livres; afrouxa um filtro por vez e avisa | — | `produtos.listar`, `disponiveis_na_rede`, `livres_por_loja` |
 | `ver_produto` | Detalhes e situação no site e em cada loja física, na cor e tamanho pedidos | — | os mesmos |
 | `informacoes_lojas` | Endereço, telefone e horários cadastrados | — | tabela `lojas` |
-| `politicas_da_loja` | Frete, trocas e devoluções, pagamento, regras do Helo | — | `frete.condicoes`, `tipos_solicitacao`, `entities/fidelidade.py` |
-| `consultar_meus_pontos` | Saldo, valor, categoria, vencimentos e quanto falta para a próxima categoria | login de cliente | `fidelidade.resumo` (a mesma conta da página Helo) |
+| `politicas_da_loja` | Frete, trocas e devoluções, pagamento, regras do Lupe+ | — | `frete.condicoes`, `tipos_solicitacao`, `entities/fidelidade.py` |
+| `consultar_meus_pontos` | Saldo, valor, categoria, vencimentos e quanto falta para a próxima categoria | login de cliente | `fidelidade.resumo` (a mesma conta da página Lupe+) |
 | `consultar_meus_pedidos` | 5 pedidos mais recentes, status e rastreio | login de cliente | `pedido_repository.do_cliente` |
 | `preparar_sacola` | Confere peça, cor, tamanho, preço e disponibilidade e mostra o botão "Adicionar à sacola" | — | preço vigente do SKU e disponível da vitrine |
 | `solicitar_atendimento_humano` | Mostra o botão "Falar com a equipe" (e telefones das lojas) | — | — |
@@ -137,7 +137,7 @@ o assistente pede para entrar e mostra os telefones das lojas. Chamar de novo de
 | `consultar_maiores_estoques` | estoque | estoque por produto |
 | `consultar_avarias` | estoque | movimentações AVARIA (contadas e estimadas) |
 | `sugerir_transferencias` | transferencias | `livres_por_loja`, mínimo de cada loja, vendas recentes |
-| `consultar_fidelidade` | financeiro | lotes do Helo (`fidelidade.lotes_em_aberto`), só números agregados |
+| `consultar_fidelidade` | financeiro | lotes do Lupe+ (`fidelidade.lotes_em_aberto`), só números agregados |
 | `consultar_alertas` | dashboard (cada tipo pede o seu módulo) | tabela `alertas` |
 
 **Faturamento:** é a regra da diretoria que já estava no Financeiro (decisões da união com a Vulto): vendas não
@@ -167,7 +167,7 @@ R$ 6.498.071,30, e as somas por loja e por canal fecham com o total.
 | Operador vendo financeiro | O modelo nem recebe as ferramentas que o perfil não pode usar; se pedir mesmo assim, a execução recusa (permissão conferida a cada chamada, pela tabela `ACESSO` existente). |
 | Equipe de uma marca vendo a outra | A marca vem do token (`escopo_marca`, o mesmo do painel). Pedir a outra marca responde SEM_PERMISSAO; loja de outra marca, LOJA_NAO_ENCONTRADA. |
 | SQL vindo do chat | Não existe ferramenta de SQL. Toda consulta é SQLAlchemy com parâmetros. Texto do usuário é só texto. |
-| Alterar estoque ou comprar pelo chat | Não existe ferramenta que grave nada disso. O copiloto e as consultas do site rodam em transação **READ ONLY** (o Postgres recusa INSERT/UPDATE/DELETE) com tempo máximo (`CONSULTA_TIMEOUT_MS`). Opcionalmente, `DATABASE_URL_LEITURA` aponta para um usuário só com SELECT. A única exceção é a consulta de pontos, que lança o vencimento como a página Helo já fazia. |
+| Alterar estoque ou comprar pelo chat | Não existe ferramenta que grave nada disso. O copiloto e as consultas do site rodam em transação **READ ONLY** (o Postgres recusa INSERT/UPDATE/DELETE) com tempo máximo (`CONSULTA_TIMEOUT_MS`). Opcionalmente, `DATABASE_URL_LEITURA` aponta para um usuário só com SELECT. A única exceção é a consulta de pontos, que lança o vencimento como a página Lupe+ já fazia. |
 | Prompt injection (do usuário ou no cadastro da peça) | Resultados de ferramenta são dados; as instruções dizem isso; a autorização não depende do modelo. Pedido para revelar o prompt cai nas regras e não revela. |
 | Chave da API | Só no backend (`ANTHROPIC_API_KEY`). Não vai para o frontend, para o banco nem para os logs; os erros do provedor viram mensagens sem a chave. |
 | Abuso e custo | Por conversa: 30 mensagens/10 min (site), 60/10 min (copiloto); por IP: 60/10 min; 20 conversas novas/h por IP (429). Mensagem de até 800 caracteres (site) e 1.500 (copiloto). Até 4 idas e voltas e 6 consultas por mensagem; histórico de 12 mensagens. |
@@ -290,7 +290,7 @@ Rafael: Lojista; Diego: Operador; clientes como mariana.costa@gmail.com). A senh
 - **Sem chave da API no ambiente desta entrega:** o caminho com o modelo foi testado com um provedor simulado (92
   testes) e o SDK contra respostas HTTP simuladas; a primeira chamada real ainda precisa ser feita com a chave.
 - **Dados até 03/10/2026** no banco local: "quanto faturamos hoje" responde R$ 0,00 e diz até quando vão os dados.
-- **Passivo do Helo no banco local:** a consulta oficial dá 3.373.251 pontos em 01/10/2026; a documentação da
+- **Passivo do Lupe+ no banco local:** a consulta oficial dá 3.373.251 pontos em 01/10/2026; a documentação da
   união fala em 4.015.759. A carga local parece anterior à correção do passivo; o copiloto mostra o que está no banco.
 - O entendimento pelas regras cobre as perguntas comuns, não linguagem livre; com o modelo ligado, as regras viram
   só contingência e respostas diretas.

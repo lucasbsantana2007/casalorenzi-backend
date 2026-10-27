@@ -116,7 +116,7 @@ DEFINICOES = {
         "mínimo ou zerado e vendeu a peça na janela. Nada é transferido automaticamente."
     ),
     "pontos": (
-        "Pontos Helo válidos: o que sobrou de cada entrada que ainda não venceu (validade de 12 meses), gastando "
+        "Pontos Lupe+ válidos: o que sobrou de cada entrada que ainda não venceu (validade de 12 meses), gastando "
         "primeiro as mais antigas. 100 pontos = R$ 5,00. Categoria pelo saldo válido."
     ),
 }
@@ -130,7 +130,7 @@ ALERTA_PONTOS = "PONTOS_A_VENCER"
 TIPOS_ALERTA = (ALERTA_ESTOQUE_BAIXO, ALERTA_ESTOQUE_PARADO, ALERTA_TRANSFERENCIA, ALERTA_PONTOS)
 
 # Quem vê cada tipo de alerta: o módulo de src/entities/papeis.py que já dá acesso àquele assunto. Os pontos
-# a vencer mostram o passivo do Helo em reais: ficam com quem vê o financeiro
+# a vencer mostram o passivo do Lupe+ em reais: ficam com quem vê o financeiro
 MODULO_DO_ALERTA = {
     ALERTA_ESTOQUE_BAIXO: "estoque",
     ALERTA_ESTOQUE_PARADO: "estoque",

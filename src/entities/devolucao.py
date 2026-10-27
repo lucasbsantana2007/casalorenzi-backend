@@ -25,7 +25,7 @@ def saldo_devolvivel(comprado: int, ja_devolvido: int) -> int:
 def valor_devolvido(
     preco_unitario: Decimal, quantidade: int, desconto: Decimal = Decimal("0"), subtotal: Decimal | None = None
 ) -> Decimal:
-    """Reembolso das peças: o preço pago menos a parte delas no desconto do pedido (ex.: resgate Helo),
+    """Reembolso das peças: o preço pago menos a parte delas no desconto do pedido (ex.: resgate Lupe+),
     na proporção do preço. O frete não volta."""
     bruto = Decimal(preco_unitario) * quantidade
     if desconto and subtotal:

@@ -11,7 +11,7 @@ from src.models._restricoes import valor_em
 
 
 class AvisoPontos(Base):
-    """Aviso por e-mail de pontos Helo a vencer (decisão 82): uma linha por cliente e data de vencimento
+    """Aviso por e-mail de pontos Lupe+ a vencer (decisão 82): uma linha por cliente e data de vencimento
     avisada. A chave única garante que rodar a automação de novo nunca manda o mesmo aviso duas vezes.
     Só é gravado depois que o e-mail saiu."""
 

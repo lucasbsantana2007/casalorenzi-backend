@@ -18,7 +18,7 @@ if TYPE_CHECKING:
 
 
 class MovimentoPontos(Base):
-    """Extrato do Helo (regras em src/entities/fidelidade.py). Quantidade com sinal: positiva entra,
+    """Extrato do Lupe+ (regras em src/entities/fidelidade.py). Quantidade com sinal: positiva entra,
     negativa sai. O saldo do cliente é o saldo_resultante do último movimento (por criado_em e id),
     que o banco não deixa ficar negativo. O passivo de pontos numa data é a soma dos saldos nela."""
 

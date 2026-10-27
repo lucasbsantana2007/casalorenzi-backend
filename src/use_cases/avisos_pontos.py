@@ -1,4 +1,4 @@
-"""Aviso por e-mail de pontos Helo a vencer (decisão 82). Sem modelo de linguagem: é uma regra.
+"""Aviso por e-mail de pontos Lupe+ a vencer (decisão 82). Sem modelo de linguagem: é uma regra.
 
 Todo dia (automação aviso_pontos), cada cliente com pontos vencendo nos próximos AVISO_VENCIMENTO_DIAS dias
 recebe um e-mail, uma vez por data de vencimento:

@@ -1,10 +1,10 @@
-"""Ferramentas do copiloto gerencial: vendas, estoque, transferências, Helo e alertas, só leitura.
+"""Ferramentas do copiloto gerencial: vendas, estoque, transferências, Lupe+ e alertas, só leitura.
 
-Cada uma exige o módulo que já dá acesso ao assunto no painel (src/entities/papeis.py): vendas e Helo pedem
+Cada uma exige o módulo que já dá acesso ao assunto no painel (src/entities/papeis.py): vendas e Lupe+ pedem
 "financeiro" (só o Administrador), estoque pede "estoque", sugestões de transferência pedem "transferencias".
 A marca vem do token: quem é de uma marca só vê a dela (pedir a outra responde SEM_PERMISSAO); o Administrador
 do grupo vê as duas ou a escolhida no seletor do painel. Os números saem de src/use_cases/analises.py, que
-reaproveita o financeiro, o estoque e o Helo oficiais. As consultas rodam numa transação READ ONLY.
+reaproveita o financeiro, o estoque e o Lupe+ oficiais. As consultas rodam numa transação READ ONLY.
 """
 
 from typing import Literal
@@ -783,7 +783,7 @@ def sugerir_transferencias(db: Session, ctx: Contexto, entrada: Transferencias) 
     return Resultado(dados=dados, blocos=blocos, texto=texto)
 
 
-# ---------- Helo ----------
+# ---------- Lupe+ ----------
 
 
 class Fidelidade(Entrada):
@@ -827,7 +827,7 @@ def consultar_fidelidade(db: Session, ctx: Contexto, entrada: Fidelidade) -> Res
                 (f"Vencendo em {entrada.dias_a_vencer} dias", r["pontosAVencer"], "numero"),
                 ("Clientes com pontos vencendo", r["clientesAVencer"], "numero"),
             ],
-            f"Helo em {data(r['referencia'])}",
+            f"Lupe+ em {data(r['referencia'])}",
         ),
         bloco_tabela(
             "Clientes por categoria",
@@ -848,10 +848,10 @@ def consultar_fidelidade(db: Session, ctx: Contexto, entrada: Fidelidade) -> Res
             "numero",
         ),
         bloco_fonte(
-            "consultar_fidelidade", data(r["referencia"]), ["Programa Helo (as duas marcas)"], DEFINICOES["pontos"], None
+            "consultar_fidelidade", data(r["referencia"]), ["Programa Lupe+ (as duas marcas)"], DEFINICOES["pontos"], None
         ),
     ]
-    texto = f"O Helo tem {dados['pontosValidos']} pontos válidos ({dados['valorEmReais']} em desconto) com {dados['clientesComSaldo']} clientes. Nos próximos {entrada.dias_a_vencer} dias vencem {numero(r['pontosAVencer'])} pontos ({dados['valorVencendo']}) de {dados['clientesComPontosVencendo']} clientes."
+    texto = f"O Lupe+ tem {dados['pontosValidos']} pontos válidos ({dados['valorEmReais']} em desconto) com {dados['clientesComSaldo']} clientes. Nos próximos {entrada.dias_a_vencer} dias vencem {numero(r['pontosAVencer'])} pontos ({dados['valorVencendo']}) de {dados['clientesComPontosVencendo']} clientes."
     return Resultado(dados=dados, blocos=blocos, texto=texto)
 
 
@@ -971,7 +971,7 @@ FERRAMENTAS = [
     ),
     Ferramenta(
         "consultar_fidelidade",
-        "Números do Helo sem dado pessoal: pontos válidos e valor, clientes por categoria e pontos que vencem nos próximos dias.",
+        "Números do Lupe+ sem dado pessoal: pontos válidos e valor, clientes por categoria e pontos que vencem nos próximos dias.",
         Fidelidade,
         consultar_fidelidade,
         modulo="financeiro",

@@ -1,4 +1,4 @@
-"""Pontos Helo (antes Vulto+): ganho de pontos nas compras, bônus da categoria, resgate no checkout, estorno no cancelamento,
+"""Pontos Lupe+ (antes Vulto+): ganho de pontos nas compras, bônus da categoria, resgate no checkout, estorno no cancelamento,
 vencimento em 12 meses e consulta do extrato (cliente e equipe)."""
 
 import math
@@ -113,7 +113,7 @@ def test_resgate_vira_desconto_e_a_compra_ainda_ganha_pontos(client, mariana):
     [
         (5000, 150, 500, "múltiplos de 100"),
         (5000, 1000, None, "pelo menos R$ 500,00"),
-        (300, 1000, 500, "Saldo Helo insuficiente"),
+        (300, 1000, 500, "Saldo Lupe+ insuficiente"),
     ],
 )
 def test_resgate_recusado(client, mariana, saldo, pontos, minimo, trecho):
