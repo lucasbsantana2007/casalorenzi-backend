@@ -2,9 +2,10 @@
 Lupe+ e pedidos do cliente logado, sacola e atendimento humano.
 
 Dados pessoais (pontos, pedidos) saem só do cliente do token (Contexto.cliente_id): nenhuma ferramenta
-recebe um id de cliente. Nenhuma ferramenta compra, cobra ou mexe em estoque: preparar_sacola só monta o
-botão que o próprio cliente aperta, e a sacola continua sendo a do navegador (a mesma da página do
-produto); atendimento humano também é um botão, e o chamado só é aberto quando o cliente confirma.
+recebe um id de cliente. Nenhuma ferramenta compra, cobra ou mexe em estoque: colocar_na_sacola confere a peça
+e o navegador a coloca na sacola na hora, com Desfazer (decisão 94); a sacola é a do navegador (a mesma da
+página do produto) e o pagamento continua no checkout. Atendimento humano é um botão: o chamado só é aberto
+quando o cliente confirma.
 """
 
 from decimal import Decimal
@@ -279,7 +280,7 @@ def ver_produto(db: Session, ctx: Contexto, entrada: VerProduto) -> Resultado:
             texto += " Nas lojas físicas está indisponível agora."
         cores_no_tamanho = list(dict.fromkeys(v.cor for v in alvo))
         if pronto_para_sacola:
-            texto += " Quer que eu prepare para a sacola?"
+            texto += " Quer que eu coloque na sua sacola?"
         elif not tamanho_foco:
             texto += f" Qual tamanho? Temos {_lista(disp['tamanhosNoSite'] or tamanhos, 'ou')}."
         elif not cor_foco and len(cores_no_tamanho) > 1:
@@ -482,17 +483,17 @@ def consultar_meus_pedidos(db: Session, ctx: Contexto, entrada: SemParametros) -
     )
 
 
-# ---------- preparar_sacola ----------
+# ---------- colocar_na_sacola ----------
 
 
-class PrepararSacola(Entrada):
+class ColocarNaSacola(Entrada):
     produto_id: int
     cor: str | None = Field(None, max_length=40, description="Cor exata da peça (obrigatória se a peça tem mais de uma).")
     tamanho: str = Field(max_length=10)
     quantidade: int = Field(1, ge=1, le=MAX_SACOLA)
 
 
-def preparar_sacola(db: Session, ctx: Contexto, entrada: PrepararSacola) -> Resultado:
+def colocar_na_sacola(db: Session, ctx: Contexto, entrada: ColocarNaSacola) -> Resultado:
     """Confere peça, cor, tamanho, preço e disponibilidade e devolve o botão de confirmar. Não adiciona nada:
     a peça só entra na sacola quando o cliente aperta o botão."""
     produto = _produto(db, entrada.produto_id)
@@ -529,21 +530,25 @@ def preparar_sacola(db: Session, ctx: Contexto, entrada: PrepararSacola) -> Resu
         "codigoModelo": produto.codigo_modelo,
     }
     dados = {
-        "preparado": True,
+        "colocadoNaSacola": True,
         "peca": f"{produto.nome} · {variacao.cor} · {variacao.tamanho}",
         "preco": brl(preco),
         "quantidade": entrada.quantidade,
-        "importante": "A peça só entra na sacola quando o cliente tocar em 'Adicionar à sacola'. Não diga que já foi adicionada.",
+        "importante": "A peça entra na sacola do cliente assim que esta resposta aparece (ele pode desfazer). Diga que "
+        "colocou e pergunte se ele quer finalizar a compra ou continuar olhando.",
     }
-    texto = f"Separei {produto.nome}, cor {variacao.cor}, tamanho {variacao.tamanho}, por {brl(preco)}. Toque em “Adicionar à sacola” para confirmar."
+    texto = (
+        f"Coloquei {produto.nome}, cor {variacao.cor}, tamanho {variacao.tamanho}, por {brl(preco)}, na sua sacola. "
+        "Quer finalizar a compra ou continuar olhando?"
+    )
     return Resultado(
         dados=dados,
-        blocos=[{"tipo": "acao_sacola", "estado": "PENDENTE", "item": item}],
+        blocos=[{"tipo": "acao_sacola", "estado": "ADICIONAR", "item": item}],
         memoria={
             "produtoEmFoco": {"id": produto.id, "nome": produto.nome},
             "corEmFoco": variacao.cor,
             "tamanhoEmFoco": variacao.tamanho,
-            "oferta": "CONFIRMAR_SACOLA",
+            "oferta": "FINALIZAR",
         },
         texto=texto,
     )
@@ -633,11 +638,11 @@ FERRAMENTAS = [
         exige_cliente=True,
     ),
     Ferramenta(
-        "preparar_sacola",
-        "Confere peça, cor, tamanho, preço e disponibilidade e mostra ao cliente o botão 'Adicionar à sacola'. Não "
-        "adiciona nada sozinha: só use depois que o cliente disser que quer a peça, com cor e tamanho definidos.",
-        PrepararSacola,
-        preparar_sacola,
+        "colocar_na_sacola",
+        "Confere peça, cor, tamanho, preço e disponibilidade e coloca a peça na sacola do cliente na hora (ele pode "
+        "desfazer). Use quando o cliente pedir a peça, com cor e tamanho definidos. Não finaliza a compra.",
+        ColocarNaSacola,
+        colocar_na_sacola,
     ),
     Ferramenta(
         "solicitar_atendimento_humano",
