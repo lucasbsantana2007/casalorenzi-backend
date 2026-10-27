@@ -1,4 +1,4 @@
-"""Aviso por e-mail de pontos Helo a vencer (decisão 82): desligado por padrão, uma vez por vencimento, sem
+"""Aviso por e-mail de pontos Lupe+ a vencer (decisão 82): desligado por padrão, uma vez por vencimento, sem
 número quando o e-mail é de mais de uma conta, modo teste para o e-mail do time, limite diário e nenhum
 aviso gravado sem o e-mail ter saído."""
 
@@ -56,9 +56,9 @@ def test_avisa_uma_vez_por_vencimento(client, enviados):
     assert primeira.status == "SUCESSO" and primeira.criados == 1
     [email] = enviados
     assert email.para == EMAIL_MARIANA
-    assert "800 pontos Helo vencem em" in email.assunto
-    assert "Você tem 800 pontos Helo (R$ 40,00 em desconto)" in email.texto
-    assert "aviso sobre a sua conta Helo" in email.texto and "/cliente/pontos" in email.texto
+    assert "800 pontos Lupe+ vencem em" in email.assunto
+    assert "Você tem 800 pontos Lupe+ (R$ 40,00 em desconto)" in email.texto
+    assert "aviso sobre a sua conta Lupe+" in email.texto and "/cliente/pontos" in email.texto
     assert _avisos() == [(MARIANA, 800, "REAL", EMAIL_MARIANA, False)]
 
     # De novo: ninguém recebe duas vezes o mesmo aviso
@@ -69,7 +69,7 @@ def test_avisa_uma_vez_por_vencimento(client, enviados):
     _pontos(MARIANA, 200, 345)
     automacoes.executar("aviso_pontos", forcar=True)
     assert len(enviados) == 2
-    assert "1.000 pontos Helo" in enviados[1].assunto and "200 pontos em" in enviados[1].texto
+    assert "1.000 pontos Lupe+" in enviados[1].assunto and "200 pontos em" in enviados[1].texto
     assert [linha[1] for linha in _avisos()] == [800, 200]
 
 
@@ -80,7 +80,7 @@ def test_email_de_duas_contas_vai_sem_o_saldo(client, enviados):
     automacoes.executar("aviso_pontos")
     assert len(enviados) == 2
     for email in enviados:
-        assert email.assunto.endswith("Há pontos Helo vencendo na sua conta")
+        assert email.assunto.endswith("Há pontos Lupe+ vencendo na sua conta")
         assert "800" not in email.texto and "1.200" not in email.texto and "saldo" in email.texto
     assert all(sem_numeros for *_, sem_numeros in _avisos())
 

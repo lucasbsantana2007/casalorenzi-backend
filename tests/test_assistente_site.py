@@ -1,4 +1,4 @@
-"""Assistente do site: busca, contexto, disponibilidade, compra assistida, pontos Helo, atendimento humano,
+"""Assistente do site: busca, contexto, disponibilidade, compra assistida, pontos Lupe+, atendimento humano,
 segurança (dados de outro cliente, conversas isoladas, injeção) e confiabilidade (modelo fora do ar,
 resposta malformada, repetição, simultaneidade, banco indisponível)."""
 
@@ -120,25 +120,25 @@ def test_vulto_mais_do_cliente_logado(client):
     assert pontos["categoria"] == "Bronze"
     assert pontos["proximaCategoria"] == {"categoria": "Prata", "faltam": 301}  # Prata a partir de 1.501
     assert pontos["aVencer"][0]["pontos"] == 1200
-    assert "1.200 pontos Helo" in resposta["texto"]
+    assert "1.200 pontos Lupe+" in resposta["texto"]
 
 
-def test_entende_o_nome_helo_e_o_antigo(client):
+def test_entende_o_nome_lupe_e_o_antigo(client):
     _pontos(MARIANA, 1200)
     conversa, chave = abrir_site(client, token=entrar(client, "mariana.costa@gmail.com"))
-    assert blocos(diga(client, conversa, chave, "meu saldo helo"), "pontos")[0]["saldo"] == 1200
+    assert blocos(diga(client, conversa, chave, "meu saldo lupe+"), "pontos")[0]["saldo"] == 1200
     assert blocos(diga(client, conversa, chave, "e meu saldo vulto+?"), "pontos")[0]["saldo"] == 1200
 
 
 def test_marcia_se_apresenta_como_assistente_virtual(client):
     conversa, chave = abrir_site(client)
-    assert diga(client, conversa, chave, "oi")["texto"].startswith("Olá! Sou a Márcia, assistente virtual")
+    assert diga(client, conversa, chave, "oi")["texto"].startswith("Olá! Sou a Lúcia, assistente virtual")
     for pergunta in ("você é um robô?", "qual é o seu nome?", "vc é uma pessoa de verdade?"):
         texto = diga(client, conversa, chave, pergunta)["texto"]
-        assert "Márcia" in texto and "Não sou uma pessoa" in texto, pergunta
+        assert "Lúcia" in texto and "Não sou uma pessoa" in texto, pergunta
     # Pedir uma pessoa continua sendo pedido de atendimento
     assert blocos(diga(client, conversa, chave, "quero falar com uma pessoa"), "acao_atendimento")
-    assert "Márcia" in PROMPT_CLIENTE and "não é uma pessoa" in PROMPT_CLIENTE
+    assert "Lúcia" in PROMPT_CLIENTE and "não é uma pessoa" in PROMPT_CLIENTE
 
 
 def test_pedidos_do_cliente_logado(client):
