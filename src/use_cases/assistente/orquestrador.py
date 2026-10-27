@@ -23,6 +23,9 @@ from src.use_cases.assistente.prompts import RECUSA_SEGURA, SEM_RESPOSTA
 
 log = logging.getLogger("casalorenzi.assistente")
 
+# Bloco que pede o login dentro do chat (pontos, pedidos e outros dados do cliente)
+BLOCO_ENTRAR = "entrar"
+
 
 @dataclass
 class Rodada:
@@ -77,6 +80,9 @@ class Coletor:
             self.ctx.memoria = aplicar_memoria(self.ctx.memoria, execucao.resultado.memoria)
             self._blocos.pop(execucao.nome, None)
             self._blocos[execucao.nome] = execucao.resultado.blocos
+        elif (execucao.erro or "").startswith("LOGIN_NECESSARIO"):
+            # O chat mostra o login ali mesmo; depois de entrar, a pergunta é respondida sem sair da conversa
+            self._blocos[BLOCO_ENTRAR] = [{"tipo": BLOCO_ENTRAR}]
         return execucao
 
     @property
