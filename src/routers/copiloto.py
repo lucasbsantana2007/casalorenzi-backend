@@ -34,7 +34,7 @@ SUGESTOES = [
     ("Quais produtos têm avarias?", "estoque"),
     ("Que transferências você sugere?", "transferencias"),
     ("Quantos clientes têm pontos vencendo nos próximos 30 dias?", "financeiro"),
-    ("Quantos clientes temos em cada categoria do Vulto+?", "financeiro"),
+    ("Quantos clientes temos em cada categoria do Helo?", "financeiro"),
 ]
 
 

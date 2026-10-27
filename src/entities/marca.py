@@ -13,7 +13,7 @@ MARCA_PADRAO = LORENZI
 
 # O site é um só para as duas marcas, cada uma com a sua vitrine (/ = Casa Lorenzi, /vulto = Vulto):
 # a vitrine e a página Lojas pedem a marca (?marca=); sem ela, o visitante recebe a do início do site.
-# Sacola, login, checkout e Vulto+ são compartilhados; a peça sai de uma loja da marca dela.
+# Sacola, login, checkout e Helo são compartilhados; a peça sai de uma loja da marca dela.
 MARCA_DO_SITE = LORENZI
 
 # Marca de cada funcionário da equipe: trabalha só com a Casa Lorenzi, só com a Vulto ou, para o

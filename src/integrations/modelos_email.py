@@ -18,7 +18,7 @@ def _link(caminho: str) -> str:
 
 
 MARCAS = "Casa Lorenzi e Vulto"
-RODAPE = "Casa Lorenzi · Vulto — uma conta, duas marcas, os mesmos pontos Vulto+."
+RODAPE = "Casa Lorenzi · Vulto — uma conta, duas marcas, os mesmos pontos Helo."
 
 
 def _html(paragrafos: list[str], botao: tuple[str, str] | None = None) -> str:

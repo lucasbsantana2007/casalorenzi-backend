@@ -1,4 +1,4 @@
-"""Vulto+: o que a área do cliente e o painel mostram do saldo e do extrato."""
+"""Helo: o que a área do cliente e o painel mostram do saldo e do extrato."""
 
 from src.entities import fidelidade as regra
 from src.use_cases.fidelidade import Resumo

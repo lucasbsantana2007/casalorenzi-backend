@@ -1,4 +1,4 @@
-"""Vulto+ (programa de pontos da Vulto, incorporado à plataforma).
+"""Helo, o programa de pontos do grupo (nasceu na Vulto como Vulto+; decisões 86 e 87).
 
 O saldo nunca é editado direto: cada mudança é um movimento (movimentos_pontos) com quantidade com
 sinal (positiva entra, negativa sai) e o saldo resultante, que nunca fica negativo. O saldo atual do
@@ -15,7 +15,7 @@ Ganho (aba LEIA ISSO da Vulto, com as decisões 78 e 79 da união):
 - R$ 1 em produtos = 1 ponto na loja física e 2 no site e no app (o frete não conta);
 - bônus pela categoria do cliente na hora da compra: Ouro +25% e Vip +50%;
 - só depois do pagamento aprovado; compra cancelada perde os pontos dela (estorno);
-- compras da Casa Lorenzi também ganham pontos Vulto+.
+- compras da Casa Lorenzi também ganham pontos Helo.
 
 Resgate no checkout: 100 pontos = R$ 5,00, a partir de 100 pontos e só em múltiplos de 100, sem
 passar do saldo nem do valor dos produtos, e só em compras com pelo menos R$ 500 em produtos, sem o

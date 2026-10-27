@@ -94,7 +94,7 @@ CONSULTA_TIMEOUT_MS = int(os.getenv("CONSULTA_TIMEOUT_MS", "8000"))
 ALERTA_ESTOQUE_BAIXO_JANELA_DIAS = int(os.getenv("ALERTA_ESTOQUE_BAIXO_JANELA_DIAS", "60"))
 # Estoque parado: peça com saldo e sem venda no local há N dias ou mais
 ALERTA_ESTOQUE_PARADO_DIAS = int(os.getenv("ALERTA_ESTOQUE_PARADO_DIAS", "90"))
-# Pontos Vulto+ que vencem nos próximos N dias
+# Pontos Helo que vencem nos próximos N dias
 ALERTA_PONTOS_DIAS = int(os.getenv("ALERTA_PONTOS_DIAS", "30"))
 
 # Aviso por e-mail de pontos a vencer (decisão 82, automação aviso_pontos). Desligado por padrão: com a chave

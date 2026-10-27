@@ -54,7 +54,7 @@ def obter(cliente_id: str, db: Session = Depends(get_db), sessao: Sessao = Depen
 
 @router.get("/{cliente_id}/pontos")
 def pontos(cliente_id: str, db: Session = Depends(get_db), sessao: Sessao = Depends(acesso)):
-    """Vulto+ do cliente (equipe de atendimento ou o próprio cliente): saldo, categoria e extrato."""
+    """Helo do cliente (equipe de atendimento ou o próprio cliente): saldo, categoria e extrato."""
     return pontos_saida(fidelidade.resumo(db, _cliente(db, sessao, cliente_id)))
 
 

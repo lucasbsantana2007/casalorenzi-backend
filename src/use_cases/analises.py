@@ -2,7 +2,7 @@
 
 Nenhuma conta de negócio é refeita aqui: o faturamento é o de financeiro.resumo (a regra da diretoria),
 o status do estoque é o de src/entities/estoque.py, o saldo livre é o de estoque_repository.livres_por_loja
-(que desconta reservas e soma o que está a caminho) e os pontos usam os lotes do Vulto+ de
+(que desconta reservas e soma o que está a caminho) e os pontos usam os lotes do Helo de
 src/use_cases/fidelidade.py. Aqui só se recorta, agrupa e ordena o que essas regras devolvem.
 
 marca: a marca que a pessoa pode ver (None = as duas). lojas: ids já conferidos contra essa marca.
@@ -463,7 +463,7 @@ def sugestoes_transferencia(db: Session, *, marca: str | None, janela_dias: int 
     return sugestoes[:limite]
 
 
-# ---------- Vulto+ ----------
+# ---------- Helo ----------
 
 
 def fidelidade(db: Session, *, dias_a_vencer: int = 30, referencia: date | None = None, com_ids: bool = False) -> dict:

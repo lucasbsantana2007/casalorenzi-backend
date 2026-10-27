@@ -29,10 +29,10 @@ log = logging.getLogger("casalorenzi.assistente")
 
 ROTULO_PAPEL = {"ADMINISTRADOR": "Administrador", "LOJISTA": "Lojista", "OPERADOR": "Operador"}
 ROTULO_MODULO = {
-    "financeiro": "dados financeiros (vendas, faturamento e Vulto+)",
+    "financeiro": "dados financeiros (vendas, faturamento e Helo)",
     "estoque": "estoque",
     "transferencias": "transferências",
-    "atendimento": "dados de clientes e do Vulto+",
+    "atendimento": "dados de clientes e do Helo",
     "dashboard": "indicadores do painel",
 }
 
@@ -92,7 +92,7 @@ class Ferramenta:
     modulo: str | None = None
     # Dado pessoal: só com cliente logado, e sempre o do token
     exige_cliente: bool = False
-    # Pode gravar (só o vencimento dos pontos, pela regra oficial do Vulto+)
+    # Pode gravar (só o vencimento dos pontos, pela regra oficial do Helo)
     escrita: bool = False
 
     def esquema(self) -> dict:

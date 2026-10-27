@@ -1,7 +1,7 @@
 """Respostas do copiloto gerencial sem modelo de linguagem.
 
 Lê na pergunta o assunto (faturamento, mais vendidos, cancelamentos, estoque baixo, parado, por loja,
-avarias, transferências, Vulto+, alertas), o período ("hoje", "nesta semana", "em setembro", "últimos 30
+avarias, transferências, Helo, alertas), o período ("hoje", "nesta semana", "em setembro", "últimos 30
 dias", "de 01/09 a 15/09"), a marca, a loja e o canal, e chama a mesma ferramenta que o modelo chamaria.
 A permissão é conferida pela ferramenta: a regra não decide quem vê o quê.
 """
@@ -162,7 +162,7 @@ def direta(texto: str, ctx: Contexto, executar) -> Rodada | None:
         r"^(oi+|ola+|bom dia|boa tarde|boa noite|e ai|ajuda|help|o que voce faz\??|o que posso perguntar\??)$", n
     ):
         return Rodada(
-            "Posso consultar vendas e faturamento, produtos mais vendidos, cancelamentos, estoque baixo e parado, concentração de estoque, avarias, sugestões de transferência, alertas e os números do Vulto+. Escolha uma pergunta ou escreva a sua.",
+            "Posso consultar vendas e faturamento, produtos mais vendidos, cancelamentos, estoque baixo e parado, concentração de estoque, avarias, sugestões de transferência, alertas e os números do Helo. Escolha uma pergunta ou escreva a sua.",
             [{"tipo": "sugestoes", "itens": SUGESTOES[:6]}],
         )
     if re.match(r"^(obrigad[oa]|valeu|vlw|perfeito|otimo|show)\b", n) and len(n.split()) <= 4:
@@ -203,7 +203,7 @@ def responder(texto: str, ctx: Contexto, executar) -> Rodada:
     ):
         return _consultar(executar, "consultar_estoque_baixo", {**escopo, "categoria": _categoria(n)})
     if re.search(
-        r"(vulto\+|vulto mais|\bpontos\b|\bfidelidade\b|\bpassivo\b|\bcategorias? de clientes?\b|\bclientes?\b.*\bcategorias?\b)",
+        r"(\bhelo\b|vulto\+|vulto mais|\bpontos\b|\bfidelidade\b|\bpassivo\b|\bcategorias? de clientes?\b|\bclientes?\b.*\bcategorias?\b)",
         n,
     ):
         dias = re.search(r"(\d{1,3})\s*dias", n)
@@ -246,6 +246,6 @@ def responder(texto: str, ctx: Contexto, executar) -> Rodada:
             executar, "consultar_faturamento", {**escopo, **periodo, "canal": canal, "agrupar_por": agrupar, "comparar": comparar}
         )
     return Rodada(
-        "Não entendi a pergunta. Posso consultar vendas e faturamento, mais vendidos, cancelamentos, estoque baixo ou parado, concentração de estoque, avarias, transferências, alertas e Vulto+.",
+        "Não entendi a pergunta. Posso consultar vendas e faturamento, mais vendidos, cancelamentos, estoque baixo ou parado, concentração de estoque, avarias, transferências, alertas e Helo.",
         [{"tipo": "sugestoes", "itens": SUGESTOES[:6]}],
     )

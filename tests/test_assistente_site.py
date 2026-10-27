@@ -1,4 +1,4 @@
-"""Assistente do site: busca, contexto, disponibilidade, compra assistida, Vulto+, atendimento humano,
+"""Assistente do site: busca, contexto, disponibilidade, compra assistida, pontos Helo, atendimento humano,
 segurança (dados de outro cliente, conversas isoladas, injeção) e confiabilidade (modelo fora do ar,
 resposta malformada, repetição, simultaneidade, banco indisponível)."""
 
@@ -120,7 +120,14 @@ def test_vulto_mais_do_cliente_logado(client):
     assert pontos["categoria"] == "Bronze"
     assert pontos["proximaCategoria"] == {"categoria": "Prata", "faltam": 301}  # Prata a partir de 1.501
     assert pontos["aVencer"][0]["pontos"] == 1200
-    assert "1.200 pontos" in resposta["texto"]
+    assert "1.200 pontos Helo" in resposta["texto"]
+
+
+def test_entende_o_nome_helo_e_o_antigo(client):
+    _pontos(MARIANA, 1200)
+    conversa, chave = abrir_site(client, token=entrar(client, "mariana.costa@gmail.com"))
+    assert blocos(diga(client, conversa, chave, "meu saldo helo"), "pontos")[0]["saldo"] == 1200
+    assert blocos(diga(client, conversa, chave, "e meu saldo vulto+?"), "pontos")[0]["saldo"] == 1200
 
 
 def test_pedidos_do_cliente_logado(client):

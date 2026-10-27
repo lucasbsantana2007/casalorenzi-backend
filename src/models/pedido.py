@@ -48,7 +48,7 @@ class Pedido(Base):
     status_origem: Mapped[str | None] = mapped_column(String(40))
     codigo_rastreio: Mapped[str | None] = mapped_column(String(40))
     subtotal: Mapped[Decimal] = mapped_column(Numeric(12, 2))
-    # Desconto da venda (na Vulto: desconto do PDV e resgate de pontos Vulto+). Zero quando não há
+    # Desconto da venda (na Vulto: desconto do PDV e resgate de pontos Helo). Zero quando não há
     desconto: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=0, server_default="0")
     total: Mapped[Decimal] = mapped_column(Numeric(12, 2))
     # Frete e endereço de entrega: só e-commerce e app (nulos na loja física)

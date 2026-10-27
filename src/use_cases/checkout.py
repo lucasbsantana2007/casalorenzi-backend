@@ -5,7 +5,7 @@ pagamento e itens.
 Numa única transação: confere os dados, recalcula preços e frete no servidor (nada de valor
 vem do navegador), escolhe a loja de expedição, grava pedido, itens e pagamento (aprovado:
 pagamento simulado na demonstração) e cria as transferências das peças que faltam na loja.
-Vulto+: o resgate de pontos vira desconto nos produtos e a compra aprovada ganha pontos
+Helo: o resgate de pontos vira desconto nos produtos e a compra aprovada ganha pontos
 (regras em src/entities/fidelidade.py).
 As peças só saem do estoque no envio (painel de pedidos), mas ficam reservadas desde a compra:
 o disponível para venda desconta os pedidos ainda não enviados.
@@ -94,7 +94,7 @@ def finalizar_compra(db: Session, cliente: m.Cliente, dados: CheckoutEntrada) ->
         raise DadosInvalidos("Escolha a forma de pagamento.")
     parcelas = min(max(dados.pagamento.parcelas or 1, 1), PARCELAS_MAX) if metodo == "CARTAO" else 1
 
-    # Resgate Vulto+: confere saldo e regras e trava o cliente até o fim da compra
+    # Resgate Helo: confere saldo e regras e trava o cliente até o fim da compra
     desconto = fidelidade.conferir_resgate(db, cliente, subtotal, dados.pontos)
 
     loja = escolher_loja_expedicao(db, [(v.id, q) for v, q, _ in itens], cep)
