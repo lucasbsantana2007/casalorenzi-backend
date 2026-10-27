@@ -21,6 +21,7 @@ from sqlalchemy.orm import Session
 from src import models as m
 from src.config import settings
 from src.entities import assistente as regra
+from src.entities import atendimento as regra_atendimento
 from src.entities.papeis import ACESSO, pode_acessar
 from src.repositories import assistente_repository, cadastro_repository, sessao
 from src.use_cases import analises, atendimentos
@@ -408,9 +409,12 @@ def registrar_sacola(db: Session, conversa: m.ConversaAssistente, mensagem_id: i
     sessao.confirmar(db)
 
 
-def _resumo_para_atendimento(db: Session, conversa: m.ConversaAssistente, motivo: str | None) -> str:
+def _resumo_para_atendimento(db: Session, conversa: m.ConversaAssistente, motivo: str | None, canal: str = "SITE") -> str:
     memoria = conversa.contexto or {}
-    linhas = ["Solicitação aberta pelo assistente virtual do site, a pedido do cliente."]
+    if canal == "WHATSAPP":
+        linhas = ["Solicitação aberta pelo assistente virtual do site. O cliente seguiu pelo WhatsApp com este protocolo."]
+    else:
+        linhas = ["Solicitação aberta pelo assistente virtual do site, a pedido do cliente."]
     if motivo:
         linhas.append(f"Motivo: {motivo.strip()[:300]}")
     linhas.append(f"Vitrine: {prompts.NOME_MARCA.get(conversa.marca or '', 'Casa Lorenzi')}")
@@ -436,24 +440,52 @@ def _tipo_para_atendimento(db: Session) -> m.TipoSolicitacao:
     return next((t for t in tipos if t.titulo == "Dúvida sobre produto"), tipos[0])
 
 
-def encaminhar(db: Session, conversa: m.ConversaAssistente, cliente: m.Cliente | None, motivo: str | None) -> m.Atendimento:
+def link_whatsapp(atendimento: m.Atendimento, motivo: str | None) -> str | None:
+    """Link wa.me do atendimento com o protocolo na mensagem; None sem WHATSAPP_ATENDIMENTO."""
+    if not settings.WHATSAPP_ATENDIMENTO:
+        return None
+    return regra_atendimento.link_whatsapp(settings.WHATSAPP_ATENDIMENTO, atendimento.protocolo, motivo)
+
+
+def encaminhar(
+    db: Session, conversa: m.ConversaAssistente, cliente: m.Cliente | None, motivo: str | None, canal: str = "SITE"
+) -> m.Atendimento:
     """Abre um chamado de atendimento (o mesmo do site e do painel) com o resumo da conversa. Idempotente:
-    a mesma conversa não abre dois chamados."""
-    if cliente is None:
+    a mesma conversa não abre dois chamados. SITE exige login (a equipe responde em Minha conta); WHATSAPP
+    não (decisão 81): o cliente segue pelo link wa.me, que leva o protocolo."""
+    whatsapp = canal == "WHATSAPP"
+    if whatsapp and not settings.WHATSAPP_ATENDIMENTO:
+        raise DadosInvalidos("O atendimento pelo WhatsApp não está disponível.")
+    if not whatsapp and cliente is None:
         raise NaoAutenticado("Entre na sua conta para falar com a equipe.")
     assistente_repository.travar(db, conversa.id)
     if conversa.atendimento_id:
         existente = db.get(m.Atendimento, conversa.atendimento_id)
         if existente is not None:
+            if existente.cliente_id is None and cliente is not None:
+                # Foi para o WhatsApp antes de entrar na conta: o chamado passa a ser dela, como a conversa
+                existente.cliente_id = cliente.id
+                sessao.confirmar(db)
             return existente
-    resumo = _resumo_para_atendimento(db, conversa, motivo)
+    resumo = _resumo_para_atendimento(db, conversa, motivo, canal)
     tipo = _tipo_para_atendimento(db)
-    atendimento = atendimentos.abrir_para_cliente(db, cliente, tipo_solicitacao_id=tipo.id, pedido_id=None, descricao=resumo)
+    if whatsapp:
+        atendimento = atendimentos.abrir_pelo_whatsapp(
+            db, cliente, marca=conversa.marca, tipo_solicitacao_id=tipo.id, descricao=resumo
+        )
+    else:
+        atendimento = atendimentos.abrir_para_cliente(db, cliente, tipo_solicitacao_id=tipo.id, pedido_id=None, descricao=resumo)
     conversa = assistente_repository.obter(db, conversa.id, regra.CLIENTE)
     conversa.atendimento_id = atendimento.id
     conversa.status = regra.ENCAMINHADA
     momento = agora()
-    texto = f"Pronto! Abri a solicitação {atendimento.protocolo}. A equipe responde por lá, em Minha conta > Solicitações."
+    if whatsapp:
+        texto = (
+            f"Pronto! Abri o protocolo {atendimento.protocolo} com o resumo desta conversa. "
+            "Toque em “Abrir o WhatsApp”: a mensagem já vai com o protocolo, e a equipe continua de onde paramos."
+        )
+    else:
+        texto = f"Pronto! Abri a solicitação {atendimento.protocolo}. A equipe responde por lá, em Minha conta > Solicitações."
     sessao.adicionar(
         db,
         m.MensagemAssistente(
@@ -465,7 +497,8 @@ def encaminhar(db: Session, conversa: m.ConversaAssistente, cliente: m.Cliente |
                     "tipo": "atendimento_aberto",
                     "atendimentoId": atendimento.id,
                     "protocolo": atendimento.protocolo,
-                    "link": f"/cliente/solicitacoes/{atendimento.id}",
+                    "link": f"/cliente/solicitacoes/{atendimento.id}" if atendimento.cliente_id else None,
+                    "whatsappUrl": link_whatsapp(atendimento, motivo) if whatsapp else None,
                 }
             ],
             modo=regra.REGRAS,

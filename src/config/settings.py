@@ -79,6 +79,11 @@ IA_RETENCAO_DIAS = int(os.getenv("IA_RETENCAO_DIAS", "90"))
 # Respostas prontas (sem LLM) para mensagens simples: saudação, agradecimento, pedido de atendente
 IA_RESPOSTAS_DIRETAS = os.getenv("IA_RESPOSTAS_DIRETAS", "true").lower() == "true"
 
+# WhatsApp do atendimento, só números com DDI e DDD (5511999999999). Com ele, o assistente do site oferece
+# "Continuar no WhatsApp": abre o chamado com o resumo da conversa e um link wa.me com o protocolo.
+# Vazio: só o chamado pelo site (decisão 81).
+WHATSAPP_ATENDIMENTO = "".join(c for c in os.getenv("WHATSAPP_ATENDIMENTO", "") if c.isdigit())
+
 # Banco só de leitura para o copiloto e as automações (opcional): um usuário do Postgres só com SELECT.
 # Vazio: usa DATABASE_URL, e cada consulta roda numa transação READ ONLY com tempo máximo.
 DATABASE_URL_LEITURA = os.getenv("DATABASE_URL_LEITURA", "") or DATABASE_URL

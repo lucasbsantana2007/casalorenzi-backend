@@ -144,6 +144,36 @@ def abrir_para_cliente(
     return atendimento
 
 
+def abrir_pelo_whatsapp(
+    db: Session, cliente: m.Cliente | None, *, marca: str | None, tipo_solicitacao_id: int, descricao: str
+) -> m.Atendimento:
+    """Chamado que o cliente leva do assistente do site para o WhatsApp do atendimento (decisão 81). Com login,
+    já fica ligado à conta; sem login, nasce sem cliente, como os atendimentos de WhatsApp da Vulto, e a equipe
+    o encontra pelo protocolo que vai escrito na mensagem. Sem loja: é o atendimento central da marca."""
+    tipo = cadastro_repository.tipo_solicitacao(db, tipo_solicitacao_id)
+    if tipo is None or not tipo.ativo or tipo.exige_venda:
+        raise DadosInvalidos("Tipo de solicitação inválido para o WhatsApp.")
+    momento = agora()
+    atendimento = m.Atendimento(
+        marca=marca if marca in MARCAS else MARCA_PADRAO,
+        protocolo=f"TMP-{uuid.uuid4().hex[:12]}",  # trocado pelo protocolo definitivo assim que o id existe
+        cliente_id=cliente.id if cliente else None,
+        contato=None if cliente else "WhatsApp",
+        contato_nome=None if cliente else "Visitante do site",
+        canal="WHATSAPP",
+        tipo_solicitacao_id=tipo.id,
+        status="ABERTO",
+        criado_em=momento,
+        atualizado_em=momento,
+    )
+    sessao.adicionar(db, atendimento)
+    sessao.gerar_ids(db)
+    atendimento.protocolo = protocolo(atendimento.id)
+    _nova_mensagem(db, atendimento, autor_tipo="CLIENTE", autor_id=None, conteudo=descricao, anexo=None, quando=momento)
+    sessao.confirmar(db, atendimento)
+    return atendimento
+
+
 def abrir(
     db: Session,
     usuario: m.Usuario,

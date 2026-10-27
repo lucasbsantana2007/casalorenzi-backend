@@ -13,6 +13,7 @@ from typing import Literal
 from pydantic import Field
 from sqlalchemy.orm import Session
 
+from src.config import settings
 from src.entities import fidelidade as regra_pontos
 from src.entities.busca import (
     PedidoBusca,
@@ -564,22 +565,29 @@ class AtendimentoHumano(Entrada):
 
 
 def solicitar_atendimento_humano(db: Session, ctx: Contexto, entrada: AtendimentoHumano) -> Resultado:
-    """Oferece o botão para abrir um chamado com a equipe (o chamado só é aberto quando o cliente confirma)."""
+    """Oferece os botões para falar com a equipe: chamado pelo site (com login) e, se configurado, o WhatsApp
+    do atendimento, que não exige login (decisão 81). Nada é aberto até o cliente tocar num deles."""
     logado = ctx.cliente_id is not None
+    whatsapp = bool(settings.WHATSAPP_ATENDIMENTO)
     lojas = [loja_saida(loja) for loja in cadastro_repository.lojas(db, somente_ativas=True, marca=ctx.marca_site, tipo="LOJA")]
     bloco = {
         "tipo": "acao_atendimento",
         "estado": "PENDENTE",
         "motivo": entrada.motivo.strip()[:300],
         "precisaLogin": not logado,
+        "whatsapp": whatsapp,
         "telefones": [{"loja": loja["nome"], "telefone": loja["telefone"]} for loja in lojas if loja["telefone"]][:5],
     }
-    if logado:
+    if whatsapp:
+        texto = "Posso passar você para a nossa equipe com o resumo desta conversa. Toque em “Continuar no WhatsApp”" + (
+            " ou em “Falar com a equipe” para receber a resposta aqui no site." if logado else "."
+        )
+    elif logado:
         texto = "Posso abrir uma solicitação para a nossa equipe com o resumo desta conversa. Toque em “Falar com a equipe” para confirmar."
     else:
         texto = "Para a equipe responder pela sua conta, entre no site e toque em “Falar com a equipe”. Se preferir, ligue para uma das lojas abaixo."
     return Resultado(
-        dados={"botaoOferecido": True, "precisaLogin": not logado},
+        dados={"botaoOferecido": True, "precisaLogin": not logado, "whatsapp": whatsapp},
         blocos=[bloco],
         memoria={"oferta": "ATENDIMENTO"},
         texto=texto,
