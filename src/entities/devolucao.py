@@ -12,6 +12,8 @@ from decimal import Decimal
 
 STATUS_ACEITAM_DEVOLUCAO = ("ENVIADO", "ENTREGUE")
 MOTIVO_MAX = 500
+# O cliente pede a devolução em até 30 dias do recebimento (política de trocas do site; decisão 97)
+PRAZO_DEVOLUCAO_DIAS = 30
 
 
 def aceita_devolucao(status_pedido: str) -> bool:
