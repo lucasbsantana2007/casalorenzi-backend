@@ -44,6 +44,11 @@ def aplicar_movimentacao(
     sessao.adicionar(db, mov)
     estoque.quantidade = saldo
     estoque.atualizado_em = quando
+    if quantidade > 0:
+        # A peça pode ter voltado ao site: quem pediu "Avise-me" é conferido depois do commit
+        from src.use_cases.avisos_cliente import marcar_liberadas
+
+        marcar_liberadas(db, [estoque.variacao_id])
     return mov
 
 

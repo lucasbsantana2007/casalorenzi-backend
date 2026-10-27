@@ -151,6 +151,8 @@ AUTOMACOES = (
     "sugestoes_transferencia",
     "pontos_a_vencer",
     "aviso_pontos",
+    "aviso_estoque",
+    "lembrete_sacola",
     "limpeza_conversas",
 )
 STATUS_EXECUCAO = ("EM_ANDAMENTO", "SUCESSO", "ERRO", "IGNORADA")
