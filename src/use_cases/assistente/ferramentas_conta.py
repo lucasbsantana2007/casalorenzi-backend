@@ -6,25 +6,23 @@ pelas rotas da conta, não pelo modelo.
 Os dados pessoais saem sempre do cliente do token: nenhuma ferramenta recebe id ou CPF de cliente.
 """
 
-from datetime import datetime, timedelta
 from decimal import Decimal, InvalidOperation
 
 from pydantic import Field
 from sqlalchemy.orm import Session
 
 from src import models as m
-from src.entities import devolucao as regra_devolucao
 from src.entities.atendimento import EM_ABERTO
+from src.entities.cliente import email_valido, normalizar_email
 from src.entities.frete import ROTULOS as ROTULO_FRETE
 from src.entities.frete import somente_digitos, uf_do_cep
-from src.entities.pedido import CANAL_LOJA
 from src.repositories import atendimento_repository, pedido_repository
-from src.use_cases import fidelidade
+from src.use_cases import fidelidade, pedidos_cliente
 from src.use_cases import frete as frete_config
 from src.use_cases.assistente.ferramentas import Contexto, Entrada, FalhaFerramenta, Ferramenta, Resultado
 from src.use_cases.assistente.ferramentas_cliente import ROTULO_STATUS_PEDIDO, SemParametros, _cliente
 from src.use_cases.assistente.formatacao import brl, data, numero
-from src.utils.datas import agora, ms
+from src.utils.datas import ms
 
 ROTULO_PAGAMENTO = {
     "APROVADO": "aprovado",
@@ -54,25 +52,11 @@ def _peca(variacao) -> str:
     return f"{variacao.produto.nome} ({variacao.cor}, {variacao.tamanho})"
 
 
-def recebido_em(pedido: m.Pedido) -> datetime | None:
-    """Quando o cliente recebeu: o evento de entrega; sem ele, a data do pedido para pedido entregue."""
-    entrega = next((e for e in reversed(pedido.eventos) if e.status == "ENTREGUE"), None)
-    if entrega is not None:
-        return entrega.criado_em
-    return pedido.criado_em if pedido.status == "ENTREGUE" else None
-
-
-def prazo_devolucao(pedido: m.Pedido) -> datetime | None:
-    """Último dia para pedir a devolução (30 dias do recebimento); None se ainda não foi entregue."""
-    recebido = recebido_em(pedido)
-    return recebido + timedelta(days=regra_devolucao.PRAZO_DEVOLUCAO_DIAS) if recebido else None
-
-
 def pedido_do_cliente(db: Session, cliente: m.Cliente, numero_pedido: str) -> m.Pedido:
     """Aceita "CL-105093", "cl-105093" ou só "105093"; só entre os pedidos do próprio cliente."""
     texto = (numero_pedido or "").strip().upper()
     if not texto:
-        raise FalhaFerramenta("PEDIDO_NAO_INFORMADO: pergunte o número do pedido ou consulte os pedidos do cliente.")
+        raise FalhaFerramenta("PEDIDO_NAO_INFORMADO: qual é o número do pedido? Ele aparece em Minha conta > Pedidos.")
     pedido = pedido_repository.do_cliente_por_numero(db, cliente.id, texto)
     if pedido is None:
         digitos = somente_digitos(texto)
@@ -96,10 +80,8 @@ def ver_pedido(db: Session, ctx: Contexto, entrada: VerPedido) -> Resultado:
     status = ROTULO_STATUS_PEDIDO.get(pedido.status, pedido.status)
     pagamento = pedido.pagamentos[-1] if pedido.pagamentos else None
     devolucoes = [d for item in pedido.itens for d in item.devolucoes]
-    prazo = prazo_devolucao(pedido)
-    pode_devolver = (
-        regra_devolucao.aceita_devolucao(pedido.status) and prazo is not None and agora() <= prazo and pedido.canal != CANAL_LOJA
-    )
+    prazo = pedidos_cliente.prazo_devolucao(pedido)
+    pode_devolver = pedidos_cliente.pode_pedir_devolucao(pedido)
     frete = None
     if pedido.frete_tipo:
         valor = "grátis" if not pedido.frete_valor else brl(pedido.frete_valor)
@@ -343,6 +325,119 @@ def calcular_frete(db: Session, ctx: Contexto, entrada: CalcularFrete) -> Result
     return Resultado(dados=dados, blocos=[bloco], texto=texto)
 
 
+# ---------- Ações com confirmação (decisões 95, 96 e 97) ----------
+# A ferramenta só confere e monta o cartão; a ação acontece quando o cliente confirma no cartão, pelas rotas da
+# conta (a senha do e-mail vai direto para /conta, nunca para a conversa nem para o modelo).
+
+CONFIRMAR = "Nada foi feito ainda: a ação só acontece quando o cliente confirma no cartão. Não diga que já foi feita."
+
+
+class TrocarEmail(Entrada):
+    novo_email: str = Field(max_length=255, description="O e-mail novo que o cliente quer na conta.")
+
+
+def trocar_meu_email(db: Session, ctx: Contexto, entrada: TrocarEmail) -> Resultado:
+    cliente = _cliente(db, ctx)
+    novo = normalizar_email(entrada.novo_email)
+    if not email_valido(novo):
+        raise FalhaFerramenta("EMAIL_INVALIDO: o e-mail informado não é válido. Peça para o cliente conferir.")
+    if novo == normalizar_email(cliente.email):
+        raise FalhaFerramenta("MESMO_EMAIL: esse já é o e-mail da conta.")
+    texto = (
+        f"Para trocar o e-mail da sua conta para {novo}, confirme com a sua senha atual no cartão abaixo. "
+        "A senha vai direto para a sua conta, não para mim."
+    )
+    return Resultado(
+        dados={"emailNovo": novo, "importante": CONFIRMAR},
+        blocos=[{"tipo": "confirmar_email", "estado": "PENDENTE", "emailNovo": novo}],
+        texto=texto,
+    )
+
+
+class NumeroDoPedido(Entrada):
+    numero_pedido: str = Field(max_length=30, description="Número do pedido, como CL-105093.")
+
+
+def cancelar_pedido(db: Session, ctx: Contexto, entrada: NumeroDoPedido) -> Resultado:
+    cliente = _cliente(db, ctx)
+    pedido = pedido_do_cliente(db, cliente, entrada.numero_pedido)
+    if pedido.status == "CANCELADO":
+        raise FalhaFerramenta(f"JA_CANCELADO: o pedido {pedido.numero} já está cancelado.")
+    if pedido.status != "PROCESSANDO":
+        raise FalhaFerramenta(
+            f"NAO_CANCELAVEL: o pedido {pedido.numero} já saiu para entrega e não pode ser cancelado. Quando ele chegar, dá para pedir a devolução."
+        )
+    texto = (
+        f"Posso cancelar o pedido {pedido.numero}, de {brl(pedido.total)}. O pagamento é estornado e os pontos usados "
+        "voltam para a sua conta. Confirme no cartão abaixo."
+    )
+    bloco = {
+        "tipo": "confirmar_cancelamento",
+        "estado": "PENDENTE",
+        "numero": pedido.numero,
+        "total": float(pedido.total),
+        "itens": [f"{_peca(i.variacao)} x{i.quantidade}" for i in pedido.itens],
+    }
+    return Resultado(
+        dados={"pedido": pedido.numero, "total": brl(pedido.total), "importante": CONFIRMAR},
+        blocos=[bloco],
+        memoria={"pedidoEmFoco": pedido.numero},
+        texto=texto,
+    )
+
+
+class SolicitarDevolucao(Entrada):
+    numero_pedido: str = Field(max_length=30, description="Número do pedido, como CL-105093.")
+    motivo: str = Field("", max_length=300, description="O motivo com as palavras do cliente (ex.: ficou grande).")
+
+
+def solicitar_devolucao(db: Session, ctx: Contexto, entrada: SolicitarDevolucao) -> Resultado:
+    cliente = _cliente(db, ctx)
+    pedido = pedido_do_cliente(db, cliente, entrada.numero_pedido)
+    if pedido.status == "PROCESSANDO":
+        raise FalhaFerramenta(
+            f"AINDA_NAO_ENVIADO: o pedido {pedido.numero} ainda não saiu para entrega: dá para cancelar em vez de devolver."
+        )
+    if not pedidos_cliente.pode_pedir_devolucao(pedido):
+        raise FalhaFerramenta(
+            f"FORA_DO_PRAZO: o pedido {pedido.numero} não aceita mais devolução (o prazo é de 30 dias do recebimento). "
+            "Posso chamar alguém da equipe para ver o seu caso."
+        )
+    pecas = [
+        {
+            "itemPedidoId": i.id,
+            "nome": i.variacao.produto.nome,
+            "cor": i.variacao.cor,
+            "tamanho": i.variacao.tamanho,
+            "quantidade": pedidos_cliente.devolvivel(i),
+            "preco": float(i.preco_unitario),
+        }
+        for i in pedido.itens
+        if pedidos_cliente.devolvivel(i) > 0
+    ]
+    if not pecas:
+        raise FalhaFerramenta(f"NADA_A_DEVOLVER: as peças do pedido {pedido.numero} já foram devolvidas.")
+    prazo = pedidos_cliente.prazo_devolucao(pedido)
+    texto = (
+        f"Separei a devolução do pedido {pedido.numero}. Marque as peças, confira o motivo e confirme no cartão. "
+        "A equipe confere a peça e faz o reembolso."
+    )
+    bloco = {
+        "tipo": "confirmar_devolucao",
+        "estado": "PENDENTE",
+        "numero": pedido.numero,
+        "prazoAte": data(prazo),
+        "motivo": entrada.motivo.strip(),
+        "pecas": pecas,
+    }
+    return Resultado(
+        dados={"pedido": pedido.numero, "prazoAte": data(prazo), "pecas": len(pecas), "importante": CONFIRMAR},
+        blocos=[bloco],
+        memoria={"pedidoEmFoco": pedido.numero},
+        texto=texto,
+    )
+
+
 FERRAMENTAS = [
     Ferramenta(
         "ver_pedido",
@@ -386,5 +481,32 @@ FERRAMENTAS = [
         "login. Se o cliente não disse o CEP, pergunte.",
         CalcularFrete,
         calcular_frete,
+    ),
+    Ferramenta(
+        "trocar_meu_email",
+        "Prepara a troca do e-mail da conta do cliente logado: mostra um cartão em que o cliente confirma com a senha "
+        "atual (a senha não passa por você). Use quando o cliente pedir para trocar o e-mail e disser o novo. Sem "
+        "login, devolve LOGIN_NECESSARIO.",
+        TrocarEmail,
+        trocar_meu_email,
+        exige_cliente=True,
+    ),
+    Ferramenta(
+        "cancelar_pedido",
+        "Prepara o cancelamento de um pedido do cliente logado que ainda está em separação: mostra o cartão de "
+        "confirmação (o pagamento é estornado e os pontos usados voltam). Pedido já enviado não cancela: ofereça a "
+        "devolução. Sem login, devolve LOGIN_NECESSARIO.",
+        NumeroDoPedido,
+        cancelar_pedido,
+        exige_cliente=True,
+    ),
+    Ferramenta(
+        "solicitar_devolucao",
+        "Prepara o pedido de devolução de um pedido do cliente logado (enviado ou entregue, até 30 dias do "
+        "recebimento): mostra o cartão com as peças para marcar e o motivo. A equipe confere a peça e faz o reembolso. "
+        "Sem login, devolve LOGIN_NECESSARIO.",
+        SolicitarDevolucao,
+        solicitar_devolucao,
+        exige_cliente=True,
     ),
 ]

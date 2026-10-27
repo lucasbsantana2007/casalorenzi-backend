@@ -32,6 +32,11 @@ IRRITADO = re.compile(
     r"\b(porcaria|absurdo|pessimo|pessima|horrivel|vergonha|lixo|palhacada|ridiculo|nunca mais compro|procon|"
     r"reclame aqui|enganad[oa]|roubo|golpe)\b"
 )
+# Ações da conta pelo chat (decisões 95 a 97)
+TROCAR_EMAIL = re.compile(r"\b(trocar|mudar|alterar|atualizar|corrigir) (o |meu )?(e-?mail|email)\b")
+EMAIL = re.compile(r"[^\s@]+@[^\s@]+\.[^\s@]+")
+CANCELAR = re.compile(r"\b(cancelar|cancela|cancelamento)\b")
+DEVOLVER = re.compile(r"\b(devolver|devolvo|quero (fazer|pedir) (a |uma )?devolucao)\b")
 # Tarefas da conta (decisão 93). PESSOAL separa "minha devolução" de "como funciona a devolução"
 REEMBOLSO = re.compile(r"\b(reembolsos?|estornos?|estornad[oa]s?|dinheiro de volta|devolucao|devolucoes)\b")
 PESSOAL = re.compile(r"\b(minha|minhas|meu|meus|cade|situacao|status|andamento|recebi|chegou|caiu|quando (vou|vai))\b")
@@ -177,6 +182,30 @@ def responder(texto: str, ctx: Contexto, executar) -> Rodada:
         _cor_unica(memoria)  # peça de uma cor só: a cor já fica escolhida
         return _ver(executar, memoria, foco)
 
+    # Ações com cartão de confirmação (decisões 95 a 97): a ferramenta só prepara; o cliente confirma no cartão
+    numero_pedido = NUMERO_PEDIDO.search(texto)
+    if TROCAR_EMAIL.search(n):
+        if email := EMAIL.search(texto):
+            return Rodada(
+                _do_resultado(executar("trocar_meu_email", {"novo_email": email.group(0)}), "Não consegui preparar a troca.")
+            )
+        return Rodada("Qual é o e-mail novo? Me diga que eu preparo a troca, e você confirma com a sua senha.")
+    if CANCELAR.search(n) or DEVOLVER.search(n):
+        cancelar = bool(CANCELAR.search(n))
+        if numero_pedido is None:
+            execucao = executar("consultar_meus_pedidos", {})
+            pergunta = (
+                "Qual pedido você quer cancelar? Dá para cancelar os que ainda estão em separação."
+                if cancelar
+                else "Qual pedido você quer devolver? Me diga o número; dá para devolver até 30 dias depois do recebimento."
+            )
+            return Rodada(pergunta if execucao.sucesso else _do_resultado(execucao, pergunta))
+        if cancelar:
+            argumentos = {"numero_pedido": numero_pedido.group(1)}
+            return Rodada(_do_resultado(executar("cancelar_pedido", argumentos), "Não consegui preparar o cancelamento."))
+        argumentos = {"numero_pedido": numero_pedido.group(1), "motivo": texto.strip()[:300]}
+        return Rodada(_do_resultado(executar("solicitar_devolucao", argumentos), "Não consegui preparar a devolução."))
+
     # O caso do cliente, não a política (decisão 93): "cadê meu reembolso" consulta a conta; "como funciona a
     # devolução" continua indo para a política de trocas, mais abaixo
     if REEMBOLSO.search(n) and PESSOAL.search(n):
@@ -187,7 +216,7 @@ def responder(texto: str, ctx: Contexto, executar) -> Rodada:
         return Rodada(
             _do_resultado(executar("consultar_minhas_solicitacoes", {}), "Não consegui consultar suas solicitações agora.")
         )
-    if numero_pedido := NUMERO_PEDIDO.search(texto):
+    if numero_pedido:
         return Rodada(
             _do_resultado(
                 executar("ver_pedido", {"numero_pedido": numero_pedido.group(1)}), "Não consegui consultar esse pedido agora."

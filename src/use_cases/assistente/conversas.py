@@ -415,6 +415,41 @@ def registrar_sacola(
     sessao.confirmar(db)
 
 
+BLOCO_DA_ACAO = {"EMAIL": "confirmar_email", "CANCELAMENTO": "confirmar_cancelamento", "DEVOLUCAO": "confirmar_devolucao"}
+DESCRICAO_DA_ACAO = {
+    "EMAIL": "O cliente trocou o e-mail da conta",
+    "CANCELAMENTO": "O cliente cancelou o pedido",
+    "DEVOLUCAO": "O cliente pediu a devolução",
+}
+
+
+def registrar_acao(db: Session, conversa: m.ConversaAssistente, mensagem_id: int, acao: str, detalhe: str | None) -> None:
+    """O cliente confirmou no cartão e a rota da conta fez a ação: o cartão fica CONCLUIDO (recarregar não mostra o
+    botão de novo) e a conversa lembra, para a Lúcia não oferecer a mesma ação outra vez."""
+    assistente_repository.travar(db, conversa.id)
+    mensagem = assistente_repository.mensagem(db, conversa.id, mensagem_id)
+    blocos = list(mensagem.blocos or []) if mensagem else []
+    indice = next((i for i, b in enumerate(blocos) if b.get("tipo") == BLOCO_DA_ACAO[acao]), None)
+    if indice is None:
+        raise NaoEncontrado("Ação não encontrada nesta conversa.")
+    if blocos[indice].get("estado") != "CONCLUIDO":
+        detalhe = (detalhe or "").strip()[:200]
+        blocos[indice] = {**blocos[indice], "estado": "CONCLUIDO", "detalhe": detalhe}
+        mensagem.blocos = blocos
+        descricao = DESCRICAO_DA_ACAO[acao] + (f": {detalhe}" if detalhe else "")
+        momento = agora()
+        sessao.adicionar(
+            db,
+            m.MensagemAssistente(conversa_id=conversa.id, papel=regra.SISTEMA, conteudo=descricao, blocos=[], criada_em=momento),
+        )
+        memoria = dict(conversa.contexto or {})
+        memoria["eventos"] = [*(memoria.get("eventos") or []), descricao][-5:]
+        memoria["oferta"] = None
+        conversa.contexto = _limpar_memoria(memoria)
+        conversa.atualizada_em = momento
+    sessao.confirmar(db)
+
+
 def _resumo_para_atendimento(db: Session, conversa: m.ConversaAssistente, motivo: str | None, canal: str = "SITE") -> str:
     memoria = conversa.contexto or {}
     quem = f"{prompts.NOME_ASSISTENTE}, a assistente virtual do site"
