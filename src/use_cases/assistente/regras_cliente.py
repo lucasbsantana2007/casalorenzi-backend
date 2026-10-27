@@ -28,6 +28,17 @@ QUEM_E = re.compile(
     r"\b(qual (e |eh )?(o )?seu nome|como (voce|vc) se chama|quem (e|eh) (voce|vc)|"
     r"(voce|vc) (e|eh) (um |uma )?(robo|bot|humana?|pessoa|ia|inteligencia artificial|de verdade))\b"
 )
+IRRITADO = re.compile(
+    r"\b(porcaria|absurdo|pessimo|pessima|horrivel|vergonha|lixo|palhacada|ridiculo|nunca mais compro|procon|"
+    r"reclame aqui|enganad[oa]|roubo|golpe)\b"
+)
+# Tarefas da conta (decisão 93). PESSOAL separa "minha devolução" de "como funciona a devolução"
+REEMBOLSO = re.compile(r"\b(reembolsos?|estornos?|estornad[oa]s?|dinheiro de volta|devolucao|devolucoes)\b")
+PESSOAL = re.compile(r"\b(minha|minhas|meu|meus|cade|situacao|status|andamento|recebi|chegou|caiu|quando (vou|vai))\b")
+EXTRATO = re.compile(r"\b(extrato|pontos sumiram|sumiram (os )?(meus )?pontos|para onde foram|cade (os )?(meus )?pontos)\b")
+SOLICITACOES = re.compile(r"\b(minhas? solicitac(ao|oes)|meus? chamados?|meu protocolo)\b")
+NUMERO_PEDIDO = re.compile(r"\b((?:CL|cl|Cl)-?\d{4,})\b")
+CEP = re.compile(r"\b\d{5}-?\d{3}\b")
 PONTOS = re.compile(r"(\blupe\b|vulto\+|vulto mais|vultomais|\bpontos?\b|\bfidelidade\b|\bcashback\b)")
 SALDO_PONTOS = re.compile(r"\b(quantos|meus|meu|saldo|tenho|vencem|vence|vencer|vencimento|categoria|subir|falta|faltam|nivel)\b")
 REGRAS_PONTOS = re.compile(
@@ -138,6 +149,10 @@ def direta(texto: str, ctx: Contexto, executar) -> Rodada | None:
         return Rodada("Por nada! Se precisar de mais alguma peça ou informação, é só chamar.")
     if DESPEDIDA.match(n):
         return Rodada("Até mais! Quando quiser, estou por aqui.")
+    # Cliente irritado vai direto para uma pessoa, com o resumo, antes de qualquer consulta
+    if IRRITADO.search(n):
+        execucao = executar("solicitar_atendimento_humano", {"motivo": texto.strip()[:300]})
+        return Rodada("Sinto muito pelo transtorno. " + _do_resultado(execucao, "Posso chamar alguém da equipe agora."))
     # "Você é uma pessoa de verdade?" é pergunta sobre a Lúcia; "quero falar com uma pessoa" é pedido de atendente
     if QUEM_E.search(n) and "falar" not in n.split():
         return Rodada(APRESENTACAO)
@@ -161,6 +176,25 @@ def responder(texto: str, ctx: Contexto, executar) -> Rodada:
     if ctx.acao and ctx.acao.get("tipo") == "FOCAR_PRODUTO" and foco:
         _cor_unica(memoria)  # peça de uma cor só: a cor já fica escolhida
         return _ver(executar, memoria, foco)
+
+    # O caso do cliente, não a política (decisão 93): "cadê meu reembolso" consulta a conta; "como funciona a
+    # devolução" continua indo para a política de trocas, mais abaixo
+    if REEMBOLSO.search(n) and PESSOAL.search(n):
+        return Rodada(_do_resultado(executar("consultar_reembolsos", {}), "Não consegui consultar seus reembolsos agora."))
+    if EXTRATO.search(n):
+        return Rodada(_do_resultado(executar("consultar_extrato_pontos", {}), "Não consegui consultar seu extrato agora."))
+    if SOLICITACOES.search(n):
+        return Rodada(
+            _do_resultado(executar("consultar_minhas_solicitacoes", {}), "Não consegui consultar suas solicitações agora.")
+        )
+    if numero_pedido := NUMERO_PEDIDO.search(texto):
+        return Rodada(
+            _do_resultado(
+                executar("ver_pedido", {"numero_pedido": numero_pedido.group(1)}), "Não consegui consultar esse pedido agora."
+            )
+        )
+    if FRETE.search(n) and (cep := CEP.search(texto)):
+        return Rodada(_do_resultado(executar("calcular_frete", {"cep": cep.group(0)}), "Não consegui calcular o frete agora."))
 
     # Lupe+: as regras do programa ou o saldo do cliente logado
     if PONTOS.search(n) and not PEDIDOS.search(n):

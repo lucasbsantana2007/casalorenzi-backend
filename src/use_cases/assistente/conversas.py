@@ -28,6 +28,7 @@ from src.use_cases import analises, atendimentos
 from src.use_cases.assistente import (
     catalogo,
     ferramentas_cliente,
+    ferramentas_conta,
     ferramentas_gerenciais,
     prompts,
     regras_cliente,
@@ -41,7 +42,7 @@ from src.utils.erros import DadosInvalidos, Expirado, NaoAutenticado, NaoEncontr
 
 ASSISTENTE_CLIENTE = Assistente(
     tipo=regra.CLIENTE,
-    ferramentas=ferramentas_cliente.FERRAMENTAS,
+    ferramentas=ferramentas_cliente.FERRAMENTAS + ferramentas_conta.FERRAMENTAS,
     prompt_fixo=prompts.PROMPT_CLIENTE,
     direta=regras_cliente.direta,
     regras=regras_cliente.responder,
