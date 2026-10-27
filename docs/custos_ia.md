@@ -144,7 +144,7 @@ Não medidos: dependem de dados de atendimento e vendas que ainda não existem c
 | Venda assistida | Botões "Adicionar à sacola" confirmados × pedidos com essas peças | Taxa de conversão do chat |
 | Menos ruptura | Alertas de estoque baixo resolvidos antes de zerar | Itens zerados com demanda antes e depois |
 | Capital parado | Alertas de estoque parado (hoje 2,1 mil itens sem venda há 90+ dias no banco local [MEDIDO]) | Valor parado que virou ação comercial ou transferência |
-| Retenção do Helo | Clientes com pontos a vencer contatados (com consentimento) | No banco local, 522 clientes e 281.401 pontos (R$ 14.070,05) vencem em 30 dias [MEDIDO] |
+| Retenção do Lupe+ | Clientes com pontos a vencer contatados (com consentimento) | No banco local, 522 clientes e 281.401 pontos (R$ 14.070,05) vencem em 30 dias [MEDIDO] |
 | Gestão mais rápida | Perguntas ao copiloto × tempo para montar o mesmo número no Financeiro | Respostas medidas em até 0,4 s por consulta de mês [MEDIDO] |
 
 ## 8. Limitações e riscos

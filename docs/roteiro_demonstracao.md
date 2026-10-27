@@ -16,7 +16,7 @@ o mesmo.
 
 ## 1. O cliente encontra uma peça (vitrine da Vulto, sem login)
 
-Abrir `/vulto` e o botão **Márcia** (a assistente do site).
+Abrir `/vulto` e o botão **Lúcia** (a assistente do site).
 
 | Digitar | Mostrar |
 | --- | --- |
@@ -47,7 +47,7 @@ preço e frete no servidor.
 | `quantos pontos eu tenho?` | Sem login: pede para entrar. Não mostra dado pessoal. |
 | `quero falar com um atendente` | Sem login: botão "Entrar para falar com a equipe" e os telefones das lojas. |
 
-## 4. Cliente logado: Helo, pedidos e chamado
+## 4. Cliente logado: Lupe+, pedidos e chamado
 
 Entrar como `mariana.costa@gmail.com` e abrir o assistente (na área do cliente ou na vitrine). No banco local, as
 contas de demonstração ainda não têm pontos: finalize antes, como Mariana, a compra da camisa que o assistente pôs na
@@ -55,7 +55,7 @@ sacola (passo 2; o pagamento é simulado e aprovado). A compra pelo site gera 2 
 
 | Digitar | Mostrar |
 | --- | --- |
-| `quantos pontos eu tenho?` | Saldo da compra, valor em reais, categoria, vencimento (12 meses) e quanto falta para a próxima categoria (regras oficiais do Helo). Sem compra, o assistente diz que ela ainda não tem pontos e como ganhar. |
+| `quantos pontos eu tenho?` | Saldo da compra, valor em reais, categoria, vencimento (12 meses) e quanto falta para a próxima categoria (regras oficiais do Lupe+). Sem compra, o assistente diz que ela ainda não tem pontos e como ganhar. |
 | `qual o status do meu pedido?` | Os pedidos dela, com status e rastreio. |
 | `quero falar com um atendente` → **Falar com a equipe** | Abre um chamado real com o resumo da conversa. Mostrar no painel (Atendimento) o protocolo e a mensagem com o resumo. |
 

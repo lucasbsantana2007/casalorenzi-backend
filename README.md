@@ -126,7 +126,7 @@ O diagrama das tabelas, com o que a união mudou, está em [docs/diagrama_banco.
 | Catálogo | `categorias`, `fornecedores`, `produtos` (com descrição, composição, cuidados, marca, código do modelo e coleção), `variacoes` (SKU, com `preco_custo`, EAN, código do CD, preço próprio e situação no catálogo), `imagens_produto` (foto enviada no cadastro) |
 | Estoque | `estoques` (saldo por **loja + SKU**, nunca negativo), `movimentacoes` (histórico com sinal, inclusive saldo inicial, inventário e avaria), `transferencias` (com `pedido_id` quando atendem um pedido) |
 | Vendas | `pedidos` (loja física, e-commerce ou app; venda ou troca; com desconto, frete e endereço de entrega), `itens_pedido`, `eventos_pedido` (histórico), `pagamentos`, `devolucoes` |
-| Helo | `movimentos_pontos` (extrato de pontos com o saldo resultante) |
+| Lupe+ | `movimentos_pontos` (extrato de pontos com o saldo resultante) |
 | Atendimento | `tipos_solicitacao`, `atendimentos` (site, WhatsApp, Instagram ou e-mail; com cliente ou só o contato), `mensagens`, `anexos` (foto) |
 | Administração | `config_frete` e `frete_regioes` (frete configurável), `log_acoes` (quem fez o quê) |
 | Migração da Vulto | `decisoes_migracao` (registro de decisões: os 54 da Vulto e os da união, em [docs/registro_decisoes_uniao.md](docs/registro_decisoes_uniao.md)), `de_para` (origem de cada registro migrado) |
@@ -151,7 +151,7 @@ Todas sob o prefixo `/api`. As rotas internas exigem `Authorization: Bearer <tok
 | POST | `/auth/cadastro` (conta do cliente; já devolve a sessão), `/auth/esqueci-senha`, `/auth/redefinir-senha` | público |
 | GET | `/lojas` (com endereço, telefone, horários e `ativa`), `/categorias`, `/tipos-solicitacao` | público |
 | GET, PUT · PUT · POST | `/conta` · `/conta/senha` · `/conta/exclusao` (configurações da conta) | o próprio cliente |
-| GET | `/conta/pontos` (Helo: saldo, categoria, valor em R$, próximos vencimentos e extrato) | o próprio cliente |
+| GET | `/conta/pontos` (Lupe+: saldo, categoria, valor em R$, próximos vencimentos e extrato) | o próprio cliente |
 | GET | `/frete/condicoes` (valores e prazos, sem custo) | público |
 | GET, PUT | `/frete/config` · POST `/frete/simulacao` | administrador |
 | GET, POST | `/admin/funcionarios` · PUT `/admin/funcionarios/{id}` · PATCH `/admin/funcionarios/{id}/status` · POST `/admin/funcionarios/{id}/convite` | administrador |
@@ -165,7 +165,7 @@ Todas sob o prefixo `/api`. As rotas internas exigem `Authorization: Bearer <tok
 | GET | `/estoque/posicao?data&lojaId&busca` | equipe |
 | GET, POST | `/movimentacoes` (filtros: `estoqueId&lojaId&tipo&de&ate&busca`) | equipe |
 | GET, POST | `/transferencias` · PATCH `/transferencias/{id}` (status) | administrador, operador |
-| POST | `/checkout` (o cliente vem do token; `pontos` usa o saldo Helo como desconto) | cliente logado |
+| POST | `/checkout` (o cliente vem do token; `pontos` usa o saldo Lupe+ como desconto) | cliente logado |
 | GET | `/pedidos?status&lojaId&canal&busca`, `/pedidos/{id}` | equipe |
 | PATCH | `/pedidos/{id}` (loja de expedição ou status) | equipe |
 | GET | `/pedidos/{id}/pagamentos` | equipe |
@@ -286,7 +286,7 @@ A Lia e o Bruno trabalham em lojas da Vulto, que só existem depois da carga: en
 A senha da equipe e dos clientes de demonstração está em `src/database/seed/dados.py`
 (`SENHA_DEMO`). Clientes entram pelo mesmo login (ex.: mariana.costa@gmail.com, CPF 158.813.998-03).
 
-## Helo (pontos)
+## Lupe+ (pontos)
 
 Regras em `src/entities/fidelidade.py`, decisões 78 a 80 em `docs/registro_decisoes_uniao.md`:
 
@@ -306,9 +306,9 @@ Detalhes em [docs/assistente_ia.md](docs/assistente_ia.md), custos em [docs/cust
 roteiro para a banca em [docs/roteiro_demonstracao.md](docs/roteiro_demonstracao.md).
 
 - **Assistente do site** (`/assistente`): busca peças no catálogo real, disponibilidade no site e por loja, memória da
-  conversa, Helo e pedidos do cliente logado, botão "Adicionar à sacola" (o cliente confirma) e encaminhamento para o
+  conversa, Lupe+ e pedidos do cliente logado, botão "Adicionar à sacola" (o cliente confirma) e encaminhamento para o
   atendimento com o resumo da conversa.
-- **Copiloto gerencial** (`/copiloto`, tela Assistente IA do painel): vendas, estoque, transferências e Helo em
+- **Copiloto gerencial** (`/copiloto`, tela Assistente IA do painel): vendas, estoque, transferências e Lupe+ em
   linguagem natural, com as regras oficiais (o faturamento é o do Financeiro) e período, filtros e definição em cada
   resposta. Cada consulta confere o papel e a marca do token; as consultas rodam em transação somente leitura.
 - **Automações** (`python -m src.automacoes`): alertas de estoque baixo, estoque parado, sugestões de transferência e
