@@ -1,4 +1,4 @@
-"""Helo, o programa de pontos do grupo (nasceu na Vulto como Vulto+; decisões 86 e 87).
+"""Lupe+, o programa de pontos do grupo (nasceu na Vulto como Vulto+; decisões 86, 87 e 91).
 
 O saldo nunca é editado direto: cada mudança é um movimento (movimentos_pontos) com quantidade com
 sinal (positiva entra, negativa sai) e o saldo resultante, que nunca fica negativo. O saldo atual do
@@ -15,7 +15,7 @@ Ganho (aba LEIA ISSO da Vulto, com as decisões 78 e 79 da união):
 - R$ 1 em produtos = 1 ponto na loja física e 2 no site e no app (o frete não conta);
 - bônus pela categoria do cliente na hora da compra: Ouro +25% e Vip +50%;
 - só depois do pagamento aprovado; compra cancelada perde os pontos dela (estorno);
-- compras da Casa Lorenzi também ganham pontos Helo.
+- compras da Casa Lorenzi também ganham pontos Lupe+.
 
 Resgate no checkout: 100 pontos = R$ 5,00, a partir de 100 pontos e só em múltiplos de 100, sem
 passar do saldo nem do valor dos produtos, e só em compras com pelo menos R$ 500 em produtos, sem o
@@ -47,9 +47,9 @@ BONUS_CATEGORIA = {"OURO": Decimal("0.25"), "VIP": Decimal("0.50")}
 RESGATE_MULTIPLO = 100
 COMPRA_MINIMA_RESGATE = Decimal("500.00")
 
-# Nome do programa para o cliente (decisões 86 e 87: Helo, no lugar de Vulto+). Nomes internos do código e do
+# Nome do programa para o cliente (decisões 86, 87 e 91: Lupe+, no lugar de Vulto+). Nomes internos do código e do
 # banco (vulto_mais, movimentos_pontos) continuam os mesmos.
-NOME_PROGRAMA = "Helo"
+NOME_PROGRAMA = "Lupe+"
 
 # Aviso por e-mail antes do vencimento (decisão 82): aviso de serviço, sem oferta, a todos com e-mail válido.
 # REAL vai para o cliente; TESTE vai para um e-mail do time (AVISO_PONTOS_TESTE_PARA), no máximo

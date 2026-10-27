@@ -36,7 +36,7 @@ class Alerta(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     tipo: Mapped[str] = mapped_column(String(30), index=True)
     chave: Mapped[str] = mapped_column(String(160))
-    # Nula quando o alerta vale para as duas marcas (os pontos Helo são do grupo)
+    # Nula quando o alerta vale para as duas marcas (os pontos Lupe+ são do grupo)
     marca: Mapped[str | None] = mapped_column(String(10), index=True)
     loja_id: Mapped[int | None] = mapped_column(ForeignKey("lojas.id"))
     variacao_id: Mapped[int | None] = mapped_column(ForeignKey("variacoes.id"))

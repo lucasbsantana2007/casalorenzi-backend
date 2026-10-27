@@ -1,4 +1,4 @@
-"""Helo: saldo, extrato, vencimento, crédito das compras, estorno e resgate no checkout.
+"""Lupe+: saldo, extrato, vencimento, crédito das compras, estorno e resgate no checkout.
 Regras em src/entities/fidelidade.py.
 
 O saldo nunca é editado: cada mudança é um movimento com o saldo resultante. Quem lança precisa ter
@@ -150,15 +150,15 @@ def conferir_resgate(db: Session, cliente: m.Cliente, valor_produtos: Decimal, p
         return Decimal("0")
     if pontos < 0 or pontos % regra.RESGATE_MULTIPLO:
         multiplo = regra.RESGATE_MULTIPLO
-        raise DadosInvalidos(f"Use os pontos Helo a partir de {multiplo} e em múltiplos de {multiplo}.")
+        raise DadosInvalidos(f"Use os pontos Lupe+ a partir de {multiplo} e em múltiplos de {multiplo}.")
     if not regra.pode_resgatar(valor_produtos):
         minimo = _brl(regra.COMPRA_MINIMA_RESGATE)
-        raise DadosInvalidos(f"Para usar pontos Helo, a compra precisa ter pelo menos {minimo} em produtos (sem o frete).")
+        raise DadosInvalidos(f"Para usar pontos Lupe+, a compra precisa ter pelo menos {minimo} em produtos (sem o frete).")
     travar(db, cliente.id)
     vencer(db, cliente.id)
     saldo = fidelidade_repository.saldo(db, cliente.id)
     if pontos > saldo:
-        raise DadosInvalidos(f"Saldo Helo insuficiente: você tem {saldo} pontos.")
+        raise DadosInvalidos(f"Saldo Lupe+ insuficiente: você tem {saldo} pontos.")
     maximo = regra.maximo_resgatavel(saldo, valor_produtos)
     if pontos > maximo:
         raise DadosInvalidos(f"Nesta compra dá para usar no máximo {maximo} pontos (o desconto não passa do valor dos produtos).")

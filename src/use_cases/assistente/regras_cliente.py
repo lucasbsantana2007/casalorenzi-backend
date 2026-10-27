@@ -23,12 +23,12 @@ HUMANO = re.compile(
     r"\b(atendente|humano|pessoa de verdade|alguem da (equipe|loja)|falar com (a equipe|alguem|um vendedor|o vendedor|uma pessoa)|"
     r"vendedor|vendedora|suporte|reclamacao|reclamar|sac)\b"
 )
-# "Quem é você?", "você é um robô?": a Márcia diz que é uma assistente virtual (decisão 89)
+# "Quem é você?", "você é um robô?": a Lúcia diz que é uma assistente virtual (decisões 89 e 92)
 QUEM_E = re.compile(
     r"\b(qual (e |eh )?(o )?seu nome|como (voce|vc) se chama|quem (e|eh) (voce|vc)|"
     r"(voce|vc) (e|eh) (um |uma )?(robo|bot|humana?|pessoa|ia|inteligencia artificial|de verdade))\b"
 )
-PONTOS = re.compile(r"(\bhelo\b|vulto\+|vulto mais|vultomais|\bpontos?\b|\bfidelidade\b|\bcashback\b)")
+PONTOS = re.compile(r"(\blupe\b|vulto\+|vulto mais|vultomais|\bpontos?\b|\bfidelidade\b|\bcashback\b)")
 SALDO_PONTOS = re.compile(r"\b(quantos|meus|meu|saldo|tenho|vencem|vence|vencer|vencimento|categoria|subir|falta|faltam|nivel)\b")
 REGRAS_PONTOS = re.compile(
     r"\b(como (funciona|ganho|ganhar|uso|usar|resgato|resgatar|junto|acumulo)|regras?|quanto vale|vale quanto|"
@@ -64,7 +64,7 @@ ORDINAL = re.compile(
 ORDINAIS = {"primeir": 0, "segund": 1, "terceir": 2, "quart": 3, "quint": 4, "sext": 5, "ultim": -1}
 PALAVRAS_DO_NOME = {"de", "da", "do", "das", "dos", "e", "com", "a", "o", "par"}
 
-SUGESTOES = ["Camisa azul tamanho M", "Calça preta até R$ 300", "Lojas em São Paulo", "Quantos pontos Helo eu tenho?"]
+SUGESTOES = ["Camisa azul tamanho M", "Calça preta até R$ 300", "Lojas em São Paulo", "Quantos pontos Lupe+ eu tenho?"]
 
 
 def _limpo(texto: str) -> str:
@@ -138,7 +138,7 @@ def direta(texto: str, ctx: Contexto, executar) -> Rodada | None:
         return Rodada("Por nada! Se precisar de mais alguma peça ou informação, é só chamar.")
     if DESPEDIDA.match(n):
         return Rodada("Até mais! Quando quiser, estou por aqui.")
-    # "Você é uma pessoa de verdade?" é pergunta sobre a Márcia; "quero falar com uma pessoa" é pedido de atendente
+    # "Você é uma pessoa de verdade?" é pergunta sobre a Lúcia; "quero falar com uma pessoa" é pedido de atendente
     if QUEM_E.search(n) and "falar" not in n.split():
         return Rodada(APRESENTACAO)
     if HUMANO.search(n):
@@ -162,18 +162,18 @@ def responder(texto: str, ctx: Contexto, executar) -> Rodada:
         _cor_unica(memoria)  # peça de uma cor só: a cor já fica escolhida
         return _ver(executar, memoria, foco)
 
-    # Helo: as regras do programa ou o saldo do cliente logado
+    # Lupe+: as regras do programa ou o saldo do cliente logado
     if PONTOS.search(n) and not PEDIDOS.search(n):
         if REGRAS_PONTOS.search(n) and not re.search(r"\b(quantos|meus|tenho|saldo)\b", n):
             return Rodada(
                 _do_resultado(
-                    executar("politicas_da_loja", {"assunto": "vulto_mais"}), "Não consegui consultar as regras do Helo agora."
+                    executar("politicas_da_loja", {"assunto": "vulto_mais"}), "Não consegui consultar as regras do Lupe+ agora."
                 )
             )
         if REGRAS_PONTOS.search(n) and re.search(r"\b(ganho|ganharia|ganhar)\b", n):
             return Rodada(
                 _do_resultado(
-                    executar("politicas_da_loja", {"assunto": "vulto_mais"}), "Não consegui consultar as regras do Helo agora."
+                    executar("politicas_da_loja", {"assunto": "vulto_mais"}), "Não consegui consultar as regras do Lupe+ agora."
                 )
             )
         if SALDO_PONTOS.search(n) or len(n.split()) <= 3:
@@ -278,7 +278,7 @@ def responder(texto: str, ctx: Contexto, executar) -> Rodada:
 
 def _nao_entendi() -> Rodada:
     return Rodada(
-        "Não entendi bem. Posso buscar peças (por exemplo: “camisa azul M até R$ 200”), ver a disponibilidade nas lojas, informar horários e consultar seus pontos Helo. Se preferir, chamo alguém da equipe.",
+        "Não entendi bem. Posso buscar peças (por exemplo: “camisa azul M até R$ 200”), ver a disponibilidade nas lojas, informar horários e consultar seus pontos Lupe+. Se preferir, chamo alguém da equipe.",
         [_sugestoes()],
     )
 

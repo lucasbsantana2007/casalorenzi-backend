@@ -1,5 +1,5 @@
 """Ferramentas do assistente do site (Casa Lorenzi + Vulto): catálogo, disponibilidade, lojas, políticas,
-Helo e pedidos do cliente logado, sacola e atendimento humano.
+Lupe+ e pedidos do cliente logado, sacola e atendimento humano.
 
 Dados pessoais (pontos, pedidos) saem só do cliente do token (Contexto.cliente_id): nenhuma ferramenta
 recebe um id de cliente. Nenhuma ferramenta compra, cobra ou mexe em estoque: preparar_sacola só monta o
@@ -372,8 +372,8 @@ def politicas_da_loja(db: Session, ctx: Contexto, entrada: Politicas) -> Resulta
         )
     elif entrada.assunto == "pagamento":
         metodos = ["PIX" if m_ == "PIX" else f"cartão de crédito em até {PARCELAS_MAX}x" for m_ in METODOS_ECOMMERCE]
-        dados = {"formasNoSite": metodos, "pontosVultoMais": "dá para usar pontos Helo como desconto no checkout"}
-        texto = f"No site aceitamos {_lista(metodos)}. Também dá para usar os pontos Helo como desconto no checkout."
+        dados = {"formasNoSite": metodos, "pontosVultoMais": "dá para usar pontos Lupe+ como desconto no checkout"}
+        texto = f"No site aceitamos {_lista(metodos)}. Também dá para usar os pontos Lupe+ como desconto no checkout."
     else:
         dados = {
             "ganho": "R$ 1 em produtos = 1 ponto na loja física e 2 pontos no site e no app (o frete não conta); Ouro ganha +25% e Vip +50%",
@@ -383,7 +383,7 @@ def politicas_da_loja(db: Session, ctx: Contexto, entrada: Politicas) -> Resulta
             "vale": "compras da Casa Lorenzi e da Vulto",
         }
         texto = (
-            "No Helo, cada R$ 1 em produtos vale 1 ponto na loja física e 2 no site e no app. 100 pontos = R$ 5,00 de desconto, "
+            "No Lupe+, cada R$ 1 em produtos vale 1 ponto na loja física e 2 no site e no app. 100 pontos = R$ 5,00 de desconto, "
             f"em compras a partir de {brl(regra_pontos.COMPRA_MINIMA_RESGATE)}. Os pontos valem {regra_pontos.VALIDADE_MESES} meses."
         )
     return Resultado(dados={"assunto": entrada.assunto, **dados}, texto=texto)
@@ -405,7 +405,7 @@ def _cliente(db: Session, ctx: Contexto):
 
 def consultar_meus_pontos(db: Session, ctx: Contexto, entrada: SemParametros) -> Resultado:
     cliente = _cliente(db, ctx)
-    resumo = fidelidade.resumo(db, cliente)  # a mesma conta da página Helo (lança o vencimento, se houver)
+    resumo = fidelidade.resumo(db, cliente)  # a mesma conta da página Lupe+ (lança o vencimento, se houver)
     categoria = ROTULO_CATEGORIA.get(resumo.categoria or "")
     proxima = regra_pontos.proxima_categoria(resumo.saldo)
     vencimentos = [{"data": data(d), "pontos": numero(p)} for d, p in resumo.a_vencer]
@@ -427,9 +427,9 @@ def consultar_meus_pontos(db: Session, ctx: Contexto, entrada: SemParametros) ->
         "link": "/cliente/pontos",
     }
     if resumo.saldo == 0:
-        texto = "Você ainda não tem pontos Helo. Cada R$ 1 em produtos vale 1 ponto na loja física e 2 no site e no app, nas duas marcas."
+        texto = "Você ainda não tem pontos Lupe+. Cada R$ 1 em produtos vale 1 ponto na loja física e 2 no site e no app, nas duas marcas."
     else:
-        texto = f"Você tem {numero(resumo.saldo)} pontos Helo ({brl(resumo.valor_em_reais)} em desconto)"
+        texto = f"Você tem {numero(resumo.saldo)} pontos Lupe+ ({brl(resumo.valor_em_reais)} em desconto)"
         texto += f", na categoria {categoria}." if categoria else "."
         if vencimentos:
             texto += f" Os próximos a vencer: {vencimentos[0]['pontos']} pontos em {vencimentos[0]['data']}."
@@ -612,13 +612,13 @@ FERRAMENTAS = [
     ),
     Ferramenta(
         "politicas_da_loja",
-        "Regras oficiais do site: frete (valores e frete grátis), trocas e devoluções, formas de pagamento e o programa Helo.",
+        "Regras oficiais do site: frete (valores e frete grátis), trocas e devoluções, formas de pagamento e o programa Lupe+.",
         Politicas,
         politicas_da_loja,
     ),
     Ferramenta(
         "consultar_meus_pontos",
-        "Saldo de pontos Helo do cliente logado: pontos, valor em reais, categoria, próximos vencimentos e quanto "
+        "Saldo de pontos Lupe+ do cliente logado: pontos, valor em reais, categoria, próximos vencimentos e quanto "
         "falta para a próxima categoria. Sem login, devolve LOGIN_NECESSARIO.",
         SemParametros,
         consultar_meus_pontos,

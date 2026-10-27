@@ -16,6 +16,6 @@ router = APIRouter(tags=["Loja"])
 @router.post("/checkout", status_code=201)
 def finalizar_compra(dados: CheckoutEntrada, db: Session = Depends(get_db), cliente: m.Cliente = Depends(cliente_atual)):
     """Cria o pedido do cliente logado (pagamento simulado, aprovado). Preços e frete são recalculados
-    aqui. Sem sessão de cliente: 401. Item esgotado: 409. pontosGanhos: Helo creditados na compra."""
+    aqui. Sem sessão de cliente: 401. Item esgotado: 409. pontosGanhos: Lupe+ creditados na compra."""
     pedido = checkout.finalizar_compra(db, cliente, dados)
     return {**pedido_publico_saida(pedido), "pontosGanhos": fidelidade_repository.total_no_pedido(db, pedido.id, "CREDITO")}
