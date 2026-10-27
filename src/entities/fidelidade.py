@@ -64,6 +64,14 @@ def categoria_pelo_saldo(saldo: int) -> str | None:
     return next((nome for minimo, nome in FAIXAS_CATEGORIA if saldo >= minimo), None)
 
 
+def proxima_categoria(saldo: int) -> tuple[str, int] | None:
+    """(próxima categoria, pontos que faltam), pelas faixas oficiais; None para quem já é Vip."""
+    for minimo, nome in sorted(FAIXAS_CATEGORIA):
+        if saldo < minimo:
+            return nome, minimo - saldo
+    return None
+
+
 def valor_em_reais(pontos: int) -> Decimal:
     return (pontos * VALOR_PONTO).quantize(Decimal("0.01"))
 
