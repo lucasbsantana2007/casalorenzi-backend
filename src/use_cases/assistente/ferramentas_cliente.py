@@ -408,7 +408,8 @@ def consultar_meus_pontos(db: Session, ctx: Contexto, entrada: SemParametros) ->
     cliente = _cliente(db, ctx)
     resumo = fidelidade.resumo(db, cliente)  # a mesma conta da página Lupe+ (lança o vencimento, se houver)
     categoria = ROTULO_CATEGORIA.get(resumo.categoria or "")
-    proxima = regra_pontos.proxima_categoria(resumo.saldo)
+    # Sem pontos, "falta 1 ponto para a Bronze" soa estranho: a primeira compra já leva à Bronze
+    proxima = regra_pontos.proxima_categoria(resumo.saldo) if resumo.saldo > 0 else None
     vencimentos = [{"data": data(d), "pontos": numero(p)} for d, p in resumo.a_vencer]
     dados = {
         "saldo": numero(resumo.saldo),
@@ -418,6 +419,8 @@ def consultar_meus_pontos(db: Session, ctx: Contexto, entrada: SemParametros) ->
         "proximaCategoria": {"categoria": ROTULO_CATEGORIA[proxima[0]], "faltam": numero(proxima[1])} if proxima else None,
         "resgate": f"100 pontos = R$ 5,00, em compras a partir de {brl(regra_pontos.COMPRA_MINIMA_RESGATE)} em produtos",
     }
+    if resumo.saldo == 0:
+        dados["comoComecar"] = "Com a primeira compra o cliente já entra na categoria Bronze."
     bloco = {
         "tipo": "pontos",
         "saldo": resumo.saldo,
