@@ -232,6 +232,19 @@ def _enviar(db: Session, pedido: m.Pedido, codigo_rastreio: str | None, usuario:
     _log(db, usuario, pedido, f"Marcou o pedido {pedido.numero} como enviado (rastreio {codigo})")
 
 
+def cancelar(db: Session, pedido: m.Pedido, momento: datetime, *, usuario_id: int | None, observacao: str) -> None:
+    """O cancelamento do pedido, o mesmo pelo painel e pelo cliente (decisão 96): cancela as transferências que
+    ainda não saíram, estorna o pagamento, tira os pontos ganhos e devolve os usados. Quem chama já travou o
+    pedido e conferiu que ele pode ser cancelado."""
+    _cancelar_transferencias_pendentes(pedido)
+    estornar_aprovados(db, pedido, momento)
+    # Lupe+: a compra cancelada perde os pontos ganhos e devolve os que foram usados nela
+    fidelidade.estornar_compra(db, pedido, momento, motivo=f"Pedido {pedido.numero} cancelado")
+    fidelidade.devolver_resgate(db, pedido, momento)
+    pedido.status = "CANCELADO"
+    registrar_evento(db, pedido, "CANCELADO", usuario_id=usuario_id, observacao=observacao, quando=momento)
+
+
 def atualizar(
     db: Session,
     pedido_id: int,
@@ -260,13 +273,7 @@ def atualizar(
         registrar_evento(db, pedido, status, usuario_id=usuario.id, quando=momento)
         _log(db, usuario, pedido, f"Marcou o pedido {pedido.numero} como entregue")
     else:  # CANCELADO
-        _cancelar_transferencias_pendentes(pedido)
-        estornar_aprovados(db, pedido, momento)
-        # Lupe+: a compra cancelada perde os pontos ganhos e devolve os que foram usados nela
-        fidelidade.estornar_compra(db, pedido, momento, motivo=f"Pedido {pedido.numero} cancelado")
-        fidelidade.devolver_resgate(db, pedido, momento)
-        pedido.status = status
-        registrar_evento(db, pedido, status, usuario_id=usuario.id, observacao="Pagamento estornado", quando=momento)
+        cancelar(db, pedido, momento, usuario_id=usuario.id, observacao="Pagamento estornado")
         _log(db, usuario, pedido, f"Cancelou o pedido {pedido.numero} e estornou o pagamento")
 
     sessao.confirmar(db)

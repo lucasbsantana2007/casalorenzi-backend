@@ -13,6 +13,7 @@ from src.middlewares import limite
 from src.middlewares.autenticacao import Sessao, sessao_opcional
 from src.schemas.comum import Entrada
 from src.use_cases.assistente import conversas
+from src.utils.erros import DadosInvalidos
 
 router = APIRouter(prefix="/assistente", tags=["Assistente IA (site)"])
 
@@ -34,9 +35,13 @@ class MensagemEntrada(Entrada):
 
 
 class EventoEntrada(Entrada):
-    tipo: Literal["SACOLA_ADICIONADA", "SACOLA_REMOVIDA"]
+    tipo: Literal["SACOLA_ADICIONADA", "SACOLA_REMOVIDA", "ACAO_CONCLUIDA"]
     mensagem_id: int
-    variacao_id: int
+    # Sacola: a peça do cartão
+    variacao_id: int | None = None
+    # ACAO_CONCLUIDA: o cliente confirmou no cartão e a rota da conta fez a ação (decisões 95 a 97)
+    acao: Literal["EMAIL", "CANCELAMENTO", "DEVOLUCAO"] | None = None
+    detalhe: str | None = Field(None, max_length=200)
 
 
 class EncaminharEntrada(Entrada):
@@ -118,8 +123,17 @@ def evento(
     sessao: Sessao | None = Depends(sessao_opcional),
     chave: str | None = Header(default=None, alias="X-Conversa-Chave"),
 ):
-    """A peça entrou na sacola do navegador (SACOLA_ADICIONADA) ou o cliente tocou em "Desfazer" (SACOLA_REMOVIDA)."""
+    """A peça entrou na sacola do navegador (SACOLA_ADICIONADA), o cliente tocou em "Desfazer" (SACOLA_REMOVIDA) ou
+    confirmou uma ação no cartão (ACAO_CONCLUIDA: e-mail, cancelamento ou devolução, já feita pela rota da conta).
+    Só muda o cartão e a memória da conversa; a ação em si é sempre da rota da conta."""
     conversa = conversas.conversa_do_site(db, conversa_id, chave, _cliente(sessao))
+    if dados.tipo == "ACAO_CONCLUIDA":
+        if dados.acao is None:
+            raise DadosInvalidos("Informe a ação concluída.")
+        conversas.registrar_acao(db, conversa, dados.mensagem_id, dados.acao, dados.detalhe)
+        return
+    if dados.variacao_id is None:
+        raise DadosInvalidos("Informe a peça.")
     removida = dados.tipo == "SACOLA_REMOVIDA"
     conversas.registrar_sacola(db, conversa, dados.mensagem_id, dados.variacao_id, removida=removida)
 
