@@ -411,10 +411,11 @@ def registrar_sacola(db: Session, conversa: m.ConversaAssistente, mensagem_id: i
 
 def _resumo_para_atendimento(db: Session, conversa: m.ConversaAssistente, motivo: str | None, canal: str = "SITE") -> str:
     memoria = conversa.contexto or {}
+    quem = f"{prompts.NOME_ASSISTENTE}, a assistente virtual do site"
     if canal == "WHATSAPP":
-        linhas = ["Solicitação aberta pelo assistente virtual do site. O cliente seguiu pelo WhatsApp com este protocolo."]
+        linhas = [f"Solicitação aberta pela {quem}. O cliente seguiu pelo WhatsApp com este protocolo."]
     else:
-        linhas = ["Solicitação aberta pelo assistente virtual do site, a pedido do cliente."]
+        linhas = [f"Solicitação aberta pela {quem}, a pedido do cliente."]
     if motivo:
         linhas.append(f"Motivo: {motivo.strip()[:300]}")
     linhas.append(f"Vitrine: {prompts.NOME_MARCA.get(conversa.marca or '', 'Casa Lorenzi')}")

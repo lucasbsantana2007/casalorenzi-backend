@@ -130,6 +130,17 @@ def test_entende_o_nome_helo_e_o_antigo(client):
     assert blocos(diga(client, conversa, chave, "e meu saldo vulto+?"), "pontos")[0]["saldo"] == 1200
 
 
+def test_marcia_se_apresenta_como_assistente_virtual(client):
+    conversa, chave = abrir_site(client)
+    assert diga(client, conversa, chave, "oi")["texto"].startswith("Olá! Sou a Márcia, assistente virtual")
+    for pergunta in ("você é um robô?", "qual é o seu nome?", "vc é uma pessoa de verdade?"):
+        texto = diga(client, conversa, chave, pergunta)["texto"]
+        assert "Márcia" in texto and "Não sou uma pessoa" in texto, pergunta
+    # Pedir uma pessoa continua sendo pedido de atendimento
+    assert blocos(diga(client, conversa, chave, "quero falar com uma pessoa"), "acao_atendimento")
+    assert "Márcia" in PROMPT_CLIENTE and "não é uma pessoa" in PROMPT_CLIENTE
+
+
 def test_pedidos_do_cliente_logado(client):
     conversa, chave = abrir_site(client, token=entrar(client, "mariana.costa@gmail.com"))
     resposta = diga(client, conversa, chave, "qual o status do meu pedido?")

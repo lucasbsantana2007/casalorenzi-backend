@@ -2,7 +2,7 @@
 
 Dois assistentes integrados à plataforma existente, mais automações operacionais:
 
-1. **Assistente do site** (clientes): busca peças no catálogo real, mostra a disponibilidade no site e em
+1. **Assistente do site, a Márcia** (clientes; decisão 89): busca peças no catálogo real, mostra a disponibilidade no site e em
    cada loja, mantém o contexto da conversa, consulta pontos Helo e pedidos do cliente logado, prepara a
    peça para a sacola (o cliente confirma no botão) e encaminha para o atendimento humano com o resumo da conversa.
 2. **Copiloto gerencial** (equipe): "Inteligência de Negócios — Assistente IA" no painel. Responde perguntas

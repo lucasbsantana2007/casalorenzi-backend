@@ -13,6 +13,7 @@ from src.entities.busca import PedidoBusca, interpretar_busca
 from src.use_cases.assistente import catalogo
 from src.use_cases.assistente.ferramentas import Contexto
 from src.use_cases.assistente.orquestrador import Rodada
+from src.use_cases.assistente.prompts import APRESENTACAO, BOAS_VINDAS
 from src.utils.texto import normalizar
 
 SAUDACAO = re.compile(r"^(oi+|ola+|opa|bom dia|boa tarde|boa noite|e ai|eai|hey|hello|hi|salve)( (tudo bem|tudo bom|como vai))?$")
@@ -21,6 +22,11 @@ DESPEDIDA = re.compile(r"^(tchau|ate mais|ate logo|falou|flw|so isso|era isso)\b
 HUMANO = re.compile(
     r"\b(atendente|humano|pessoa de verdade|alguem da (equipe|loja)|falar com (a equipe|alguem|um vendedor|o vendedor|uma pessoa)|"
     r"vendedor|vendedora|suporte|reclamacao|reclamar|sac)\b"
+)
+# "Quem é você?", "você é um robô?": a Márcia diz que é uma assistente virtual (decisão 89)
+QUEM_E = re.compile(
+    r"\b(qual (e |eh )?(o )?seu nome|como (voce|vc) se chama|quem (e|eh) (voce|vc)|"
+    r"(voce|vc) (e|eh) (um |uma )?(robo|bot|humana?|pessoa|ia|inteligencia artificial|de verdade))\b"
 )
 PONTOS = re.compile(r"(\bhelo\b|vulto\+|vulto mais|vultomais|\bpontos?\b|\bfidelidade\b|\bcashback\b)")
 SALDO_PONTOS = re.compile(r"\b(quantos|meus|meu|saldo|tenho|vencem|vence|vencer|vencimento|categoria|subir|falta|faltam|nivel)\b")
@@ -127,14 +133,14 @@ def direta(texto: str, ctx: Contexto, executar) -> Rodada | None:
     """Mensagens simples que dispensam o modelo (economia): saudação, agradecimento, despedida e pedido de atendente."""
     n = _limpo(texto)
     if not n or SAUDACAO.match(n):
-        return Rodada(
-            "Olá! Posso encontrar peças da Casa Lorenzi e da Vulto, ver se tem na sua loja, informar horários e consultar seus pontos Helo. O que você procura?",
-            [_sugestoes()],
-        )
+        return Rodada(BOAS_VINDAS["CLIENTE"], [_sugestoes()])
     if AGRADECIMENTO.match(n) and len(n.split()) <= 4:
         return Rodada("Por nada! Se precisar de mais alguma peça ou informação, é só chamar.")
     if DESPEDIDA.match(n):
         return Rodada("Até mais! Quando quiser, estou por aqui.")
+    # "Você é uma pessoa de verdade?" é pergunta sobre a Márcia; "quero falar com uma pessoa" é pedido de atendente
+    if QUEM_E.search(n) and "falar" not in n.split():
+        return Rodada(APRESENTACAO)
     if HUMANO.search(n):
         execucao = executar("solicitar_atendimento_humano", {"motivo": texto.strip()[:300]})
         return Rodada(_do_resultado(execucao, "Posso chamar alguém da equipe para você."))

@@ -16,7 +16,7 @@ o mesmo.
 
 ## 1. O cliente encontra uma peça (vitrine da Vulto, sem login)
 
-Abrir `/vulto` e o botão **Assistente**.
+Abrir `/vulto` e o botão **Márcia** (a assistente do site).
 
 | Digitar | Mostrar |
 | --- | --- |
