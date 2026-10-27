@@ -5,6 +5,8 @@ e os da ferramenta à parte que a Vulto usava (WhatsApp, Instagram e e-mail). At
 externo pode não ter cliente identificado: aí fica o contato (telefone, e-mail ou @) que ele usou.
 """
 
+from urllib.parse import quote
+
 STATUS_ATENDIMENTO = ("ABERTO", "EM_ANDAMENTO", "AGUARDANDO_CLIENTE", "CONCLUIDO")
 CANAIS_ATENDIMENTO = ("SITE", "WHATSAPP", "INSTAGRAM", "EMAIL")
 CANAL_ATENDIMENTO_PADRAO = "SITE"
@@ -15,6 +17,16 @@ DESCRICAO_MINIMA = 10
 
 def protocolo(atendimento_id: int) -> str:
     return f"ATD-{26000 + atendimento_id * 37:06d}"
+
+
+def link_whatsapp(numero: str, protocolo_atendimento: str, assunto: str | None = None) -> str:
+    """Link wa.me que abre a conversa com o atendimento já com a mensagem escrita: o protocolo leva a
+    equipe ao chamado (com o resumo da conversa do assistente) sem perguntar de novo. numero: só dígitos,
+    com DDI e DDD (5511999999999)."""
+    texto = f"Olá! Vim do assistente do site. Protocolo {protocolo_atendimento}."
+    if assunto and assunto.strip():
+        texto += f"\nAssunto: {' '.join(assunto.split())[:200]}"
+    return f"https://wa.me/{numero}?text={quote(texto)}"
 
 
 def status_apos_mensagem(status_atual: str, autor_tipo: str) -> str:

@@ -41,6 +41,8 @@ class EventoEntrada(Entrada):
 
 class EncaminharEntrada(Entrada):
     motivo: str | None = Field(None, max_length=300)
+    # SITE: a equipe responde em Minha conta (exige login). WHATSAPP: link wa.me com o protocolo (sem login)
+    canal: Literal["SITE", "WHATSAPP"] = "SITE"
 
 
 def _ip(request: Request) -> str:
@@ -129,15 +131,17 @@ def encaminhar(
     sessao: Sessao | None = Depends(sessao_opcional),
     chave: str | None = Header(default=None, alias="X-Conversa-Chave"),
 ):
-    """Abre um chamado de atendimento com o resumo da conversa (exige login de cliente; 401 sem ele).
+    """Abre um chamado de atendimento com o resumo da conversa. canal SITE exige login de cliente (401 sem
+    ele); WHATSAPP não, e devolve `whatsappUrl` (422 se o WhatsApp do atendimento não estiver configurado).
     Chamar de novo devolve o mesmo chamado."""
     cliente = _cliente(sessao)
     conversa = conversas.conversa_do_site(db, conversa_id, chave, cliente)
-    atendimento = conversas.encaminhar(db, conversa, cliente, dados.motivo)
+    atendimento = conversas.encaminhar(db, conversa, cliente, dados.motivo, dados.canal)
     return {
         "atendimentoId": atendimento.id,
         "protocolo": atendimento.protocolo,
-        "link": f"/cliente/solicitacoes/{atendimento.id}",
+        "link": f"/cliente/solicitacoes/{atendimento.id}" if atendimento.cliente_id else None,
+        "whatsappUrl": conversas.link_whatsapp(atendimento, dados.motivo) if dados.canal == "WHATSAPP" else None,
     }
 
 
