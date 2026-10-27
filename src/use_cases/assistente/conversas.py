@@ -377,8 +377,11 @@ def enviar(
 # ---------- Sacola, atendimento humano e encerramento ----------
 
 
-def registrar_sacola(db: Session, conversa: m.ConversaAssistente, mensagem_id: int, variacao_id: int) -> None:
-    """O cliente tocou em "Adicionar à sacola": o botão vira confirmado e a conversa lembra disso."""
+def registrar_sacola(
+    db: Session, conversa: m.ConversaAssistente, mensagem_id: int, variacao_id: int, removida: bool = False
+) -> None:
+    """A peça entrou na sacola (o chat coloca na hora, decisão 94) ou o cliente tocou em "Desfazer": o cartão
+    fica CONFIRMADO ou DESFEITO (recarregar a conversa não coloca de novo) e a conversa lembra disso."""
     assistente_repository.travar(db, conversa.id)
     mensagem = assistente_repository.mensagem(db, conversa.id, mensagem_id)
     blocos = list(mensagem.blocos or []) if mensagem else []
@@ -393,10 +396,12 @@ def registrar_sacola(db: Session, conversa: m.ConversaAssistente, mensagem_id: i
     if indice is None:
         raise NaoEncontrado("Ação não encontrada nesta conversa.")
     item = blocos[indice]["item"]
-    if blocos[indice].get("estado") != "CONFIRMADO":
-        blocos[indice] = {**blocos[indice], "estado": "CONFIRMADO"}
+    estado = "DESFEITO" if removida else "CONFIRMADO"
+    if blocos[indice].get("estado") != estado:
+        blocos[indice] = {**blocos[indice], "estado": estado}
         mensagem.blocos = blocos
-        descricao = f"O cliente adicionou {item['nome']} ({item['cor']}, {item['tamanho']}) à sacola"
+        peca = f"{item['nome']} ({item['cor']}, {item['tamanho']})"
+        descricao = f"O cliente tirou {peca} da sacola" if removida else f"O cliente adicionou {peca} à sacola"
         momento = agora()
         sessao.adicionar(
             db,

@@ -217,18 +217,16 @@ def responder(texto: str, ctx: Contexto, executar) -> Rodada:
     pedido = interpretar_busca(texto)
     pergunta_de_peca = bool(pedido.tipos) or foco is not None
 
-    # Respostas curtas a uma oferta do assistente ("Quer que eu prepare para a sacola?" -> "sim")
+    # Respostas curtas a uma oferta do assistente ("Quer que eu coloque na sua sacola?" -> "sim")
     curta = len(n.split()) <= 3
     if curta and SIM.match(n) and not pedido.tipos:
         if oferta == "SACOLA" and foco:
-            return _preparar_sacola(executar, memoria)
-        if oferta == "CONFIRMAR_SACOLA":
-            return Rodada(
-                "É só tocar em “Adicionar à sacola”, logo acima, para confirmar. A peça só entra na sacola quando você toca no botão."
-            )
+            return _colocar_na_sacola(executar, memoria)
+        if oferta == "FINALIZAR":
+            return Rodada("É só tocar em “Finalizar compra”, logo acima: a sua sacola já está pronta para o pagamento.")
         if oferta == "ATENDIMENTO":
             return Rodada("É só tocar em “Falar com a equipe”, logo acima, para eu abrir a solicitação.")
-    if curta and NAO.match(n) and oferta in ("SACOLA", "ATENDIMENTO", "CONFIRMAR_SACOLA"):
+    if curta and NAO.match(n) and oferta in ("SACOLA", "ATENDIMENTO", "FINALIZAR"):
         memoria["oferta"] = None
         return Rodada("Tudo bem! Posso procurar outra peça ou ajudar com outra coisa?", [_sugestoes()])
 
@@ -282,7 +280,7 @@ def responder(texto: str, ctx: Contexto, executar) -> Rodada:
                 return Rodada(f"Qual delas? {nomes}. Pode tocar em “Quero esta” no card.")
             return Rodada("Qual peça você quer? Me diga o tipo, a cor ou o tamanho que eu procuro.", [_sugestoes()])
         if memoria.get("tamanhoEmFoco") and (memoria.get("corEmFoco") or _cor_unica(memoria)):
-            return _preparar_sacola(executar, memoria)
+            return _colocar_na_sacola(executar, memoria)
         return _ver(executar, memoria, foco)
 
     # Só tamanho, cor ou preço: continua a conversa sobre a peça em foco ou a última busca
@@ -369,14 +367,14 @@ def _ver(executar, memoria: dict, foco: dict, cor: str | None = None, tamanho: s
     return Rodada(_do_resultado(execucao, "Não consegui consultar essa peça agora."))
 
 
-def _preparar_sacola(executar, memoria: dict) -> Rodada:
+def _colocar_na_sacola(executar, memoria: dict) -> Rodada:
     foco = memoria["produtoEmFoco"]
     argumentos = {"produto_id": foco["id"], "tamanho": memoria.get("tamanhoEmFoco") or ""}
     if memoria.get("corEmFoco"):
         argumentos["cor"] = memoria["corEmFoco"]
     if not argumentos["tamanho"]:
         return _ver(executar, memoria, foco)
-    execucao = executar("preparar_sacola", argumentos)
+    execucao = executar("colocar_na_sacola", argumentos)
     return Rodada(_do_resultado(execucao, "Não consegui preparar a peça agora."))
 
 

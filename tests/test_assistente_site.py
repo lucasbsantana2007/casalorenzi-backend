@@ -86,29 +86,33 @@ def test_disponibilidade_numa_loja(client):
     assert "Leblon" in resposta["texto"]
 
 
-def test_compra_assistida_ate_o_botao_da_sacola(client):
+def test_compra_assistida_coloca_na_sacola_com_desfazer(client):
     conversa, chave = abrir_site(client)
     diga(client, conversa, chave, "camisa de linho toscana")
     resposta = diga(client, conversa, chave, "M")
     assert "Em qual cor" in resposta["texto"]
     resposta = diga(client, conversa, chave, "branca")
-    assert "prepare para a sacola" in resposta["texto"]
+    assert "coloque na sua sacola" in resposta["texto"]
     resposta = diga(client, conversa, chave, "sim")
     acao = blocos(resposta, "acao_sacola")[0]
-    assert acao["estado"] == "PENDENTE"
+    assert acao["estado"] == "ADICIONAR"  # o navegador coloca na hora (decisão 94)
     assert (acao["item"]["cor"], acao["item"]["tamanho"], acao["item"]["preco"]) == ("Branco", "M", 489.0)
-    assert "já" not in resposta["texto"].lower() or "adicionad" not in resposta["texto"].lower()
+    assert resposta["texto"].startswith("Coloquei") and "finalizar a compra" in resposta["texto"]
 
-    # O cliente toca no botão: a sacola é a do navegador; a conversa registra e o botão vira confirmado
-    r = client.post(
-        f"/api/assistente/conversas/{conversa}/eventos",
-        json={"tipo": "SACOLA_ADICIONADA", "mensagemId": resposta["id"], "variacaoId": acao["item"]["variacaoId"]},
-        headers=chave,
-    )
-    assert r.status_code == 204
-    historico = client.get(f"/api/assistente/conversas/{conversa}", headers=chave).json()
-    confirmado = [b for m in historico["mensagens"] for b in m["blocos"] if b["tipo"] == "acao_sacola"]
-    assert confirmado[-1]["estado"] == "CONFIRMADO"
+    def evento(tipo):
+        r = client.post(
+            f"/api/assistente/conversas/{conversa}/eventos",
+            json={"tipo": tipo, "mensagemId": resposta["id"], "variacaoId": acao["item"]["variacaoId"]},
+            headers=chave,
+        )
+        assert r.status_code == 204
+        historico = client.get(f"/api/assistente/conversas/{conversa}", headers=chave).json()
+        return [b for m in historico["mensagens"] for b in m["blocos"] if b["tipo"] == "acao_sacola"][-1]["estado"]
+
+    # A peça entrou: recarregar a conversa não coloca de novo; Desfazer tira e fica registrado
+    assert evento("SACOLA_ADICIONADA") == "CONFIRMADO"
+    assert evento("SACOLA_REMOVIDA") == "DESFEITO"
+    assert "tirou" in sql("SELECT contexto::text FROM conversas_assistente WHERE id = :c", c=conversa)[0][0]
 
 
 def test_vulto_mais_do_cliente_logado(client):
@@ -327,7 +331,7 @@ def test_nao_existe_ferramenta_que_altera_estoque_ou_compra(client):
 def test_produto_sem_estoque_nao_vai_para_a_sacola(client):
     sql("UPDATE estoques SET quantidade = 0 WHERE variacao_id = 39")  # Saia Plissada Midi, Preto, 40
     falso = ProvedorFalso(
-        ferramenta("preparar_sacola", {"produto_id": 9, "cor": "Preto", "tamanho": "40"}), texto("Esse tamanho esgotou.")
+        ferramenta("colocar_na_sacola", {"produto_id": 9, "cor": "Preto", "tamanho": "40"}), texto("Esse tamanho esgotou.")
     )
     ia.definir_provedor(falso)
     conversa, chave = abrir_site(client)
@@ -485,5 +489,5 @@ def test_botao_quero_esta_mantem_o_tamanho_ja_dito(client):
         "M",
         "Marinho",
     )
-    assert "prepare para a sacola" in resposta["texto"]
+    assert "coloque na sua sacola" in resposta["texto"]
     assert blocos(diga(client, conversa, chave, "sim"), "acao_sacola")[0]["item"]["tamanho"] == "M"

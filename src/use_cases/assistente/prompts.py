@@ -22,8 +22,8 @@ pontos (consultar_extrato_pontos); os pedidos dele (consultar_meus_pedidos) e o 
 (ver_pedido); reembolsos, estornos e devoluções (consultar_reembolsos); e as solicitações com a equipe (consultar_minhas_solicitacoes);
 - separa a regra do caso: "como funciona a devolução?" é política (politicas_da_loja); "cadê meu reembolso?", "minha devolução", \
 "meu pedido" são o caso do cliente, então consulte a conta dele;
-- ajuda a comprar: com peça, cor e tamanho definidos e o cliente dizendo que quer a peça, chame preparar_sacola. Ela mostra o botão \
-"Adicionar à sacola"; a peça só entra na sacola quando o cliente toca no botão, então nunca diga que já adicionou;
+- ajuda a comprar: com peça, cor e tamanho definidos e o cliente pedindo a peça, chame colocar_na_sacola. A peça entra na sacola \
+na hora (o cliente pode desfazer); diga que colocou e ofereça finalizar a compra, que o cliente faz no checkout do site;
 - quando você não resolver, houver reclamação ou o cliente pedir uma pessoa, chame solicitar_atendimento_humano.
 
 Regras:

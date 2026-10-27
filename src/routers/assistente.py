@@ -34,7 +34,7 @@ class MensagemEntrada(Entrada):
 
 
 class EventoEntrada(Entrada):
-    tipo: Literal["SACOLA_ADICIONADA"]
+    tipo: Literal["SACOLA_ADICIONADA", "SACOLA_REMOVIDA"]
     mensagem_id: int
     variacao_id: int
 
@@ -118,9 +118,10 @@ def evento(
     sessao: Sessao | None = Depends(sessao_opcional),
     chave: str | None = Header(default=None, alias="X-Conversa-Chave"),
 ):
-    """O cliente confirmou o botão "Adicionar à sacola" (a peça entrou na sacola do navegador)."""
+    """A peça entrou na sacola do navegador (SACOLA_ADICIONADA) ou o cliente tocou em "Desfazer" (SACOLA_REMOVIDA)."""
     conversa = conversas.conversa_do_site(db, conversa_id, chave, _cliente(sessao))
-    conversas.registrar_sacola(db, conversa, dados.mensagem_id, dados.variacao_id)
+    removida = dados.tipo == "SACOLA_REMOVIDA"
+    conversas.registrar_sacola(db, conversa, dados.mensagem_id, dados.variacao_id, removida=removida)
 
 
 @router.post("/conversas/{conversa_id}/atendimento", status_code=201)
