@@ -340,6 +340,7 @@ def enviar(
         conteudo=rodada.texto,
         blocos=cru(rodada.blocos),
         modo=rodada.modo,
+        auditoria=rodada.auditoria,
         responde_a_id=pergunta.id,
         request_id=request_id,
         criada_em=agora(),

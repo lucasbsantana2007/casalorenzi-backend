@@ -21,6 +21,19 @@ PERIODOS = (
     "personalizado",
 )
 PERIODO_PADRAO = "mes_atual"
+NOMES_DOS_PERIODOS = {
+    "hoje": "hoje",
+    "ontem": "ontem",
+    "semana_atual": "semana atual",
+    "semana_passada": "semana passada",
+    "mes_atual": "mês atual",
+    "mes_passado": "mês passado",
+    "ultimos_7_dias": "últimos 7 dias",
+    "ultimos_30_dias": "últimos 30 dias",
+    "ultimos_90_dias": "últimos 90 dias",
+    "ano_atual": "ano atual",
+    "ano_passado": "ano passado",
+}
 # Consultas mais longas que isso pesam demais (o financeiro carrega os pedidos do período)
 DURACAO_MAXIMA_DIAS = 400
 
@@ -74,6 +87,13 @@ class Periodo:
         if self.inicio == self.fim:
             return f"{self.inicio:%d/%m/%Y}"
         return f"{self.inicio:%d/%m/%Y} a {self.fim:%d/%m/%Y}"
+
+    @property
+    def descricao(self) -> str:
+        """'últimos 30 dias (28/09/2026 a 27/10/2026)': o nome do período pedido e as datas, para o copiloto citar
+        os dois (o verificador de números confere o "30 dias" contra este texto)."""
+        nome = NOMES_DOS_PERIODOS.get(self.nome)
+        return f"{nome} ({self.rotulo})" if nome else self.rotulo
 
 
 def _inicio_do_mes(dia: date) -> date:

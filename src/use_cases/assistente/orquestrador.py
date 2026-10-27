@@ -7,6 +7,9 @@ Ordem de decisão:
 3. Sem chave: as regras determinísticas respondem com as mesmas ferramentas (modo REGRAS).
 4. O modelo falhou (fora do ar, tempo esgotado, resposta inválida): se alguma consulta já tinha dado certo,
    a resposta usa o resultado dela; senão, as regras respondem (modo CONTINGENCIA). O usuário nunca vê o erro técnico.
+5. Todo número da resposta do modelo é conferido antes de sair (verificacao.py, decisão 98). Número sem fonte: o
+   modelo tem uma chance de refazer (com as ferramentas, porque pode ter faltado uma consulta); se errar de novo, a
+   resposta vira o texto pronto das ferramentas ou "não consegui confirmar". A auditoria guarda o que aconteceu.
 """
 
 import json
@@ -17,9 +20,10 @@ from dataclasses import dataclass, field
 from src.config import settings
 from src.entities.assistente import CONTINGENCIA, LLM, REGRAS, custo_estimado
 from src.integrations import ia
+from src.use_cases.assistente import verificacao
 from src.use_cases.assistente.ferramentas import Contexto, Execucao, Ferramenta, executar, oferecidas, registro_de
 from src.use_cases.assistente.formatacao import cru
-from src.use_cases.assistente.prompts import RECUSA_SEGURA, SEM_RESPOSTA
+from src.use_cases.assistente.prompts import CORRIGIR_NUMEROS, RECUSA_SEGURA, SEM_CONFIRMACAO, SEM_RESPOSTA
 
 log = logging.getLogger("casalorenzi.assistente")
 
@@ -35,6 +39,11 @@ class Rodada:
     memoria: dict = field(default_factory=dict)
     execucoes: list[Execucao] = field(default_factory=list)
     consumos: list[dict] = field(default_factory=list)
+    # A rodada não resolveu (não entendeu, não conseguiu responder ou não confirmou o número): conta para
+    # "duas falhas seguidas → pessoa" (decisão 99)
+    falhou: bool = False
+    # Conferência dos números da resposta do modelo (decisão 98), gravada com a mensagem
+    auditoria: dict | None = None
 
 
 @dataclass
@@ -95,6 +104,11 @@ class Coletor:
                 return execucao.resultado.texto
         return None
 
+    def textos(self, limite: int = 3) -> list[str]:
+        """Os textos prontos das consultas que deram certo, sem repetir (os últimos `limite`)."""
+        prontos = [e.resultado.texto for e in self.execucoes if e.sucesso and e.resultado and e.resultado.texto]
+        return list(dict.fromkeys(prontos))[-limite:]
+
 
 def _historico_para_modelo(historico: list[tuple[str, str]]) -> list[dict]:
     """Últimas mensagens (papel, texto) no formato da API: começa pelo usuário e pula texto vazio."""
@@ -144,6 +158,27 @@ def _resultado_para_modelo(execucao: Execucao) -> dict:
     return {"type": "tool_result", "content": execucao.erro or "FALHA_INTERNA", "is_error": True}
 
 
+def _fontes(assistente: Assistente, lista, contexto_dinamico: str, coletor: Coletor, historico, texto: str):
+    """(fontes fortes, fontes do usuário) para conferir os números da resposta do modelo (decisão 98)."""
+    saidas = [
+        (e.resultado.dados, e.resultado.blocos, e.resultado.texto) if e.sucesso and e.resultado else e.erro
+        for e in coletor.execucoes
+    ]
+    respostas_anteriores = [t for papel, t in historico if papel != "USUARIO"]
+    fortes = verificacao.fontes_com_unidade(assistente.prompt_fixo, verificacao.descricoes(lista)).juntar(
+        verificacao.fontes_de(verificacao.sem_ids(contexto_dinamico), respostas_anteriores, saidas)
+    )
+    do_usuario = verificacao.fontes_de(texto, [t for papel, t in historico if papel == "USUARIO"])
+    return fortes, do_usuario
+
+
+def _auditoria(situacao: str, final: verificacao.Resultado, primeira: verificacao.Resultado | None, texto_modelo: str) -> dict:
+    auditoria = {"verificacao": situacao, "numeros": final.conferidos}
+    if primeira is not None:
+        auditoria |= {"semFonte": primeira.sem_fonte, "textoModelo": texto_modelo[:1500]}
+    return auditoria
+
+
 def _com_modelo(provedor, assistente: Assistente, texto: str, ctx: Contexto, historico, contexto_dinamico: str) -> Rodada:
     lista = oferecidas(assistente.ferramentas, ctx)
     coletor = Coletor(ctx, registro_de(lista))
@@ -155,9 +190,14 @@ def _com_modelo(provedor, assistente: Assistente, texto: str, ctx: Contexto, his
     mensagens = [*_historico_para_modelo(historico), {"role": "user", "content": texto}]
     consumos: list[dict] = []
     resposta_final = ""
+    conferencia = verificacao.Resultado(ok=True)
+    # A conferência que falhou e o texto do modelo, quando ele teve a chance de refazer
+    primeira: verificacao.Resultado | None = None
+    texto_modelo = ""
     try:
-        for rodada in range(settings.IA_MAX_RODADAS):
-            ultima = rodada == settings.IA_MAX_RODADAS - 1 or len(coletor.execucoes) >= settings.IA_MAX_FERRAMENTAS
+        # +1: a chance de refazer a resposta que trouxe número sem fonte
+        for rodada in range(settings.IA_MAX_RODADAS + 1):
+            ultima = rodada >= settings.IA_MAX_RODADAS - 1 or len(coletor.execucoes) >= settings.IA_MAX_FERRAMENTAS
             resposta = provedor.gerar(sistema=sistema, ferramentas=esquemas, mensagens=mensagens, sem_ferramentas=ultima)
             if resposta.parada == "refusal":
                 consumos.append(_consumo(provedor, resposta, "RECUSA"))
@@ -172,18 +212,52 @@ def _com_modelo(provedor, assistente: Assistente, texto: str, ctx: Contexto, his
                 mensagens.append({"role": "user", "content": resultados})
                 continue
             resposta_final = resposta.texto
-            break
+            conferencia = verificacao.conferir(
+                resposta_final, *_fontes(assistente, lista, contexto_dinamico, coletor, historico, texto)
+            )
+            if conferencia.ok or primeira is not None:
+                break
+            primeira, texto_modelo = conferencia, resposta_final
+            log.info("Número sem fonte na conversa %s: %s", ctx.conversa_id, ", ".join(conferencia.sem_fonte))
+            numeros = ", ".join(f"“{n}”" for n in conferencia.sem_fonte)
+            mensagens.append({"role": "assistant", "content": resposta_final})
+            mensagens.append({"role": "user", "content": CORRIGIR_NUMEROS.format(numeros=numeros)})
     except ia.ErroIA as erro:
         log.warning("Modelo indisponível (%s) na conversa %s: %s", erro.tipo, ctx.conversa_id, erro.mensagem)
         consumos.append(_consumo(provedor, None, "TIMEOUT" if erro.tipo == "TIMEOUT" else "ERRO", erro))
+        # A primeira resposta tinha número sem fonte e a correção não veio: ela não sai
+        auditoria = _auditoria("SUBSTITUIDA", conferencia, primeira, texto_modelo) if primeira else None
         if (pronto := coletor.ultimo_texto()) is not None:
-            return Rodada(pronto, coletor.blocos, CONTINGENCIA, ctx.memoria, coletor.execucoes, consumos)
+            return Rodada(pronto, coletor.blocos, CONTINGENCIA, ctx.memoria, coletor.execucoes, consumos, auditoria=auditoria)
         ctx.origem = CONTINGENCIA
         executor = _Executor(ctx, assistente.ferramentas, coletor)
         rodada = assistente.regras(texto, ctx, executor)
-        return Rodada(rodada.texto, executor.blocos + rodada.blocos, CONTINGENCIA, ctx.memoria, coletor.execucoes, consumos)
-    texto_final = resposta_final.strip() or coletor.ultimo_texto() or SEM_RESPOSTA[assistente.tipo]
-    return Rodada(texto_final, coletor.blocos, LLM, ctx.memoria, coletor.execucoes, consumos)
+        return Rodada(
+            rodada.texto,
+            executor.blocos + rodada.blocos,
+            CONTINGENCIA,
+            ctx.memoria,
+            coletor.execucoes,
+            consumos,
+            falhou=rodada.falhou,
+            auditoria=auditoria,
+        )
+    if not conferencia.ok:
+        # Errou de novo: sai o texto pronto das consultas (determinístico) ou "não consegui confirmar"
+        prontos = coletor.textos()
+        texto_final = "\n\n".join(prontos) or SEM_CONFIRMACAO[assistente.tipo]
+        auditoria = _auditoria("SUBSTITUIDA", conferencia, primeira, texto_modelo) | {"semFonteDepois": conferencia.sem_fonte}
+        return Rodada(
+            texto_final, coletor.blocos, LLM, ctx.memoria, coletor.execucoes, consumos, falhou=not prontos, auditoria=auditoria
+        )
+    auditoria = _auditoria("CONFERIDA" if primeira is None else "REESCRITA", conferencia, primeira, texto_modelo)
+    if resposta_final.strip():
+        return Rodada(resposta_final.strip(), coletor.blocos, LLM, ctx.memoria, coletor.execucoes, consumos, auditoria=auditoria)
+    pronto = coletor.ultimo_texto()
+    texto_final = pronto or SEM_RESPOSTA[assistente.tipo]
+    return Rodada(
+        texto_final, coletor.blocos, LLM, ctx.memoria, coletor.execucoes, consumos, falhou=pronto is None, auditoria=auditoria
+    )
 
 
 class _Executor:
@@ -211,11 +285,20 @@ def responder(
         ctx.origem = REGRAS
         direta = assistente.direta(texto, ctx, executor)
         if direta is not None:
-            return Rodada(direta.texto, executor.blocos + direta.blocos, REGRAS, ctx.memoria, executor.coletor.execucoes)
+            return Rodada(
+                direta.texto,
+                executor.blocos + direta.blocos,
+                REGRAS,
+                ctx.memoria,
+                executor.coletor.execucoes,
+                falhou=direta.falhou,
+            )
     provedor = ia.provedor()
     if provedor is None:
         ctx.origem = REGRAS
         rodada = assistente.regras(texto, ctx, executor)
-        return Rodada(rodada.texto, executor.blocos + rodada.blocos, REGRAS, ctx.memoria, executor.coletor.execucoes)
+        return Rodada(
+            rodada.texto, executor.blocos + rodada.blocos, REGRAS, ctx.memoria, executor.coletor.execucoes, falhou=rodada.falhou
+        )
     ctx.origem = LLM
     return _com_modelo(provedor, assistente, texto, ctx, historico, contexto_dinamico())

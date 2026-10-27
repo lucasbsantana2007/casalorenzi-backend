@@ -125,7 +125,7 @@ def consultar_faturamento(db: Session, ctx: Contexto, entrada: Faturamento) -> R
         ("Pedidos cancelados", r["cancelados"], "numero"),
     ]
     dados = {
-        "periodo": periodo.rotulo,
+        "periodo": periodo.descricao,
         "filtros": filtros,
         "faturamento": brl(r["faturamento"]),
         "receitaDeVendas": brl(r["receitaBruta"]),
@@ -291,7 +291,7 @@ def consultar_mais_vendidos(db: Session, ctx: Contexto, entrada: MaisVendidos) -
     filtros = _filtros(marca, nome_loja, entrada.canal, [f"Categoria: {entrada.categoria}"] if entrada.categoria else None)
     ordem = "valor" if entrada.ordenar_por == "valor" else "peças"
     dados = {
-        "periodo": periodo.rotulo,
+        "periodo": periodo.descricao,
         "filtros": filtros,
         "ordenadoPor": ordem,
         "produtos": [
@@ -358,7 +358,7 @@ def consultar_cancelamentos(db: Session, ctx: Contexto, entrada: Cancelamentos) 
     r = analises.cancelamentos(db, periodo, marca=marca, lojas=lojas)
     filtros = _filtros(marca, nome_loja)
     dados = {
-        "periodo": periodo.rotulo,
+        "periodo": periodo.descricao,
         "filtros": filtros,
         "cancelados": numero(r["quantidade"]),
         "valorCancelado": brl(r["valor"]),
@@ -686,7 +686,7 @@ def consultar_avarias(db: Session, ctx: Contexto, entrada: Avarias) -> Resultado
     filtros = _filtros(marca, nome_loja)
     rotulo = periodo.rotulo if periodo else "todo o histórico"
     dados = {
-        "periodo": rotulo,
+        "periodo": periodo.descricao if periodo else rotulo,
         "filtros": filtros,
         "registros": numero(r["registros"]),
         "pecasAvariadas": numero(r["pecas"]),
