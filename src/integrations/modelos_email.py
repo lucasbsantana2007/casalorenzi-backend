@@ -3,6 +3,7 @@ Cada função devolve o e-mail pronto (texto puro e HTML).
 
 Os links levam ao site (URL_FRONTEND), não à API."""
 
+from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
 from html import escape
@@ -173,4 +174,103 @@ def aviso_pontos_sem_numeros(email: str, nome: str) -> Email:
         assunto=f"{MARCAS} · Há pontos {programa} vencendo na sua conta",
         texto="\n\n".join([*paragrafos, url]),
         html=_html([escape(p) for p in paragrafos], ("Ver meus pontos", url)),
+    )
+
+
+# ---------- Andamento do pedido (decisão 98) ----------
+
+
+def pedido_enviado(email: str, nome: str, numero: str, codigo_rastreio: str) -> Email:
+    url = _link("/cliente/pedidos")
+    saudacao = f"Olá, {_primeiro_nome(nome)}."
+    enviado = f"O seu pedido {numero} saiu para entrega."
+    rastreio = f"Código de rastreio: {codigo_rastreio}."
+    acompanhar = "Você acompanha a entrega na sua conta, em Meus pedidos."
+    return Email(
+        para=email,
+        assunto=f"{MARCAS} · Pedido {numero} enviado",
+        texto=f"{saudacao}\n\n{enviado}\n\n{rastreio}\n\n{acompanhar}\n\n{url}",
+        html=_html(
+            [
+                escape(saudacao),
+                escape(enviado),
+                f"Código de rastreio: <strong>{escape(codigo_rastreio)}</strong>.",
+                escape(acompanhar),
+            ],
+            ("Acompanhar pedido", url),
+        ),
+    )
+
+
+def pedido_entregue(email: str, nome: str, numero: str) -> Email:
+    url = _link("/cliente/pedidos")
+    saudacao = f"Olá, {_primeiro_nome(nome)}."
+    entregue = f"O seu pedido {numero} foi entregue. Esperamos que goste das peças."
+    troca = "Se precisar trocar ou devolver alguma peça, você tem 30 dias a partir do recebimento: é só pedir em Meus pedidos."
+    return Email(
+        para=email,
+        assunto=f"{MARCAS} · Pedido {numero} entregue",
+        texto=f"{saudacao}\n\n{entregue}\n\n{troca}\n\n{url}",
+        html=_html([escape(saudacao), escape(entregue), escape(troca)], ("Ver meus pedidos", url)),
+    )
+
+
+# ---------- "Avise-me quando chegar" e sacola (decisões 99 e 100) ----------
+
+
+@dataclass(frozen=True)
+class PecaEmail:
+    nome: str
+    cor: str
+    tamanho: str
+    preco: Decimal
+    caminho: str
+    quantidade: int = 1
+
+
+def _linha_peca(peca: PecaEmail) -> str:
+    quantidade = f"{peca.quantidade} × " if peca.quantidade > 1 else ""
+    return f"{quantidade}{peca.nome} · {peca.cor} · {peca.tamanho} · {_reais(peca.preco)}"
+
+
+def _pecas_html(pecas: list[PecaEmail]) -> list[str]:
+    return [f'<a href="{escape(_link(p.caminho))}" style="color:#1c1d21">{escape(_linha_peca(p))}</a>' for p in pecas]
+
+
+def peca_disponivel(email: str, nome: str, pecas: list[PecaEmail]) -> Email:
+    """Aviso pedido pelo próprio cliente na página da peça (serviço, não marketing)."""
+    saudacao = f"Olá, {_primeiro_nome(nome)}."
+    if len(pecas) == 1:
+        assunto = f"{MARCAS} · {pecas[0].nome} voltou ao estoque"
+        chegou = "A peça que você pediu para ser avisado(a) voltou ao estoque do site:"
+    else:
+        assunto = f"{MARCAS} · {len(pecas)} peças voltaram ao estoque"
+        chegou = "As peças que você pediu para ser avisado(a) voltaram ao estoque do site:"
+    pressa = "O estoque é limitado e não fica reservado: garanta a sua pelo site."
+    motivo = "Você recebeu este e-mail porque pediu o aviso na página da peça. Cada aviso é enviado uma vez."
+    url = _link(pecas[0].caminho)
+    linhas = [f"- {_linha_peca(p)}: {_link(p.caminho)}" for p in pecas]
+    return Email(
+        para=email,
+        assunto=assunto,
+        texto="\n\n".join([saudacao, chegou, *linhas, pressa, motivo]),
+        html=_html([escape(saudacao), escape(chegou), *_pecas_html(pecas), escape(pressa), escape(motivo)], ("Ver a peça", url)),
+    )
+
+
+def lembrete_sacola(email: str, nome: str, pecas: list[PecaEmail], caminho_loja: str) -> Email:
+    """Lembrete de sacola abandonada: só para quem aceita receber e-mails de marketing."""
+    saudacao = f"Olá, {_primeiro_nome(nome)}."
+    ficou = "Você deixou estas peças na sua sacola:"
+    total = _reais(sum((p.preco * p.quantidade for p in pecas), Decimal(0)))
+    resumo = f"Total das peças: {total}. Elas ainda estão disponíveis, mas o estoque não fica reservado."
+    sair = "Para não receber mais lembretes como este, desligue os e-mails de novidades em Minha conta > Dados da conta."
+    url = _link(f"{caminho_loja}?sacola=abrir")
+    return Email(
+        para=email,
+        assunto=f"{MARCAS} · Suas peças estão esperando na sacola",
+        texto="\n\n".join([saudacao, ficou, *[f"- {_linha_peca(p)}" for p in pecas], resumo, url, sair]),
+        html=_html(
+            [escape(saudacao), escape(ficou), *_pecas_html(pecas), escape(resumo), escape(sair)], ("Voltar para a sacola", url)
+        ),
     )

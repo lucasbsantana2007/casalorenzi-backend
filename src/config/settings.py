@@ -104,3 +104,14 @@ AVISO_PONTOS_ENVIAR = os.getenv("AVISO_PONTOS_ENVIAR", "false").lower() == "true
 AVISO_PONTOS_TESTE_PARA = os.getenv("AVISO_PONTOS_TESTE_PARA", "").strip()
 # Teto por dia: o plano grátis do Resend manda 100 e-mails por dia, e os outros e-mails da plataforma usam a mesma cota
 AVISO_PONTOS_LIMITE_DIA = int(os.getenv("AVISO_PONTOS_LIMITE_DIA", "80"))
+
+# Avisos aos clientes (src/use_cases/avisos_cliente.py). Os dois são desligados por padrão, pelo mesmo motivo do
+# aviso de pontos: com a chave do Resend o e-mail sai de verdade.
+# "Avise-me quando chegar": e-mail quando a peça esgotada volta a ter estoque no site
+AVISO_ESTOQUE_ENVIAR = os.getenv("AVISO_ESTOQUE_ENVIAR", "false").lower() == "true"
+AVISO_ESTOQUE_LIMITE_DIA = int(os.getenv("AVISO_ESTOQUE_LIMITE_DIA", "40"))
+# Lembrete de sacola abandonada (só para quem aceita receber e-mails de marketing)
+LEMBRETE_SACOLA_ENVIAR = os.getenv("LEMBRETE_SACOLA_ENVIAR", "false").lower() == "true"
+LEMBRETE_SACOLA_LIMITE_DIA = int(os.getenv("LEMBRETE_SACOLA_LIMITE_DIA", "30"))
+# Modo teste dos dois: tudo vai para este e-mail do time, com o cliente no assunto (padrão: o mesmo do aviso de pontos)
+AVISOS_TESTE_PARA = os.getenv("AVISOS_TESTE_PARA", "").strip() or AVISO_PONTOS_TESTE_PARA
