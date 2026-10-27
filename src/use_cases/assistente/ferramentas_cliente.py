@@ -396,14 +396,6 @@ class SemParametros(Entrada):
     pass
 
 
-def proxima_categoria(saldo: int) -> tuple[str, int] | None:
-    """(próxima categoria, pontos que faltam), pelas faixas oficiais; None para quem já é Vip."""
-    for minimo, nome in sorted(regra_pontos.FAIXAS_CATEGORIA):
-        if saldo < minimo:
-            return nome, minimo - saldo
-    return None
-
-
 def _cliente(db: Session, ctx: Contexto):
     cliente = cliente_repository.por_id(db, ctx.cliente_id) if ctx.cliente_id else None
     if cliente is None or cliente.excluido_em is not None:
@@ -415,7 +407,7 @@ def consultar_meus_pontos(db: Session, ctx: Contexto, entrada: SemParametros) ->
     cliente = _cliente(db, ctx)
     resumo = fidelidade.resumo(db, cliente)  # a mesma conta da página Vulto+ (lança o vencimento, se houver)
     categoria = ROTULO_CATEGORIA.get(resumo.categoria or "")
-    proxima = proxima_categoria(resumo.saldo)
+    proxima = regra_pontos.proxima_categoria(resumo.saldo)
     vencimentos = [{"data": data(d), "pontos": numero(p)} for d, p in resumo.a_vencer]
     dados = {
         "saldo": numero(resumo.saldo),

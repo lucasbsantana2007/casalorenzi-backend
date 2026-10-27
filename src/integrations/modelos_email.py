@@ -3,10 +3,12 @@ Cada função devolve o e-mail pronto (texto puro e HTML).
 
 Os links levam ao site (URL_FRONTEND), não à API."""
 
+from datetime import date
 from decimal import Decimal
 from html import escape
 
 from src.config.settings import URL_FRONTEND
+from src.entities import fidelidade as regra_pontos
 from src.integrations.email import Email
 
 
@@ -97,4 +99,78 @@ def pedido_confirmado(email: str, nome: str, numero: str, total: Decimal) -> Ema
         assunto=f"{MARCAS} · Pedido {numero} confirmado",
         texto=f"{saudacao}\n\n{recebido}\n\n{acompanhar}\n\n{url}",
         html=_html([escape(saudacao), escape(recebido), escape(acompanhar)], ("Ver meus pedidos", url)),
+    )
+
+
+def _reais(valor: Decimal) -> str:
+    return f"R$ {valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+
+def _pontos(quantidade: int) -> str:
+    return f"{quantidade:,}".replace(",", ".")
+
+
+def _regra_do_resgate() -> str:
+    valor_100 = _reais(regra_pontos.valor_em_reais(regra_pontos.RESGATE_MULTIPLO))
+    return (
+        f"Para usar os pontos, faça o resgate no checkout do site: cada {regra_pontos.RESGATE_MULTIPLO} pontos valem "
+        f"{valor_100} de desconto, em compras a partir de {_reais(regra_pontos.COMPRA_MINIMA_RESGATE)} em produtos."
+    )
+
+
+def aviso_pontos(
+    email: str,
+    nome: str,
+    vencimentos: list[tuple[date, int]],
+    saldo: int,
+    categoria: str | None,
+    proxima: tuple[str, int] | None,
+) -> Email:
+    """Aviso de serviço (decisão 82): quantos pontos vencem e quando, o saldo e a categoria. Sem oferta."""
+    programa = regra_pontos.NOME_PROGRAMA
+    total = sum(pontos for _, pontos in vencimentos)
+    valor = _reais(regra_pontos.valor_em_reais(total))
+    saudacao = f"Olá, {_primeiro_nome(nome)}."
+    if len(vencimentos) == 1:
+        dia, _ = vencimentos[0]
+        assunto = f"{MARCAS} · {_pontos(total)} pontos {programa} vencem em {dia:%d/%m/%Y}"
+        aviso = [f"Você tem {_pontos(total)} pontos {programa} ({valor} em desconto) que vencem em {dia:%d/%m/%Y}."]
+    else:
+        dias = regra_pontos.AVISO_VENCIMENTO_DIAS
+        assunto = f"{MARCAS} · {_pontos(total)} pontos {programa} vencem nos próximos {dias} dias"
+        aviso = [f"Você tem {_pontos(total)} pontos {programa} ({valor} em desconto) que vencem nos próximos {dias} dias:"]
+        aviso += [f"{_pontos(pontos)} pontos em {dia:%d/%m/%Y}" for dia, pontos in vencimentos]
+    situacao = f"Hoje o seu saldo é de {_pontos(saldo)} pontos ({_reais(regra_pontos.valor_em_reais(saldo))})"
+    situacao += f", na categoria {categoria.capitalize()}." if categoria else "."
+    if proxima:
+        faltam = "Falta 1 ponto" if proxima[1] == 1 else f"Faltam {_pontos(proxima[1])} pontos"
+        situacao += f" {faltam} para a categoria {proxima[0].capitalize()}."
+    servico = f"Este é um aviso sobre a sua conta {programa}, que vale nas duas marcas."
+    url = _link("/cliente/pontos")
+    paragrafos = [saudacao, *aviso, situacao, _regra_do_resgate(), servico]
+    return Email(
+        para=email,
+        assunto=assunto,
+        texto="\n\n".join([*paragrafos, url]),
+        html=_html([escape(p) for p in paragrafos], ("Ver meus pontos", url)),
+    )
+
+
+def aviso_pontos_sem_numeros(email: str, nome: str) -> Email:
+    """O mesmo aviso para um e-mail que mais de uma conta usa (familiares): sem saldo nem quantidade, para os
+    pontos de uma pessoa não aparecerem para outra (decisão 82)."""
+    programa = regra_pontos.NOME_PROGRAMA
+    saudacao = f"Olá, {_primeiro_nome(nome)}."
+    aviso = f"Há pontos {programa} na sua conta que vencem nos próximos {regra_pontos.AVISO_VENCIMENTO_DIAS} dias."
+    seguranca = (
+        "Por segurança, este e-mail não mostra o saldo: este endereço está cadastrado em mais de uma conta. "
+        "Entre na sua conta para ver quantos pontos são e quando vencem."
+    )
+    url = _link("/cliente/pontos")
+    paragrafos = [saudacao, aviso, seguranca, _regra_do_resgate()]
+    return Email(
+        para=email,
+        assunto=f"{MARCAS} · Há pontos {programa} vencendo na sua conta",
+        texto="\n\n".join([*paragrafos, url]),
+        html=_html([escape(p) for p in paragrafos], ("Ver meus pontos", url)),
     )

@@ -81,7 +81,7 @@ def test_pontos_a_vencer_sem_dado_pessoal_e_sem_envio(client):
     [(chave, titulo)] = _alertas("PONTOS_A_VENCER")
     descricao = sql("SELECT descricao FROM alertas WHERE chave = :c", c=chave)[0][0]
     assert titulo.startswith("1 clientes têm 800 pontos")
-    assert "Nenhum aviso foi enviado" in descricao and "Mariana" not in titulo + descricao
+    assert "aviso por e-mail aos clientes está desligado" in descricao and "Mariana" not in titulo + descricao
 
 
 def test_limpeza_apaga_conversas_vencidas(client):

@@ -3,8 +3,9 @@
 - estoque_baixo: item no mínimo ou zerado que vendeu no local na janela (ALERTA_ESTOQUE_BAIXO_JANELA_DIAS);
 - estoque_parado: por loja, os itens com saldo e sem venda há ALERTA_ESTOQUE_PARADO_DIAS dias ou mais;
 - sugestoes_transferencia: sobra num local, falta com demanda em outro da mesma marca (só sugestão);
-- pontos_a_vencer: pontos Vulto+ que vencem em ALERTA_PONTOS_DIAS dias (números agregados; nenhum aviso é
-  enviado ao cliente: falta um canal com consentimento configurado);
+- pontos_a_vencer: pontos Vulto+ que vencem em ALERTA_PONTOS_DIAS dias (números agregados, para a equipe);
+- aviso_pontos: e-mail a cada cliente 30 dias antes de os pontos vencerem (decisão 82; use_cases/avisos_pontos.py).
+  Desligado por padrão (AVISO_PONTOS_ENVIAR). Aqui "criados" é o número de avisos enviados;
 - limpeza_conversas: apaga as conversas dos assistentes sem atividade além da retenção (IA_RETENCAO_DIAS).
 
 Garantias: uma execução por vez de cada automação (trava do Postgres, vale entre servidores); a mesma situação
@@ -26,7 +27,7 @@ from src.config import settings
 from src.database.connection import SessionLocal
 from src.entities import assistente as regra
 from src.repositories import alerta_repository
-from src.use_cases import analises
+from src.use_cases import analises, avisos_pontos
 from src.use_cases.assistente import conversas
 from src.use_cases.assistente.formatacao import brl, cru, numero
 from src.utils.datas import agora, ms
@@ -231,8 +232,12 @@ def _pontos_a_vencer(db: Session) -> Placar:
                 titulo=f"{numero(r['clientesAVencer'])} clientes têm {numero(r['pontosAVencer'])} pontos Vulto+ vencendo em {dias} dias",
                 descricao=(
                     f"{brl(r['valorAVencer'])} em desconto vencem até {(r['referencia'] + timedelta(days=dias)):%d/%m/%Y}. "
-                    f"{numero(aceitam)} desses clientes aceitam receber mensagens de marketing. Nenhum aviso foi enviado: "
-                    "não há canal de envio com consentimento configurado."
+                    f"{numero(aceitam)} desses clientes aceitam receber mensagens de marketing. "
+                    + (
+                        "Cada cliente com e-mail válido recebe um aviso 30 dias antes do vencimento (automação aviso_pontos)."
+                        if settings.AVISO_PONTOS_ENVIAR
+                        else "O aviso por e-mail aos clientes está desligado (AVISO_PONTOS_ENVIAR)."
+                    )
                 ),
                 dados={
                     "dias": dias,
@@ -250,6 +255,11 @@ def _pontos_a_vencer(db: Session) -> Placar:
     return placar
 
 
+def _aviso_pontos(db: Session) -> Placar:
+    resultado = avisos_pontos.enviar_pendentes(db)
+    return Placar(criados=resultado.enviados, detalhe=resultado.detalhe)
+
+
 def _limpeza(db: Session) -> Placar:
     apagadas = conversas.apagar_vencidas(db)
     return Placar(resolvidos=0, detalhe=[f"{apagadas} conversa(s) apagada(s) pela retenção de {settings.IA_RETENCAO_DIAS} dias"])
@@ -260,6 +270,7 @@ AUTOMACOES: dict[str, Callable[[Session], Placar]] = {
     "estoque_parado": _estoque_parado,
     "sugestoes_transferencia": _sugestoes_transferencia,
     "pontos_a_vencer": _pontos_a_vencer,
+    "aviso_pontos": _aviso_pontos,
     "limpeza_conversas": _limpeza,
 }
 DESCRICOES = {
@@ -267,6 +278,7 @@ DESCRICOES = {
     "estoque_parado": "Por loja, itens com saldo e sem venda há muitos dias",
     "sugestoes_transferencia": "Sobra num local e falta com demanda em outro (só sugestão)",
     "pontos_a_vencer": "Pontos Vulto+ que vencem em breve (números agregados)",
+    "aviso_pontos": "E-mail aos clientes 30 dias antes de os pontos vencerem (desligado por padrão)",
     "limpeza_conversas": "Apaga conversas dos assistentes além da retenção",
 }
 
