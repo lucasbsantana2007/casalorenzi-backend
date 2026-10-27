@@ -231,12 +231,26 @@ def test_sem_login_nao_ve_dados_privados(client):
     _pontos(MARIANA, 1200)
     conversa, chave = abrir_site(client)
     resposta = diga(client, conversa, chave, "quantos pontos eu tenho?")
-    assert "entre na sua conta" in resposta["texto"]
+    assert "entre na sua conta aqui mesmo" in resposta["texto"]
     assert blocos(resposta, "pontos") == []
+    assert blocos(resposta, "entrar") == [{"tipo": "entrar"}]  # o login aparece no próprio chat
     falso = ProvedorFalso(ferramenta("consultar_meus_pedidos", {}), texto("Entre na sua conta."))
     ia.definir_provedor(falso)
-    diga(client, conversa, chave, "meus pedidos")
+    resposta = diga(client, conversa, chave, "meus pedidos")
     assert falso.resultados_de_ferramenta()[0]["content"].startswith("LOGIN_NECESSARIO")
+    assert blocos(resposta, "entrar") == [{"tipo": "entrar"}]  # com o modelo também
+
+
+def test_login_no_chat_continua_a_conversa_e_responde(client):
+    _pontos(MARIANA, 1200)
+    conversa, chave = abrir_site(client)
+    assert blocos(diga(client, conversa, chave, "quantos pontos eu tenho?"), "entrar")
+    # Entrou pelo formulário do chat: a mesma conversa passa a ser dela e a pergunta é respondida
+    logada = {**chave, **entrar(client, "mariana.costa@gmail.com")}
+    assert client.get(f"/api/assistente/conversas/{conversa}", headers=logada).status_code == 200
+    resposta = diga(client, conversa, logada, "quantos pontos eu tenho?")
+    assert blocos(resposta, "pontos")[0]["saldo"] == 1200 and blocos(resposta, "entrar") == []
+    assert sql("SELECT cliente_id FROM conversas_assistente WHERE id = :c", c=conversa)[0][0] == MARIANA
 
 
 def test_conversas_de_clientes_diferentes_ficam_isoladas(client):

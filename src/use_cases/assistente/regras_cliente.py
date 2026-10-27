@@ -86,7 +86,7 @@ def _texto_do_erro(erro: str | None) -> str | None:
     if not erro:
         return None
     if erro.startswith("LOGIN_NECESSARIO"):
-        return "Para ver isso, entre na sua conta (Iniciar sessão, no topo do site) e me pergunte de novo."
+        return "Para ver isso, entre na sua conta aqui mesmo, logo abaixo. Assim que você entrar, eu respondo."
     if erro.startswith("BANCO_INDISPONIVEL") or erro.startswith("FALHA_INTERNA"):
         return "Não consegui consultar agora. Tente de novo em instantes."
     return erro.split(":", 1)[1].strip() if ":" in erro else erro
