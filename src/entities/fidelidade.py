@@ -47,6 +47,17 @@ BONUS_CATEGORIA = {"OURO": Decimal("0.25"), "VIP": Decimal("0.50")}
 RESGATE_MULTIPLO = 100
 COMPRA_MINIMA_RESGATE = Decimal("500.00")
 
+# Nome do programa para o cliente (decisões 86 e 87: Helo, no lugar de Vulto+). Nomes internos do código e do
+# banco (vulto_mais, movimentos_pontos) continuam os mesmos.
+NOME_PROGRAMA = "Helo"
+
+# Aviso por e-mail antes do vencimento (decisão 82): aviso de serviço, sem oferta, a todos com e-mail válido.
+# REAL vai para o cliente; TESTE vai para um e-mail do time (AVISO_PONTOS_TESTE_PARA), no máximo
+# AVISOS_TESTE_POR_DIA por dia, só para ver os modelos.
+AVISO_VENCIMENTO_DIAS = 30
+MODOS_AVISO = ("REAL", "TESTE")
+AVISOS_TESTE_POR_DIA = 5
+
 CATEGORIAS_FIDELIDADE = ("BRONZE", "PRATA", "OURO", "VIP")
 # (saldo mínimo, categoria), do maior para o menor
 FAIXAS_CATEGORIA = ((10000, "VIP"), (5001, "OURO"), (1501, "PRATA"), (1, "BRONZE"))

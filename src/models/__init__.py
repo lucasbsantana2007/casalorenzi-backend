@@ -8,6 +8,7 @@
 from src.models.alerta import Alerta
 from src.models.anexo import Anexo
 from src.models.atendimento import Atendimento
+from src.models.aviso_pontos import AvisoPontos
 from src.models.categoria import Categoria
 from src.models.chamada_ferramenta import ChamadaFerramenta
 from src.models.cliente import Cliente
@@ -72,4 +73,5 @@ __all__ = [
     "ConsumoIA",
     "Alerta",
     "ExecucaoAutomacao",
+    "AvisoPontos",
 ]

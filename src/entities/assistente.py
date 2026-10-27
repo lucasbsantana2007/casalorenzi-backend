@@ -145,7 +145,14 @@ STATUS_ALERTA = (ABERTO, RESOLVIDO, DESCARTADO)
 SEVERIDADES = ("ALTA", "MEDIA", "BAIXA")
 
 # Automações (python -m src.automacoes): cada uma é idempotente e roda uma de cada vez
-AUTOMACOES = ("estoque_baixo", "estoque_parado", "sugestoes_transferencia", "pontos_a_vencer", "limpeza_conversas")
+AUTOMACOES = (
+    "estoque_baixo",
+    "estoque_parado",
+    "sugestoes_transferencia",
+    "pontos_a_vencer",
+    "aviso_pontos",
+    "limpeza_conversas",
+)
 STATUS_EXECUCAO = ("EM_ANDAMENTO", "SUCESSO", "ERRO", "IGNORADA")
 # Execução terminada há menos que isso não roda de novo (dois cliques ou dois agendadores)
 INTERVALO_MINIMO_SEGUNDOS = 60
