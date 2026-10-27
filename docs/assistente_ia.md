@@ -68,7 +68,7 @@ Assim a demonstração funciona mesmo sem chave, e uma queda do provedor não de
 | `src/entities/busca.py` | Vocabulário da busca: cores e famílias de cor, tipos de peça, tamanhos, faixa de preço (sem banco) |
 | `src/entities/periodo.py` | Períodos em datas do fuso da plataforma (`FUSO_HORARIO`) |
 | `src/use_cases/assistente/ferramentas.py` | Contrato das ferramentas, checagem de permissão, execução isolada e auditável |
-| `src/use_cases/assistente/ferramentas_cliente.py` | As 8 ferramentas do site |
+| `src/use_cases/assistente/ferramentas_cliente.py`, `ferramentas_conta.py` | As 16 ferramentas do site (catálogo, lojas, políticas, sacola, atendimento; conta do cliente e ações com confirmação) |
 | `src/use_cases/assistente/ferramentas_gerenciais.py` | As 11 ferramentas do copiloto |
 | `src/use_cases/assistente/catalogo.py` | Busca no catálogo e disponibilidade por loja (regras da vitrine) |
 | `src/use_cases/assistente/orquestrador.py` | Uma rodada: resposta direta, modelo com ferramentas ou regras; limites e contingência |
@@ -107,22 +107,41 @@ Nenhuma biblioteca nova no frontend. No backend, uma: o SDK oficial `anthropic` 
 | `politicas_da_loja` | Frete, trocas e devoluções, pagamento, regras do Lupe+ | — | `frete.condicoes`, `tipos_solicitacao`, `entities/fidelidade.py` |
 | `consultar_meus_pontos` | Saldo, valor, categoria, vencimentos e quanto falta para a próxima categoria | login de cliente | `fidelidade.resumo` (a mesma conta da página Lupe+) |
 | `consultar_meus_pedidos` | 5 pedidos mais recentes, status e rastreio | login de cliente | `pedido_repository.do_cliente` |
-| `preparar_sacola` | Confere peça, cor, tamanho, preço e disponibilidade e mostra o botão "Adicionar à sacola" | — | preço vigente do SKU e disponível da vitrine |
-| `solicitar_atendimento_humano` | Mostra o botão "Falar com a equipe" (e telefones das lojas) | — | — |
+| `colocar_na_sacola` | Confere peça, cor, tamanho, preço e disponibilidade; o chat coloca a peça na sacola na hora, com Desfazer e Finalizar compra (decisão 94) | — | preço vigente do SKU e disponível da vitrine |
+| `solicitar_atendimento_humano` | Mostra "Falar com a equipe" (chamado no site, com login) e "Continuar no WhatsApp" (com o protocolo, sem login; decisão 81) | — | módulo de Atendimento |
+| `ver_pedido` | Detalhe de um pedido: peças, valores, frete, pagamento, rastreio, histórico, devoluções e se ainda cancela ou devolve | login de cliente | `pedido_repository`, `pedidos_cliente` |
+| `consultar_reembolsos` | Devoluções registradas (com o valor reembolsado), pedidos cancelados com estorno e solicitações de devolução ou troca em análise | login de cliente | `devolucoes`, `pagamentos`, `atendimentos` |
+| `consultar_extrato_pontos` | Os últimos movimentos de pontos (compras, resgates, estornos, vencimentos) | login de cliente | `fidelidade.resumo` |
+| `consultar_minhas_solicitacoes` | As 5 solicitações mais recentes com a equipe e a situação de cada uma | login de cliente | `atendimento_repository.do_cliente` |
+| `calcular_frete` | Valor e prazo (Padrão e Expresso) para um CEP | — | `frete.opcoes` |
+| `trocar_meu_email` | Prepara o cartão de troca de e-mail; o cliente confirma com a senha (decisão 95) | login de cliente | `PUT /api/conta` |
+| `cancelar_pedido` | Prepara o cartão de cancelamento de pedido em separação (decisão 96) | login de cliente | `POST /api/conta/pedidos/{numero}/cancelamento` |
+| `solicitar_devolucao` | Prepara o cartão de devolução (pedido recebido há até 30 dias; peças e motivo; decisão 97) | login de cliente | `POST /api/conta/pedidos/{numero}/devolucao` |
 
 O cliente vê a **situação** (disponível, últimas unidades, indisponível), não a quantidade exata. Na loja,
 vale o que está na prateleira e livre: `min(saldo físico, saldo livre)`. No site, o disponível oficial da
 vitrine (saldo + a caminho − reservas).
 
-**Compra assistida:** a sacola do site já existia no navegador (`SacolaProvider`) e o checkout recalcula preço e
-frete no servidor. O assistente nunca adiciona nada sozinho: `preparar_sacola` só monta o botão; a peça entra na
-sacola quando o cliente toca nele, e a conversa registra o evento. Não há ferramenta de checkout, pagamento ou
-pedido.
+**A Lúcia faz as tarefas do cliente (decisão 93), em quatro níveis:**
 
-**Atendimento humano:** o canal real é o atendimento da plataforma (tabela `atendimentos`, canal SITE). Com login,
+| Nível | Exemplos | Como funciona |
+| --- | --- | --- |
+| Consulta | pedido, rastreio, reembolso, extrato, solicitações, frete por CEP | Responde na hora, com os dados do cliente do token |
+| Ação leve | colocar na sacola | Acontece na hora, com Desfazer; sacola não é compra |
+| Ação sensível | trocar e-mail, cancelar pedido, pedir devolução | A ferramenta só prepara o cartão; a ação acontece na rota da conta quando o cliente confirma. A senha vai direto para `/api/conta`, nunca para a conversa nem para o modelo |
+| Nunca pelo chat | pagamento e cartão, trocar senha, excluir conta | A Lúcia leva à página certa |
+
+O cancelamento é o mesmo do painel (`pedidos.cancelar`): estorna o pagamento, tira os pontos ganhos, devolve os
+usados e cancela as transferências que não saíram; só para pedido ainda em separação. A devolução abre a
+solicitação "Devolução e reembolso" ligada ao pedido; a equipe confere a peça, registra a devolução e faz o estorno:
+dinheiro de volta sempre passa por uma pessoa. Depois da confirmação, o cartão fica concluído na conversa
+(`ACAO_CONCLUIDA`) e a Lúcia lembra o que foi feito.
+
+**Atendimento humano:** o canal real é o atendimento da plataforma (tabela `atendimentos`). Com login,
 "Falar com a equipe" abre um chamado de "Dúvida sobre produto" com o resumo da conversa (motivo, peça em foco,
-última busca, últimas mensagens), que aparece no painel de Atendimento e em Minha conta > Solicitações. Sem login,
-o assistente pede para entrar e mostra os telefones das lojas. Chamar de novo devolve o mesmo chamado.
+última busca, últimas mensagens), que aparece no painel de Atendimento e em Minha conta > Solicitações. Com ou sem
+login, "Continuar no WhatsApp" abre o chamado (canal WHATSAPP) e o WhatsApp do atendimento com o protocolo já
+escrito. Chamar de novo devolve o mesmo chamado.
 
 ### Copiloto
 
