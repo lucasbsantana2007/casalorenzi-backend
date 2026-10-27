@@ -43,6 +43,33 @@ def test_faixa_de_preco_e_tamanhos_curtos():
     assert interpretar_busca("quero uma camisa e o que mais tiver de linho").tamanho is None
 
 
+@pytest.mark.parametrize(
+    ("frase", "tamanho"),
+    [
+        ("camiseta preta XS", "XP"),
+        ("tem camisa azul tamanho S?", "P"),
+        ("moletom cinza L", "G"),
+        ("quero no XL", "GG"),
+        ("e o xs?", "XP"),
+        ("L", "G"),
+    ],
+)
+def test_entende_a_grade_internacional(frase, tamanho):
+    """Muitos clientes escrevem XS, S, L e XL: XS = XP, S = P, L = G, XL = GG."""
+    assert interpretar_busca(frase).tamanho == tamanho
+
+
+def test_lucia_responde_l_com_as_pecas_no_g(client):
+    """Na conversa: o cliente pede a peça e responde só "L"; os cards vêm no G."""
+    conversa = client.post("/api/assistente/conversas", json={}).json()
+    cabecalho = {"X-Conversa-Chave": conversa["chave"]}
+    url = f"/api/assistente/conversas/{conversa['id']}/mensagens"
+    client.post(url, json={"texto": "Vocês têm camisa azul?"}, headers=cabecalho)
+    resposta = client.post(url, json={"texto": "L"}, headers=cabecalho).json()["resposta"]
+    [cards] = [b for b in resposta["blocos"] if b["tipo"] == "produtos"]
+    assert cards["itens"] and all(item["tamanhos"] == ["G"] for item in cards["itens"])
+
+
 def test_periodos_em_datas_do_fuso():
     hoje = date(2026, 10, 26)  # segunda-feira
     assert resolver("hoje", hoje).rotulo == "26/10/2026"

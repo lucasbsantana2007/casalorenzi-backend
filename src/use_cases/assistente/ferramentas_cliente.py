@@ -86,7 +86,11 @@ class BuscarProdutos(Entrada):
         None, max_length=40, description="Tipo de peça: camisa, camiseta, calça, vestido, moletom, jaqueta..."
     )
     cor: str | None = Field(None, max_length=40, description="Cor pedida pelo cliente (ex.: azul, preto, off-white).")
-    tamanho: str | None = Field(None, max_length=10, description="Tamanho: XP, P, M, G, GG, U ou numérico (36 a 56).")
+    tamanho: str | None = Field(
+        None,
+        max_length=10,
+        description="Tamanho: XP, P, M, G, GG, U ou numérico (36 a 56). Aceita a grade internacional: XS=XP, S=P, L=G, XL=GG.",
+    )
     preco_min: float | None = Field(None, ge=0, le=100000)
     preco_max: float | None = Field(None, ge=0, le=100000)
     marca: Marca | None = None
