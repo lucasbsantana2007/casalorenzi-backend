@@ -387,6 +387,10 @@ class Politicas(Entrada):
     assunto: Literal["frete", "trocas", "pagamento", "vulto_mais"]
 
 
+# Decisão 111: peça comprada no site troca em loja física da mesma marca, nas condições da troca pelo site
+TROCA_NA_LOJA = "Peça comprada no site também pode ser trocada numa loja física da mesma marca (Casa Lorenzi numa loja Casa Lorenzi, Vulto numa loja Vulto), nas mesmas condições da troca pelo site, levando o número do pedido."
+
+
 def politicas_da_loja(db: Session, ctx: Contexto, entrada: Politicas) -> Resultado:
     if entrada.assunto == "frete":
         condicoes = frete_config.condicoes(db)
@@ -415,10 +419,12 @@ def politicas_da_loja(db: Session, ctx: Contexto, entrada: Politicas) -> Resulta
             "troca": tipos.get("Troca de produto"),
             "devolucao": tipos.get("Devolução e reembolso"),
             "comoPedir": "Na conta do cliente, em Solicitações > Nova solicitação, escolhendo o pedido.",
+            "naLojaFisica": TROCA_NA_LOJA,
         }
         texto = (
             f"Trocas: {dados['troca'] or 'por outro tamanho, cor ou modelo'} Devoluções: {dados['devolucao'] or 'em até 30 dias'} "
-            "É só entrar na sua conta, abrir Solicitações e escolher o pedido."
+            "É só entrar na sua conta, abrir Solicitações e escolher o pedido. "
+            f"{TROCA_NA_LOJA}"
         )
     elif entrada.assunto == "pagamento":
         metodos = ["PIX" if m_ == "PIX" else f"cartão de crédito em até {PARCELAS_MAX}x" for m_ in METODOS_ECOMMERCE]
