@@ -94,6 +94,10 @@ def _limpar_memoria(memoria: dict) -> dict:
 # ---------- Saída ----------
 
 
+NOTAS = {"AJUDOU": 1, "NAO_AJUDOU": -1}
+NOME_DA_NOTA = {valor: nome for nome, valor in NOTAS.items()}
+
+
 def mensagem_saida(mensagem: m.MensagemAssistente) -> dict:
     return {
         "id": mensagem.id,
@@ -102,6 +106,9 @@ def mensagem_saida(mensagem: m.MensagemAssistente) -> dict:
         "blocos": mensagem.blocos or [],
         "modo": mensagem.modo,
         "criadaEm": ms(mensagem.criada_em),
+        # Respostas (não a saudação) podem receber "ajudou / não ajudou" do cliente (decisão 104)
+        "avaliavel": mensagem.papel == regra.ASSISTENTE and mensagem.responde_a_id is not None,
+        "avaliacao": NOME_DA_NOTA.get(mensagem.avaliacao),
     }
 
 
@@ -450,6 +457,19 @@ def registrar_sacola(
     sessao.confirmar(db)
 
 
+def avaliar(db: Session, conversa: m.ConversaAssistente, mensagem_id: int, nota: str, comentario: str | None) -> None:
+    """O cliente marcou se a resposta ajudou (decisão 104). Pode mudar de ideia: a última nota vale. O comentário só
+    fica com "não ajudou" (é o que a equipe lê para melhorar a Lúcia)."""
+    mensagem = assistente_repository.mensagem(db, conversa.id, mensagem_id)
+    if mensagem is None or mensagem.papel != regra.ASSISTENTE or mensagem.responde_a_id is None:
+        raise NaoEncontrado("Resposta não encontrada nesta conversa.")
+    mensagem.avaliacao = NOTAS[nota]
+    comentario = (comentario or "").strip()[:500]
+    mensagem.avaliacao_comentario = comentario if nota == "NAO_AJUDOU" and comentario else None
+    mensagem.avaliada_em = agora()
+    sessao.confirmar(db)
+
+
 BLOCO_DA_ACAO = {"EMAIL": "confirmar_email", "CANCELAMENTO": "confirmar_cancelamento", "DEVOLUCAO": "confirmar_devolucao"}
 DESCRICAO_DA_ACAO = {
     "EMAIL": "O cliente trocou o e-mail da conta",
@@ -601,6 +621,44 @@ def apagar_vencidas(db: Session) -> int:
 # ---------- Uso e custo ----------
 
 
+def _qualidade(db: Session, desde: datetime) -> dict:
+    """Por assistente: a conferência dos números (decisão 101), as falhas e as ofertas da equipe (decisão 102) e as
+    avaliações dos clientes, com os últimos comentários de "não ajudou" (decisão 104)."""
+    saida: dict[str, dict] = {}
+    for tipo, auditoria, nota, comentario, avaliada_em, pergunta in assistente_repository.qualidade_desde(db, desde):
+        q = saida.setdefault(
+            tipo,
+            {
+                "verificacao": {"CONFERIDA": 0, "REESCRITA": 0, "SUBSTITUIDA": 0},
+                "comNumeros": 0,
+                "falhas": 0,
+                "ofereceuPessoa": 0,
+                "sinaisDoCliente": {"FRUSTRACAO": 0, "REPETICAO": 0},
+                "avaliacoes": {"ajudou": 0, "naoAjudou": 0},
+                "comentarios": [],
+            },
+        )
+        auditoria = auditoria or {}
+        if (situacao := auditoria.get("verificacao")) in q["verificacao"]:
+            q["verificacao"][situacao] += 1
+            q["comNumeros"] += 1 if auditoria.get("numeros") else 0
+        q["falhas"] += 1 if auditoria.get("falhou") else 0
+        q["ofereceuPessoa"] += 1 if auditoria.get("ofereceuPessoa") else 0
+        if (sinal := auditoria.get("sinalDoCliente")) in q["sinaisDoCliente"]:
+            q["sinaisDoCliente"][sinal] += 1
+        if nota == NOTAS["AJUDOU"]:
+            q["avaliacoes"]["ajudou"] += 1
+        elif nota == NOTAS["NAO_AJUDOU"]:
+            q["avaliacoes"]["naoAjudou"] += 1
+            if comentario:
+                q["comentarios"].append(
+                    {"pergunta": (pergunta or "")[:160], "comentario": comentario[:300], "em": ms(avaliada_em)}
+                )
+    for q in saida.values():
+        q["comentarios"] = q["comentarios"][-10:][::-1]  # os 10 mais recentes, do último para o primeiro
+    return saida
+
+
 def metricas(db: Session, dias: int = 30) -> dict:
     """Uso dos assistentes no período: conversas, respostas por modo, chamadas ao modelo, tokens, custo estimado
     e consultas (com a taxa de falha). Sem dado pessoal."""
@@ -651,6 +709,7 @@ def metricas(db: Session, dias: int = 30) -> dict:
         linha["duracaoMediaMs"] = max(linha["duracaoMediaMs"], int(duracao))
     peso = sum(q for _, q in duracoes)
     return {
+        "qualidade": _qualidade(db, desde),
         "dias": dias,
         "modoIA": "LLM" if settings.ANTHROPIC_API_KEY else "REGRAS",
         "modelo": settings.IA_MODELO,
