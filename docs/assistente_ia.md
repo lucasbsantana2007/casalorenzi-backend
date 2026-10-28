@@ -281,6 +281,7 @@ botão "Atualizar alertas agora" (Administrador) na aba Alertas. No banco local,
 | `IA_RESPOSTAS_DIRETAS` | true | Mensagens simples sem modelo |
 | `MCP_TOKEN_VALIDADE_DIAS` / `MCP_TOKENS_POR_USUARIO` | 90 / 5 | Tokens do servidor MCP (decisão 106) |
 | `CANAL_WHATSAPP_SEGREDO` / `CANAL_WHATSAPP_MARCA` | vazio / `LORENZI` | A Lúcia no WhatsApp pelo n8n (decisão 108, [whatsapp.md](whatsapp.md)). Vazio: rota desligada |
+| `N8N_ENVIO_URL` / `WHATSAPP_CICLO_HORAS` | vazio / 4 | Resposta da equipe pelo WhatsApp e fim do ciclo sem resposta (decisão 115). Vazio: a resposta fica só no painel |
 | `DATABASE_URL_LEITURA` | = `DATABASE_URL` | Usuário só leitura (opcional) |
 | `CONSULTA_TIMEOUT_MS` | 8000 | Tempo máximo de cada consulta das análises |
 | `ALERTA_ESTOQUE_BAIXO_JANELA_DIAS` / `ALERTA_ESTOQUE_PARADO_DIAS` / `ALERTA_PONTOS_DIAS` | 60 / 90 / 30 | Automações |
