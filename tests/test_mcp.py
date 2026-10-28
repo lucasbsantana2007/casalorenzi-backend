@@ -283,7 +283,7 @@ def test_discover_moderno(client, admin):
 def test_chamada_moderna_e_nome_em_base64(client, admin):
     token = criar_token(client, admin)
     lista = moderno(client, token, "tools/list").json()["result"]
-    assert lista["resultType"] == "complete" and len(lista["tools"]) == 12
+    assert lista["resultType"] == "complete" and len(lista["tools"]) == 14
     nome = "ver_contexto"
     codificado = "=?base64?" + base64.b64encode(nome.encode()).decode() + "?="
     resposta = moderno(client, token, "tools/call", {"name": nome, "arguments": {}}, cabecalhos={"Mcp-Name": codificado})
@@ -323,7 +323,7 @@ def test_versao_de_2025_em_meta_e_atendida_como_2025(client, admin):
     """A lista de versões suportadas inclui as de 2025: quem tentar de novo com uma delas não fica sem resposta."""
     token = criar_token(client, admin)
     resposta = moderno(client, token, "tools/list", versao="2025-11-25")
-    assert resposta.status_code == 200 and len(resposta.json()["result"]["tools"]) == 12
+    assert resposta.status_code == 200 and len(resposta.json()["result"]["tools"]) == 14
     assert "resultType" not in resposta.json()["result"]
 
 
@@ -372,9 +372,10 @@ def test_toda_a_equipe_usa_o_mcp_e_cada_um_ve_o_seu(client, admin, lojista, oper
         nome: criar_token(client, perfil) for nome, perfil in [("lojista", lojista), ("operador", operador), ("paula", paula)]
     }
 
-    # Lojista: estoque sim; faturamento, Lupe+ e transferências não
+    # Lojista: estoque e Lupe+ sim (decisão 118); faturamento e transferências não
     assert chamar(client, tokens["lojista"], "consultar_estoque_baixo")["isError"] is False
-    for ferramenta in ("consultar_faturamento", "consultar_fidelidade", "sugerir_transferencias"):
+    assert chamar(client, tokens["lojista"], "consultar_fidelidade")["isError"] is False
+    for ferramenta in ("consultar_faturamento", "sugerir_transferencias"):
         assert "SEM_PERMISSAO: o perfil Lojista" in _recusa(chamar(client, tokens["lojista"], ferramenta))
 
     # Operador: estoque e transferências sim; faturamento não

@@ -106,7 +106,8 @@ def test_cada_perfil_ve_os_alertas_que_pode(client):
     }
     assert tipos["helena@casalorenzi.com.br"] == {"ESTOQUE_BAIXO", "ESTOQUE_PARADO", "SUGESTAO_TRANSFERENCIA", "PONTOS_A_VENCER"}
     assert tipos["diego.almeida@casalorenzi.com.br"] == {"ESTOQUE_BAIXO", "ESTOQUE_PARADO", "SUGESTAO_TRANSFERENCIA"}  # Operador
-    assert tipos["rafael.monteiro@casalorenzi.com.br"] == {"ESTOQUE_BAIXO", "ESTOQUE_PARADO"}  # Lojista
+    # Lojista: estoque e, desde a decisão 118, os pontos a vencer (Lupe+); transferência não
+    assert tipos["rafael.monteiro@casalorenzi.com.br"] == {"ESTOQUE_BAIXO", "ESTOQUE_PARADO", "PONTOS_A_VENCER"}
     # Equipe da Vulto não vê os alertas da Casa Lorenzi
     paula = entrar(client, "paula.ferraz@vulto.com.br")
     assert all(a["marca"] in (None, "VULTO") for a in client.get("/api/alertas", headers=paula).json()["alertas"])
