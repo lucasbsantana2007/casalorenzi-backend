@@ -106,11 +106,11 @@ def test_limite_de_tokens_ativos_e_revogacao(client, admin):
     assert client.post("/api/mcp/tokens", json={"nome": "Sexto"}, headers=admin).status_code == 201
 
 
-def test_nome_em_branco_e_token_de_outra_pessoa(client, admin, lojista):
+def test_nome_em_branco_e_token_de_outra_pessoa(client, admin, paula):
     assert client.post("/api/mcp/tokens", json={"nome": "   "}, headers=admin).status_code == 422
     meu = client.post("/api/mcp/tokens", json={"nome": "Meu"}, headers=admin).json()
-    assert client.delete(f"/api/mcp/tokens/{meu['id']}", headers=lojista).status_code == 404
-    assert client.get("/api/mcp/tokens", headers=lojista).json() == []
+    assert client.delete(f"/api/mcp/tokens/{meu['id']}", headers=paula).status_code == 404
+    assert client.get("/api/mcp/tokens", headers=paula).json() == []
     assert legado(client, meu["token"], "tools/list").status_code == 200
 
 
@@ -119,12 +119,12 @@ def test_cliente_nao_cria_token(client, mariana):
     assert client.get("/api/mcp/tokens").status_code == 401
 
 
-def test_token_vencido_ou_de_conta_desativada_para_de_valer(client, admin, lojista):
+def test_token_vencido_ou_de_conta_desativada_para_de_valer(client, admin, paula):
     vencido = criar_token(client, admin)
-    desativado = criar_token(client, lojista)
+    desativado = criar_token(client, paula)
     with SessionLocal() as db:
         db.execute(text("UPDATE tokens_mcp SET expira_em = now() - interval '1 minute' WHERE prefixo = :p"), {"p": vencido[:12]})
-        db.execute(text("UPDATE usuarios SET ativo = false WHERE email = 'rafael.monteiro@casalorenzi.com.br'"))
+        db.execute(text("UPDATE usuarios SET ativo = false WHERE email = 'paula.ferraz@vulto.com.br'"))
         db.commit()
     for token in (vencido, desativado):
         resposta = legado(client, token, "tools/list")
@@ -351,14 +351,19 @@ def test_faturamento_igual_ao_do_copiloto(client, admin):
     assert dados["faturamento"] == f"R$ {centavos}"
 
 
-def test_operador_nao_ve_nem_consulta_financeiro(client, operador):
-    token = criar_token(client, operador)
-    disponiveis = nomes(client, token)
-    assert "consultar_faturamento" not in disponiveis and "consultar_estoque_baixo" in disponiveis
-    resultado = chamar(client, token, "consultar_faturamento", {})
-    assert resultado["isError"] is True and resultado["content"][0]["text"].startswith("SEM_PERMISSAO")
-    chamada = chamadas_mcp()[-1]
-    assert chamada.ferramenta == "consultar_faturamento" and chamada.sucesso is False
+def test_so_a_lideranca_usa_o_mcp(client, lojista, operador):
+    """Decisão 109: o MCP é a cúpula de informação da liderança (Administradores). Lojista e Operador não criam
+    nem veem tokens; quem deixa de ser Administrador perde o MCP na hora."""
+    for perfil in (lojista, operador):
+        assert client.post("/api/mcp/tokens", json={"nome": "x"}, headers=perfil).status_code == 403
+        assert client.get("/api/mcp/tokens", headers=perfil).status_code == 403
+    otavio = _entrar(client, "otavio.vasconcelos@casalorenzi.com.br")
+    token = criar_token(client, otavio)
+    assert legado(client, token, "tools/list").status_code == 200
+    with SessionLocal() as db:
+        db.execute(text("UPDATE usuarios SET papel = 'OPERADOR' WHERE email = 'otavio.vasconcelos@casalorenzi.com.br'"))
+        db.commit()
+    assert legado(client, token, "tools/list").status_code == 401
 
 
 def test_marca_vem_do_dono_do_token(client, paula):

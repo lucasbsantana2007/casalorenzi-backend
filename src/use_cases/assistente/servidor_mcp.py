@@ -1,5 +1,6 @@
-"""Servidor MCP do copiloto (decisão 106, docs/mcp.md): as ferramentas do copiloto gerencial para apps de IA de
-fora do painel (Claude Code, Claude Desktop, n8n), com as mesmas regras do painel.
+"""Servidor MCP do copiloto (decisões 106 e 109, docs/mcp.md): as ferramentas do copiloto gerencial para apps de IA
+de fora do painel (Claude Code, Claude Desktop, n8n), com as mesmas regras do painel. Só para a liderança
+(Administradores): a cúpula de informação da empresa.
 
 O que vale aqui é o mesmo do copiloto: só leitura, permissão por papel e marca de quem é dono do token, conferida
 a cada chamada, parâmetros validados pelo mesmo contrato (campo a mais é recusado) e valores já formatados. Fica de
