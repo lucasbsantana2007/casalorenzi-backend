@@ -278,6 +278,14 @@ def _limpeza(db: Session) -> Placar:
     return Placar(resolvidos=0, detalhe=[f"{apagadas} conversa(s) apagada(s) pela retenção de {settings.IA_RETENCAO_DIAS} dias"])
 
 
+def _encerrar_whatsapp(db: Session) -> Placar:
+    from src.use_cases.assistente import canal_whatsapp
+
+    fechados = canal_whatsapp.encerrar_ciclos(db)
+    horas = settings.WHATSAPP_CICLO_HORAS
+    return Placar(resolvidos=fechados, detalhe=[f"{fechados} chamado(s) do WhatsApp encerrado(s) após {horas} h sem resposta"])
+
+
 AUTOMACOES: dict[str, Callable[[Session], Placar]] = {
     "estoque_baixo": _estoque_baixo,
     "estoque_parado": _estoque_parado,
@@ -287,6 +295,7 @@ AUTOMACOES: dict[str, Callable[[Session], Placar]] = {
     "aviso_estoque": _aviso_estoque,
     "lembrete_sacola": _lembrete_sacola,
     "limpeza_conversas": _limpeza,
+    "encerrar_whatsapp": _encerrar_whatsapp,
 }
 DESCRICOES = {
     "estoque_baixo": "Itens no mínimo ou zerados que venderam no local na janela",
@@ -297,6 +306,7 @@ DESCRICOES = {
     "aviso_estoque": 'E-mail a quem pediu "Avise-me" quando a peça volta ao estoque (desligado por padrão)',
     "lembrete_sacola": "Lembrete de sacola parada há 24 h, para quem aceita e-mails (desligado por padrão)",
     "limpeza_conversas": "Apaga conversas dos assistentes além da retenção",
+    "encerrar_whatsapp": "Encerra o chamado do WhatsApp quando o cliente fica 4 h sem responder à equipe",
 }
 
 
