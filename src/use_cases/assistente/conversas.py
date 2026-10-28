@@ -27,6 +27,7 @@ from src.repositories import assistente_repository, cadastro_repository, sessao
 from src.use_cases import analises, atendimentos
 from src.use_cases.assistente import (
     catalogo,
+    escalonamento,
     ferramentas_cliente,
     ferramentas_conta,
     ferramentas_gerenciais,
@@ -46,6 +47,7 @@ ASSISTENTE_CLIENTE = Assistente(
     prompt_fixo=prompts.PROMPT_CLIENTE,
     direta=regras_cliente.direta,
     regras=regras_cliente.responder,
+    depois=escalonamento.aplicar,
 )
 ASSISTENTE_GERENCIAL = Assistente(
     tipo=regra.GERENCIAL,
@@ -67,6 +69,7 @@ CHAVES_MEMORIA = {
     "lojaEmFocoNome",
     "oferta",
     "eventos",
+    "falhasSeguidas",
 }
 
 
@@ -208,6 +211,7 @@ def conversas_do_usuario(db: Session, usuario: m.Usuario) -> list[dict]:
 
 
 def _contexto_cliente(db: Session, conversa: m.ConversaAssistente, cliente: m.Cliente | None) -> Contexto:
+    atendimento = db.get(m.Atendimento, conversa.atendimento_id) if conversa.atendimento_id else None
     return Contexto(
         tipo=regra.CLIENTE,
         conversa_id=conversa.id,
@@ -215,6 +219,7 @@ def _contexto_cliente(db: Session, conversa: m.ConversaAssistente, cliente: m.Cl
         cliente_id=cliente.id if cliente else None,
         marca_site=conversa.marca,
         memoria=dict(conversa.contexto or {}),
+        atendimento_protocolo=atendimento.protocolo if atendimento else None,
     )
 
 

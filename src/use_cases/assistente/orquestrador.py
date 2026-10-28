@@ -56,6 +56,9 @@ class Assistente:
     # (texto, contexto, executar) -> Rodada ou None
     direta: Callable[[str, Contexto, Callable], Rodada | None]
     regras: Callable[[str, Contexto, Callable], Rodada]
+    # Passo final, depois de qualquer modo (rodada, texto, contexto, histórico, executar) -> Rodada: no site, conta
+    # as falhas seguidas e oferece a equipe (escalonamento.py, decisão 99)
+    depois: Callable[[Rodada, str, Contexto, list, Callable], Rodada] | None = None
 
 
 def aplicar_memoria(memoria: dict, mudancas: dict) -> dict:
@@ -280,6 +283,18 @@ def responder(
     assistente: Assistente, texto: str, ctx: Contexto, historico: list[tuple[str, str]], contexto_dinamico: Callable[[], str]
 ) -> Rodada:
     """historico: (papel, texto) das mensagens anteriores, sem a atual."""
+    rodada = _responder(assistente, texto, ctx, historico, contexto_dinamico)
+    if assistente.depois is None:
+        return rodada
+    executor = _Executor(ctx, assistente.ferramentas)
+    rodada = assistente.depois(rodada, texto, ctx, historico, executor)
+    rodada.execucoes = [*rodada.execucoes, *executor.coletor.execucoes]
+    return rodada
+
+
+def _responder(
+    assistente: Assistente, texto: str, ctx: Contexto, historico: list[tuple[str, str]], contexto_dinamico: Callable[[], str]
+) -> Rodada:
     executor = _Executor(ctx, assistente.ferramentas)
     if settings.IA_RESPOSTAS_DIRETAS:
         ctx.origem = REGRAS

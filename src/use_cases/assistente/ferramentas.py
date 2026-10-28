@@ -54,6 +54,8 @@ class Contexto:
     memoria: dict = field(default_factory=dict)
     # Botão da tela que acompanhou a mensagem (ex.: "Quero esta" num card = FOCAR_PRODUTO)
     acao: dict | None = None
+    # Site: a conversa já foi encaminhada para a equipe (protocolo do atendimento)
+    atendimento_protocolo: str | None = None
 
 
 @dataclass
