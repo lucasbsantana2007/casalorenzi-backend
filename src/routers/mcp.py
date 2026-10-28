@@ -1,7 +1,8 @@
 """Servidor MCP do copiloto (decisão 106, docs/mcp.md) e os tokens pessoais que dão acesso a ele.
 
 POST /api/conector-mcp: o endpoint MCP (Streamable HTTP, respostas em JSON, sem sessão). Autenticação pelo token pessoal
-(Authorization: Bearer clmcp_...), não pelo login do painel. GET e DELETE: 405 (não há stream nem sessão).
+(Authorization: Bearer clmcp_...) ou pelo acesso do login OAuth do claude.ai (clmcpa_..., decisão 114), não pelo
+login do painel. GET e DELETE: 405 (não há stream nem sessão).
 /api/mcp/tokens: o Administrador do grupo cria, vê e revoga os seus. O MCP é a cúpula de informação da
 liderança (decisões 109 e 110): só quem vê as duas marcas; os outros usam o copiloto no painel.
 
@@ -26,14 +27,17 @@ from src import models as m
 from src.config.settings import CORS_ORIGINS
 from src.database.connection import SessionLocal, get_db
 from src.middlewares.autenticacao import usuario_atual
+from src.routers.oauth_mcp import base
 from src.schemas.comum import Entrada
-from src.use_cases import tokens_mcp
+from src.use_cases import oauth_mcp, tokens_mcp
 from src.use_cases.assistente import servidor_mcp
 from src.use_cases.assistente.servidor_mcp import ERRO_JSON, Resposta
 from src.utils.erros import SemPermissao
 
 log = logging.getLogger(__name__)
 router = APIRouter(tags=["MCP (copiloto em apps de IA)"])
+
+
 def acesso(usuario: m.Usuario = Depends(usuario_atual)) -> m.Usuario:
     """Só o Administrador do grupo (decisão 110); os outros perfis da equipe recebem 403."""
     if not tokens_mcp.pode_usar(usuario):
@@ -96,9 +100,13 @@ def _json(resposta: Resposta) -> Response:
     )
 
 
-def _sem_token() -> Resposta:
+def _sem_token(endereco: str) -> Resposta:
+    """401 com o endereço da ficha do recurso: é por ela que o claude.ai acha o login OAuth (decisão 114)."""
     resposta = servidor_mcp.erro_jsonrpc(401, servidor_mcp.SEM_AUTORIZACAO, SEM_TOKEN)
-    resposta.cabecalhos["WWW-Authenticate"] = 'Bearer realm="casa-lorenzi-mcp"'
+    ficha = f"{endereco}/.well-known/oauth-protected-resource/api/conector-mcp"
+    resposta.cabecalhos["WWW-Authenticate"] = (
+        f'Bearer realm="casa-lorenzi-mcp", resource_metadata="{ficha}", scope="{oauth_mcp.ESCOPO}"'
+    )
     return resposta
 
 
@@ -111,12 +119,13 @@ def _ler(corpo: bytes):
     return json.loads(corpo, parse_constant=_sem_numero_especial)
 
 
-def _atender(mensagem, cabecalhos: dict, texto_token: str | None) -> Resposta:
+def _atender(mensagem, cabecalhos: dict, texto_token: str | None, endereco: str) -> Resposta:
     with SessionLocal() as db:
         try:
-            token = tokens_mcp.autenticar(db, texto_token)
+            # Token pessoal (clmcp_) ou acesso do login OAuth (clmcpa_, decisão 114): os dois dão a mesma conexão
+            token = tokens_mcp.autenticar(db, texto_token) or oauth_mcp.autenticar(db, texto_token, oauth_mcp.recurso(endereco))
             if token is None:
-                return _sem_token()
+                return _sem_token(endereco)
             resposta = servidor_mcp.processar(db, mensagem, cabecalhos, token, cabecalhos.get("user-agent"))
             db.commit()
             return resposta
@@ -140,8 +149,9 @@ async def mcp(request: Request):
     autorizacao = request.headers.get("authorization", "")
     esquema, _, texto_token = autorizacao.partition(" ")
     texto_token = texto_token.strip() if esquema.lower() == "bearer" else None
+    endereco = base(request)
     if not texto_token:
-        return _json(_sem_token())
+        return _json(_sem_token(endereco))
     corpo = await request.body()
     if len(corpo) > TAMANHO_MAXIMO:
         return _json(servidor_mcp.erro_jsonrpc(413, servidor_mcp.PEDIDO_INVALIDO, "Mensagem grande demais."))
@@ -150,7 +160,7 @@ async def mcp(request: Request):
     except (ValueError, RecursionError):  # JSON quebrado, NaN/Infinity, aninhado demais
         return _json(servidor_mcp.erro_jsonrpc(400, ERRO_JSON, "Corpo não é um JSON válido."))
     cabecalhos = {chave.lower(): valor for chave, valor in request.headers.items()}
-    return _json(await run_in_threadpool(_atender, mensagem, cabecalhos, texto_token))
+    return _json(await run_in_threadpool(_atender, mensagem, cabecalhos, texto_token, endereco))
 
 
 @router.api_route("/conector-mcp", methods=["GET", "DELETE"], include_in_schema=False)
