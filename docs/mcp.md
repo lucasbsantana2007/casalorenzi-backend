@@ -1,21 +1,60 @@
-# Copiloto no Claude: o servidor MCP (decisões 106, 109 e 110)
+# Copiloto no Claude: o servidor MCP (decisões 106, 109, 114 e 115)
 
-O copiloto gerencial também atende fora do painel, como a **cúpula de informação da liderança**: no **Claude
-Code**, no **Claude Desktop** ou num agente do **n8n**, pelo protocolo MCP (Model Context Protocol). Só o
-**Administrador do grupo** usa, o que vê as duas marcas; hoje, a Helena (decisão 110). Os outros perfis usam o
-copiloto no painel. Quem pergunta usa as mesmas consultas, as mesmas regras e as
-mesmas permissões do painel. Muda só o lugar da conversa.
+O copiloto gerencial também atende fora do painel: no **claude.ai**, no **Claude Code**, no **Claude Desktop** ou
+num agente do **n8n**, pelo protocolo MCP (Model Context Protocol). **Toda a equipe** com acesso ao Assistente IA
+usa (decisão 115, que substitui a 110), e cada pessoa vê só o que o perfil e a marca dela permitem. Quem pergunta
+usa as mesmas consultas, as mesmas regras e as mesmas permissões do painel. Muda só o lugar da conversa.
+
+| Perfil | Consulta | Não consulta |
+| --- | --- | --- |
+| Administrador do grupo | Tudo, nas duas marcas | — |
+| Administrador de uma marca | Tudo, só na marca dele | A outra marca |
+| Lojista | Estoque e alertas | Faturamento, vendas, Lupe+, transferências |
+| Operador | Estoque, transferências e alertas | Faturamento, vendas, Lupe+ |
 
 | O quê | Como |
 | --- | --- |
 | Endereço | `https://<api>/api/conector-mcp` (local: `http://127.0.0.1:8000/api/conector-mcp`) |
-| Login | Token pessoal (`Authorization: Bearer clmcp_...`), criado em **Inteligência > Conectar ao Claude** |
+| Login | **claude.ai**: login OAuth, com o e-mail e a senha do painel (decisão 114). **Claude Code, Claude Desktop e n8n**: token pessoal (`Authorization: Bearer clmcp_...`), criado em **Inteligência > Conectar ao Claude** |
 | O que dá para consultar | As 11 ferramentas do copiloto e `ver_contexto` (data de hoje, até quando há vendas, lojas com os ids, categorias, permissões e definições das métricas) |
 | O que não sai | Nada do cliente: pedidos, pontos, devoluções e conta ficam só na Lúcia, no site |
-| Permissão | Só o Administrador do grupo, conferido **a cada chamada**: papel, marca (as duas) e conta ativa |
+| Permissão | Toda a equipe, conferida **a cada chamada**: papel, marca e conta ativa do dono, como no copiloto do painel |
 | Escrita | Nenhuma. As consultas rodam em transação READ ONLY, como no copiloto |
 
-## Como conectar
+## Conectar no claude.ai (login, decisão 114)
+
+1. No claude.ai, abra **Configurações > Conectores > Adicionar conector personalizado**.
+2. Dê um nome (por exemplo "Casa Lorenzi") e cole o endereço `https://casalorenzi-api.onrender.com/api/conector-mcp`.
+   Não preencha client ID nem segredo: o claude.ai se cadastra sozinho.
+3. Clique em **Conectar**. Abre a página "Conectar Claude à Casa Lorenzi": entre com o e-mail e a senha do painel
+   (cada pessoa com a própria conta) e clique em **Entrar e autorizar**.
+4. De volta ao claude.ai, ative o conector na conversa e pergunte.
+
+A conexão aparece em **Inteligência > Conectar ao Claude** com o nome "Claude (login)" e se revoga por lá, como um
+token. Ela usa a mesma auditoria e o mesmo limite de consultas. O claude.ai renova o acesso sozinho, sem pedir o
+login de novo, até a conexão vencer (90 dias) ou ser revogada.
+
+Como funciona por dentro (a especificação de autorização do MCP, OAuth 2.1):
+
+| Etapa | Endereço |
+| --- | --- |
+| O servidor MCP responde 401 com o endereço da ficha do recurso | `WWW-Authenticate: Bearer resource_metadata=...` |
+| Ficha do recurso (RFC 9728) | `/.well-known/oauth-protected-resource/api/conector-mcp` |
+| Ficha do servidor de autorização (RFC 8414) | `/.well-known/oauth-authorization-server` |
+| Cadastro do app: automático (RFC 7591) ou pela ficha publicada no domínio do app (CIMD, só `claude.ai` e `claude.com`) | `POST /api/oauth/registro` |
+| Página de login e autorização | `GET/POST /api/oauth/autorizar` |
+| Troca do código e renovação | `POST /api/oauth/token` |
+| Desconectar pelo app (RFC 7009) | `POST /api/oauth/revogar` |
+
+Garantias: PKCE S256 obrigatório; o código vale 10 minutos e uma vez só (usado de novo, a conexão cai); o acesso
+vale 60 minutos (`OAUTH_ACESSO_MINUTOS`); a renovação vale 30 dias (`OAUTH_RENOVACAO_DIAS`) e é trocada a cada uso
+(usada de novo, a conexão cai); o acesso só vale para este servidor (`resource`, RFC 8707); a volta leva `iss`
+(RFC 9207); a página não pode ser embutida em outro site nem fica em cache; login com no máximo 10 tentativas a
+cada 10 minutos por IP e por e-mail. Endereço de volta só `https` ou `http` no próprio computador. Do banco, só o
+sha256 dos tokens. Opcional no Render: `URL_API` (o endereço público da API; sem ele, vale o endereço pelo qual o
+pedido chegou) e `OAUTH_CIMD_DOMINIOS`.
+
+## Conectar com token (Claude Code, Claude Desktop, n8n)
 
 1. No painel, abra **Inteligência > Conectar ao Claude**, dê um nome ao token (por exemplo "Claude Code do
    notebook") e clique em **Criar token**.
@@ -52,7 +91,8 @@ estoque parado da loja dele".
 
 - Valem **90 dias** (`MCP_TOKEN_VALIDADE_DIAS`). Cada pessoa tem no máximo **5 ativos** (`MCP_TOKENS_POR_USUARIO`).
 - **Revogar** na mesma tela corta o acesso na hora: a próxima chamada recebe 401.
-- Quem é desativado ou deixa de ser Administrador do grupo perde o MCP na hora, sem precisar revogar.
+- Quem é desativado perde o MCP na hora, sem precisar revogar. Quem muda de papel ou de marca passa a ver o do novo
+  papel na próxima consulta.
 - A tela mostra o último uso e quantas consultas cada token fez.
 - Quem tiver o token consulta o que o dono consulta. Não mande por e-mail nem cole em lugar público.
 
@@ -107,5 +147,4 @@ a causa provável é a mesma. Um exemplo é o conector do Figma, que falhava nes
 
 ## Próximos passos
 
-- Conector no claude.ai (Configurações > Conectores) exige OAuth: fica para depois da banca.
 - Uso do MCP no painel "Uso e custo da IA" (hoje a tela de tokens mostra o último uso e as consultas de cada um).

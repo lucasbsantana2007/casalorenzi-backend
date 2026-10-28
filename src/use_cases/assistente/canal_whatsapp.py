@@ -8,7 +8,7 @@ o formato: sem cards nem botões, tudo vira texto com os links das peças.
 - Uma conversa por telefone, enquanto ela estiver ativa (24 h sem mensagem encerram, como no site). O telefone não
   fica salvo na conversa: ela é achada pelo HMAC do número (com o segredo do canal), guardado como chave_hash.
 - Sem login: o WhatsApp não identifica a conta do site, então pedidos, pontos e dados da conta ficam no site.
-- Ênfase na ajuda humana (decisão 114): a primeira mensagem recebe um menu com dois botões, "Respostas rápidas" (a
+- Ênfase na ajuda humana (decisão 116): a primeira mensagem recebe um menu com dois botões, "Respostas rápidas" (a
   Lúcia) ou "Falar com a equipe" (1 ou 2 também valem). Toda resposta da Lúcia traz o botão da equipe.
 - Equipe (escolhida no menu, pedida a qualquer momento ou oferecida depois de duas falhas): abre o chamado na hora,
   canal WHATSAPP, com o resumo e o telefone. As mensagens seguintes entram no mesmo chamado, para a equipe ler no
@@ -206,7 +206,7 @@ def _passar_para_a_equipe(db: Session, conversa: m.ConversaAssistente, telefone:
     )
 
 
-# ---------- Menu: respostas rápidas ou equipe (decisão 114) ----------
+# ---------- Menu: respostas rápidas ou equipe (decisão 116) ----------
 
 LUCIA, EQUIPE, MENU = "LUCIA", "EQUIPE", "MENU"
 BOTAO_LUCIA = {"id": LUCIA, "title": "Respostas rápidas"}
@@ -320,7 +320,7 @@ def _para_a_equipe(db, conversa, telefone, nome, motivo) -> dict:
     return _saida(telefone, aviso, [BOTAO_LUCIA], conversa, db)
 
 
-# ---------- Um lugar só para o atendimento humano (decisão 115) ----------
+# ---------- Um lugar só para o atendimento humano (decisão 117) ----------
 # O chamado do WhatsApp é o mesmo do painel: o cliente que vem do site com o protocolo cai no chamado que já existe;
 # a resposta da equipe no painel volta para o WhatsApp do cliente (pelo n8n); e o ciclo fecha sozinho quando o
 # cliente fica 4 horas sem responder depois da equipe.

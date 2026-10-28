@@ -10,9 +10,9 @@ Dois assistentes integrados à plataforma existente, mais automações operacion
    definição da métrica e a data dos dados.
 3. **Automações**: alertas de estoque baixo, estoque parado, sugestões de transferência e pontos a vencer,
    idempotentes, com log de execução; mais a limpeza das conversas pela política de retenção.
-4. **Copiloto no Claude** (decisões 106, 109 e 110): a cúpula de informação da direção. As ferramentas do
-   copiloto no Claude Code, no Claude Desktop ou no n8n, por um servidor MCP com token pessoal, só para o
-   Administrador do grupo (hoje, a Helena) e só leitura. Detalhes em [mcp.md](mcp.md).
+4. **Copiloto no Claude** (decisões 106, 114 e 115): as ferramentas do copiloto no claude.ai (login OAuth), no
+   Claude Code, no Claude Desktop ou no n8n (token pessoal), para toda a equipe com acesso ao Assistente IA,
+   cada um com as permissões do próprio perfil e só leitura. Detalhes em [mcp.md](mcp.md).
 
 Custos e escolha do modelo: [custos_ia.md](custos_ia.md). Roteiro para a banca: [roteiro_demonstracao.md](roteiro_demonstracao.md).
 
@@ -116,7 +116,7 @@ SUBSTITUIDA), `numeros`, `semFonte`, `textoModelo` (o que o modelo tinha escrito
 | `src/components/assistente/ChatWidget.jsx` | Botão flutuante (vitrine Casa Lorenzi, vitrine Vulto e área do cliente; some no checkout) |
 | `src/components/assistente/PainelChat.jsx`, `BlocosChat.jsx` | Janela do chat (carregada só ao abrir) e os blocos: peças, disponibilidade, lojas, pontos, pedidos, sacola, atendimento |
 | `src/hooks/useAssistente.js` | Conversa no navegador (id + chave), nova conversa ao trocar de conta, reenvio sem duplicar, conversa vencida |
-| `src/pages/admin/InteligenciaPage.jsx` | Página `/inteligencia`: Assistente, Alertas, Uso e custo da IA (Administrador) e Conectar ao Claude (Administrador do grupo) |
+| `src/pages/admin/InteligenciaPage.jsx` | Página `/inteligencia`: Assistente, Alertas, Conectar ao Claude e Uso e custo da IA (Administrador) |
 | `src/components/copiloto/*` | Indicadores, tabelas, gráficos (recharts, já usado no Financeiro), fonte, alertas e uso |
 | `src/services/assistenteService.js`, `copilotoService.js` | Chamadas à API (a chave do modelo nunca passa pelo navegador) |
 
@@ -281,7 +281,7 @@ botão "Atualizar alertas agora" (Administrador) na aba Alertas. No banco local,
 | `IA_RESPOSTAS_DIRETAS` | true | Mensagens simples sem modelo |
 | `MCP_TOKEN_VALIDADE_DIAS` / `MCP_TOKENS_POR_USUARIO` | 90 / 5 | Tokens do servidor MCP (decisão 106) |
 | `CANAL_WHATSAPP_SEGREDO` / `CANAL_WHATSAPP_MARCA` | vazio / `LORENZI` | A Lúcia no WhatsApp pelo n8n (decisão 108, [whatsapp.md](whatsapp.md)). Vazio: rota desligada |
-| `N8N_ENVIO_URL` / `WHATSAPP_CICLO_HORAS` | vazio / 4 | Resposta da equipe pelo WhatsApp e fim do ciclo sem resposta (decisão 115). Vazio: a resposta fica só no painel |
+| `N8N_ENVIO_URL` / `WHATSAPP_CICLO_HORAS` | vazio / 4 | Resposta da equipe pelo WhatsApp e fim do ciclo sem resposta (decisão 117). Vazio: a resposta fica só no painel |
 | `DATABASE_URL_LEITURA` | = `DATABASE_URL` | Usuário só leitura (opcional) |
 | `CONSULTA_TIMEOUT_MS` | 8000 | Tempo máximo de cada consulta das análises |
 | `ALERTA_ESTOQUE_BAIXO_JANELA_DIAS` / `ALERTA_ESTOQUE_PARADO_DIAS` / `ALERTA_PONTOS_DIAS` | 60 / 90 / 30 | Automações |

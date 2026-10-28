@@ -1,11 +1,11 @@
 """automacao encerrar_whatsapp
 
-Decisão 115 (docs/registro_decisoes_e4.md): a automação encerrar_whatsapp fecha o chamado do WhatsApp quando o
+Decisão 117 (docs/registro_decisoes_e4.md): a automação encerrar_whatsapp fecha o chamado do WhatsApp quando o
 cliente fica 4 horas sem responder à equipe. Só amplia a lista de nomes aceitos em execucoes_automacao; o downgrade
 apaga as execuções dela e volta a lista anterior.
 
 Revision ID: a7c3e5f19b28
-Revises: d8a3f1c26b47
+Revises: e026a0aedd29
 Create Date: 2026-10-28 17:00:00.000000
 
 """
@@ -15,7 +15,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = 'a7c3e5f19b28'
-down_revision: str | Sequence[str] | None = 'd8a3f1c26b47'
+down_revision: str | Sequence[str] | None = 'e026a0aedd29'
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

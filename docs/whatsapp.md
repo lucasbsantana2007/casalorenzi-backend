@@ -1,4 +1,4 @@
-# A Lúcia no WhatsApp (decisões 108, 114 e 115)
+# A Lúcia no WhatsApp (decisões 108, 116 e 117)
 
 O n8n recebe e entrega as mensagens; quem responde é a API, com o mesmo assistente do site.
 
@@ -26,7 +26,7 @@ Resposta: `{ "responder": true, "texto": "...", "mensagem": {...}, "conversaId":
 `mensagem` é o corpo pronto para `POST /{phone-number-id}/messages` da Graph API: texto ou botões, já com o
 destinatário. Com `responder: false` (a Meta entregou a mesma mensagem de novo), o n8n não envia nada.
 
-### O menu (decisão 114)
+### O menu (decisão 116)
 
 1. **Primeira mensagem:** cumprimento pelo horário com o primeiro nome do perfil ("Boa tarde, Ana! Aqui é a
    Lúcia...") e dois botões: **Respostas rápidas** e **Falar com a equipe**. Responder 1 ou 2 também vale. Se a
@@ -37,7 +37,7 @@ destinatário. Com `responder: false` (a Meta entregou a mesma mensagem de novo)
    chamado, e o cliente recebe a confirmação com o protocolo e o botão **Respostas rápidas** para voltar.
 4. **"menu"** mostra as opções de novo. Chamado encerrado: a próxima mensagem recomeça pelo menu.
 
-### Um lugar só para o atendimento humano (decisão 115)
+### Um lugar só para o atendimento humano (decisão 117)
 
 - **Um número:** `WHATSAPP_ATENDIMENTO` no Render é o mesmo número da Meta. O botão "Continuar no WhatsApp" do
   site abre esse número com o protocolo escrito; a mensagem chega com o protocolo e entra no chamado que já
@@ -99,7 +99,7 @@ Corpo do nó 3:
 O nó **WhatsApp > Send message** não manda botões; por isso o envio é o HTTP Request do passo 5, que publica a
 `mensagem` que a API montou.
 
-### Segundo fluxo: envio da equipe (decisão 115)
+### Segundo fluxo: envio da equipe (decisão 117)
 
 A API chama este fluxo quando a equipe responde no painel ou quando o ciclo fecha.
 

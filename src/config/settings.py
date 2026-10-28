@@ -84,6 +84,16 @@ IA_RESPOSTAS_DIRETAS = os.getenv("IA_RESPOSTAS_DIRETAS", "true").lower() == "tru
 MCP_TOKEN_VALIDADE_DIAS = int(os.getenv("MCP_TOKEN_VALIDADE_DIAS", "90"))
 MCP_TOKENS_POR_USUARIO = int(os.getenv("MCP_TOKENS_POR_USUARIO", "5"))
 
+# Conector do claude.ai (decisão 114, docs/mcp.md): login OAuth 2.1 no servidor MCP, além do token pessoal.
+# Endereço público da API (o "issuer" do OAuth). Vazio: o endereço pelo qual a requisição chegou
+URL_API = os.getenv("URL_API", "").rstrip("/")
+# Apps que se apresentam por uma ficha publicada no próprio domínio (Client ID Metadata Document): só destes domínios
+OAUTH_CIMD_DOMINIOS = [
+    d.strip().lower() for d in os.getenv("OAUTH_CIMD_DOMINIOS", "claude.ai,claude.com").split(",") if d.strip()
+]
+OAUTH_ACESSO_MINUTOS = int(os.getenv("OAUTH_ACESSO_MINUTOS", "60"))
+OAUTH_RENOVACAO_DIAS = int(os.getenv("OAUTH_RENOVACAO_DIAS", "30"))
+
 # WhatsApp do atendimento, só números com DDI e DDD (5511999999999). Com ele, o assistente do site oferece
 # "Continuar no WhatsApp": abre o chamado com o resumo da conversa e um link wa.me com o protocolo.
 # Vazio: só o chamado pelo site (decisão 81).
@@ -93,7 +103,7 @@ WHATSAPP_ATENDIMENTO = "".join(c for c in os.getenv("WHATSAPP_ATENDIMENTO", "") 
 # com este segredo no cabeçalho X-Canal-Segredo. Vazio: a rota não existe (404). Marca: a vitrine do número.
 CANAL_WHATSAPP_SEGREDO = os.getenv("CANAL_WHATSAPP_SEGREDO", "")
 CANAL_WHATSAPP_MARCA = os.getenv("CANAL_WHATSAPP_MARCA", "LORENZI")
-# Atendimento humano num lugar só (decisão 115): a resposta da equipe no painel volta para o WhatsApp pelo
+# Atendimento humano num lugar só (decisão 117): a resposta da equipe no painel volta para o WhatsApp pelo
 # webhook de envio do n8n (vazio: fica só no painel). O ciclo fecha quando o cliente fica tantas horas sem
 # responder depois da equipe; conversa com a Lúcia parada esse tempo também recomeça pelo menu.
 N8N_ENVIO_URL = os.getenv("N8N_ENVIO_URL", "").strip()

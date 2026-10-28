@@ -242,7 +242,7 @@ def enviar_mensagem(
     atendimento.atualizado_em = momento
     sessao.confirmar(db, atendimento)
     if atendimento.canal == "WHATSAPP" and conteudo.strip():
-        # Chamado do WhatsApp: a resposta também vai para o cliente, pelo n8n (decisão 115)
+        # Chamado do WhatsApp: a resposta também vai para o cliente, pelo n8n (decisão 117)
         from src.use_cases.assistente import canal_whatsapp
 
         canal_whatsapp.entregar_resposta_da_equipe(db, atendimento, conteudo)
@@ -267,7 +267,7 @@ def responder_como_cliente(
 
 
 def mensagem_do_whatsapp(db: Session, atendimento: m.Atendimento, conteudo: str) -> m.Atendimento:
-    """Mensagem que o cliente mandou pelo WhatsApp depois de pedir a equipe (decisão 114): entra no mesmo chamado,
+    """Mensagem que o cliente mandou pelo WhatsApp depois de pedir a equipe (decisão 116): entra no mesmo chamado,
     para a equipe ler no painel. O telefone já está no chamado; sem login, não há conta a conferir."""
     momento = agora()
     _nova_mensagem(db, atendimento, autor_tipo="CLIENTE", autor_id=None, conteudo=conteudo, anexo=None, quando=momento)

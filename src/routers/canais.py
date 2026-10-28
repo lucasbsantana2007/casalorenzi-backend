@@ -26,7 +26,7 @@ class MensagemDoWhatsApp(Entrada):
     id_mensagem: str | None = Field(None, max_length=256)
     # O nome do perfil do WhatsApp, para o chamado de atendimento
     nome: str | None = Field(None, max_length=120)
-    # Botão tocado (o id do button_reply da Meta): LUCIA, EQUIPE ou MENU (decisão 114)
+    # Botão tocado (o id do button_reply da Meta): LUCIA, EQUIPE ou MENU (decisão 116)
     botao: str | None = Field(None, max_length=40)
 
 

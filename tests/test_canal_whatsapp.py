@@ -1,4 +1,4 @@
-"""A Lúcia no WhatsApp (decisões 108 e 114): o n8n chama a API com o segredo do canal; a primeira mensagem recebe o
+"""A Lúcia no WhatsApp (decisões 108, 116 e 117): o n8n chama a API com o segredo do canal; a primeira mensagem recebe o
 menu (respostas rápidas ou equipe); a equipe abre o chamado na hora e as mensagens seguintes entram nele; toda
 resposta da Lúcia traz o botão da equipe; uma conversa por telefone e nada respondido duas vezes."""
 
@@ -265,7 +265,7 @@ def test_texto_longo_e_cortado_no_limite_do_whatsapp():
     assert len(cortado) <= canal.TAMANHO_MAXIMO and cortado.endswith("…")
 
 
-# ---------- Atendimento humano num lugar só (decisão 115) ----------
+# ---------- Atendimento humano num lugar só (decisão 117) ----------
 
 
 @pytest.fixture

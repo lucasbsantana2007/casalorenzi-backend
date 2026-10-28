@@ -71,7 +71,7 @@ CHAVES_MEMORIA = {
     "oferta",
     "eventos",
     "falhasSeguidas",
-    # WhatsApp (decisão 114): o que o cliente escolheu no menu, a pergunta que chegou antes da escolha e a última
+    # WhatsApp (decisão 116): o que o cliente escolheu no menu, a pergunta que chegou antes da escolha e a última
     # mensagem tratada (a Meta reentrega quando não recebe confirmação)
     "whatsappModo",
     "perguntaPendente",
