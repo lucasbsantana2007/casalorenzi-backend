@@ -117,6 +117,10 @@ def _livres_na_loja(db: Session, loja_id: int, variacao_ids: list[int]) -> dict[
     return {vid: max(min(fisico.get(vid, 0), livres.get((loja_id, vid), 0)), 0) for vid in variacao_ids}
 
 
+# Último afrouxamento: nada na faixa de preço pedida (as peças mostradas são as mais perto dela)
+ROTULO_PRECO = "preço fora da faixa"
+
+
 def buscar(
     db: Session,
     pedido: PedidoBusca,
@@ -190,9 +194,7 @@ def buscar(
             ("outras cores", dict(cor_minima=0, com_tamanho=False, com_termos=False, com_cor=False, com_preco=True))
         )
     if pedido.preco_min is not None or pedido.preco_max is not None:
-        tentativas.append(
-            ("fora da faixa de preço", dict(cor_minima=1, com_tamanho=False, com_termos=True, com_cor=True, com_preco=False))
-        )
+        tentativas.append((ROTULO_PRECO, dict(cor_minima=1, com_tamanho=False, com_termos=True, com_cor=True, com_preco=False)))
 
     for rotulo, regras in tentativas:
         achados, esgotados = [], []
@@ -209,8 +211,13 @@ def buscar(
             maior = max(a.nota[0] for a in achados)
             achados = [a for a in achados if a.nota[0] == maior]
         if achados:
-            # Mais palavras livres achadas, cor exata, marca da vitrine aberta, mais peças disponíveis
-            achados.sort(key=lambda a: (-a.nota[0], not a.nota[1], not a.nota[2], -a.nota[3], chave_texto(a.produto.nome)))
+            if rotulo == ROTULO_PRECO:
+                # Ninguém na faixa: primeiro as que ficam mais perto do valor que o cliente disse
+                alvo = pedido.preco_max if pedido.preco_max is not None else pedido.preco_min
+                achados.sort(key=lambda a: (abs(a.preco - alvo), chave_texto(a.produto.nome)))
+            else:
+                # Mais palavras livres achadas, cor exata, marca da vitrine aberta, mais peças disponíveis
+                achados.sort(key=lambda a: (-a.nota[0], not a.nota[1], not a.nota[2], -a.nota[3], chave_texto(a.produto.nome)))
             resultado.achados = achados[:limite]
             resultado.total = len(achados)
             if rotulo != "exato":

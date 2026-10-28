@@ -8,6 +8,9 @@ página do produto) e o pagamento continua no checkout. Atendimento humano é um
 quando o cliente confirma.
 """
 
+import re
+from dataclasses import replace
+from datetime import date
 from decimal import Decimal
 from typing import Literal
 
@@ -117,25 +120,39 @@ def _pedido_da_entrada(entrada: BuscarProdutos) -> PedidoBusca:
     return pedido
 
 
+def _sem_desconhecidas(resultado: catalogo.ResultadoBusca) -> PedidoBusca:
+    """O pedido sem as palavras que não aparecem em nenhuma peça (a busca não as usou; a descrição também não)."""
+    return replace(resultado.pedido, termos=[t for t in resultado.pedido.termos if t not in resultado.desconhecidos])
+
+
+def _frase_do_afrouxado(rotulo: str) -> str:
+    if rotulo.startswith("sem "):
+        return rotulo
+    if rotulo == catalogo.ROTULO_PRECO:
+        return "com preço fora da faixa"
+    return f"em {rotulo}"
+
+
 def texto_da_busca(resultado: catalogo.ResultadoBusca, cards: list[dict], loja_nome: str | None) -> str:
     pedido = resultado.pedido
-    descricao = descrever(pedido)
+    descricao = descrever(_sem_desconhecidas(resultado))
     onde = f" na {loja_nome}" if loja_nome else ""
     if not cards:
         so_desconhecidas = not (pedido.tipos or pedido.cor or pedido.tamanho or pedido.preco_min or pedido.preco_max)
         if resultado.desconhecidos and so_desconhecidas and set(pedido.termos) <= set(resultado.desconhecidos):
             return f"Não encontrei “{' '.join(resultado.desconhecidos)}” no nosso catálogo. Quer que eu procure outra peça?"
-        texto = f"Não encontrei {descricao} disponível{onde} agora."
+        texto = f"Não encontrei {descricao}{onde} à venda agora."
         if resultado.esgotados:
             texto += f" {_lista(resultado.esgotados)} {'está esgotada' if len(resultado.esgotados) == 1 else 'estão esgotadas'} nessa opção."
         return texto + " Posso procurar outra cor, outro tamanho ou outra peça?"
     quantidade = f"{resultado.total} {'opção' if resultado.total == 1 else 'opções'}"
-    if resultado.afrouxado:
-        texto = f"Não encontrei exatamente {descricao}{onde}. Separei {quantidade} com {_lista(resultado.afrouxado)}."
+    if resultado.afrouxado == [catalogo.ROTULO_PRECO] and pedido.preco_max is not None:
+        menor = min(card["preco"] for card in cards)
+        texto = f"Não encontrei {descricao}{onde}. Separei as {quantidade} mais perto do seu orçamento, a partir de {brl(menor)}."
+    elif resultado.afrouxado:
+        texto = f"Não encontrei exatamente {descricao}{onde}. Separei {quantidade} {_frase_do_afrouxado(resultado.afrouxado[0])}."
     else:
         texto = f"Encontrei {quantidade} de {descricao}{onde}."
-    if resultado.desconhecidos:
-        texto += f" (não usei “{' '.join(resultado.desconhecidos)}”, que não aparece nas peças)"
     if pedido.tamanho is None and set(pedido.tipos) & TIPOS_COM_TAMANHO:
         texto += " Qual tamanho você procura?"
     elif len(cards) > 1:
@@ -154,7 +171,7 @@ def buscar_produtos(db: Session, ctx: Contexto, entrada: BuscarProdutos) -> Resu
     cards = [catalogo.card(a) for a in resultado.achados]
     memoria = {
         "busca": pedido.para_dict(),
-        "buscaDescricao": descrever(pedido),
+        "buscaDescricao": descrever(_sem_desconhecidas(resultado)),
         "produtosMostrados": [{"id": c["produtoId"], "nome": c["nome"]} for c in cards],
         # Busca nova: a peça em foco só continua se for a única encontrada
         "produtoEmFoco": {"id": cards[0]["produtoId"], "nome": cards[0]["nome"]} if len(cards) == 1 else None,
@@ -170,7 +187,7 @@ def buscar_produtos(db: Session, ctx: Contexto, entrada: BuscarProdutos) -> Resu
         memoria["lojaEmFoco"] = loja.id
         memoria["lojaEmFocoNome"] = loja.nome
     dados = {
-        "busca": descrever(pedido),
+        "busca": descrever(_sem_desconhecidas(resultado)),
         "loja": loja.nome if loja else None,
         "encontrados": resultado.total,
         "pecas": [

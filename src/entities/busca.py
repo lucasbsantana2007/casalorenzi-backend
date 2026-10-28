@@ -143,6 +143,9 @@ _MARCAS = {"vulto": "VULTO", "lorenzi": "LORENZI"}
 _GENEROS = {
     **{p: "Masculino" for p in ("masculino", "masculina", "masculinos", "masculinas", "homem", "homens", "masc")},
     **{p: "Feminino" for p in ("feminino", "feminina", "femininos", "femininas", "mulher", "mulheres", "fem")},
+    # "Presente pro meu pai", "para a minha esposa": quem vai usar a peça
+    **{p: "Masculino" for p in ("pai", "marido", "namorado", "filho", "irmao", "tio", "sogro", "padrinho", "noivo")},
+    **{p: "Feminino" for p in ("mae", "esposa", "namorada", "filha", "irma", "tia", "sogra", "madrinha", "noiva")},
 }
 PALAVRAS_VAZIAS = frozenset(
     """a o as os um uma uns umas de do da dos das no na nos nas em e ou com sem para pra pro por que
@@ -431,7 +434,7 @@ def descrever(pedido: PedidoBusca) -> str:
         partes.append(" ou ".join(ROTULO_TIPO.get(t, t) for t in pedido.tipos))
     if pedido.termos:
         partes.append(" ".join(pedido.termos))
-    texto = " ".join(partes) or "peças"
+    texto = " ".join(partes) or {"Masculino": "peças masculinas", "Feminino": "peças femininas"}.get(pedido.genero, "peças")
     if pedido.cor:
         texto += f" na cor {_COR_FEMININA.get(pedido.cor, rotulo_cor(pedido.cor))}"
     if pedido.tamanho:
