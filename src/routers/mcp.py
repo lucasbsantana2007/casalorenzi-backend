@@ -2,7 +2,8 @@
 
 POST /api/conector-mcp: o endpoint MCP (Streamable HTTP, respostas em JSON, sem sessão). Autenticação pelo token pessoal
 (Authorization: Bearer clmcp_...), não pelo login do painel. GET e DELETE: 405 (não há stream nem sessão).
-/api/mcp/tokens: cada membro da equipe cria, vê e revoga os seus.
+/api/mcp/tokens: cada Administrador cria, vê e revoga os seus. O MCP é a cúpula de informação da liderança
+(decisão 109): Lojista e Operador usam o copiloto só no painel.
 
 Antivírus que inspecionam tráfego MCP (visto com o Avast, em 28/10/2026) reescrevem as respostas com
 Content-Length das requisições com o cabeçalho MCP-Protocol-Version ou em endereços terminados em /mcp ou /sse:
@@ -32,7 +33,7 @@ from src.use_cases.assistente.servidor_mcp import ERRO_JSON, Resposta
 
 log = logging.getLogger(__name__)
 router = APIRouter(tags=["MCP (copiloto em apps de IA)"])
-acesso = exigir_modulo("inteligencia")
+acesso = exigir_modulo("administracao")  # só a liderança (decisão 109)
 
 # Corpo maior que isso não é uma chamada de ferramenta do copiloto
 TAMANHO_MAXIMO = 64 * 1024

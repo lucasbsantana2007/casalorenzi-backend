@@ -1,9 +1,10 @@
-"""Tokens pessoais do servidor MCP (decisão 106): cada membro da equipe cria os seus no painel (Inteligência >
-Conectar ao Claude), cola no app que vai usar (Claude Code, Claude Desktop, n8n) e revoga quando quiser.
+"""Tokens pessoais do servidor MCP (decisões 106 e 109): cada Administrador (a liderança) cria os seus no painel
+(Inteligência > Conectar ao Claude), cola no app que vai usar (Claude Code, Claude Desktop, n8n) e revoga quando
+quiser.
 
 O token em si aparece uma vez, na criação; o banco guarda só o sha256. Ele não carrega permissão nenhuma: a
 cada chamada, o servidor lê o dono e usa o papel, a marca e a conta ativa dele naquele momento. Quem for
-desativado ou perder o acesso à Inteligência perde o MCP na hora, sem precisar revogar.
+desativado ou deixar de ser Administrador perde o MCP na hora, sem precisar revogar.
 """
 
 import hashlib
@@ -97,14 +98,14 @@ def revogar(db: Session, usuario: m.Usuario, token_id: int) -> m.TokenMcp:
 
 
 def autenticar(db: Session, texto: str | None) -> m.TokenMcp | None:
-    """Token válido de alguém da equipe que ainda pode usar a Inteligência; senão None (o servidor responde 401)."""
+    """Token válido de um Administrador ativo; senão None (o servidor responde 401)."""
     if not texto or not texto.startswith(PREFIXO) or len(texto) > 100:
         return None
     token = repo.por_hash(db, _hash(texto))
     if token is None or situacao(token) != ATIVO:
         return None
     usuario = token.usuario
-    if not usuario.ativo or usuario.papel not in ACESSO["inteligencia"]:
+    if not usuario.ativo or usuario.papel not in ACESSO["administracao"]:
         return None
     momento = agora()
     if token.ultimo_uso_em is None or momento - token.ultimo_uso_em >= _INTERVALO_ULTIMO_USO:
