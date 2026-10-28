@@ -28,6 +28,7 @@ from src.routers import (
     estoque,
     financeiro,
     frete,
+    mcp,
     pagamentos,
     pedidos,
     produtos,
@@ -87,6 +88,7 @@ for modulo in (
     assistente,
     copiloto,
     alertas,
+    mcp,
 ):
     api.include_router(modulo.router)
 
