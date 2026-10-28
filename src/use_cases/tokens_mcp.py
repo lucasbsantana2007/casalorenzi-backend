@@ -1,11 +1,11 @@
-"""Tokens pessoais do servidor MCP (decisões 106, 109 e 110): só o Administrador do grupo (o que vê as duas
-marcas; hoje, a Helena) cria os seus no painel
+"""Tokens pessoais do servidor MCP (decisões 106 e 115): cada pessoa da equipe com acesso ao Assistente IA cria
+os seus no painel
 (Inteligência > Conectar ao Claude), cola no app que vai usar (Claude Code, Claude Desktop, n8n) e revoga quando
 quiser.
 
 O token em si aparece uma vez, na criação; o banco guarda só o sha256. Ele não carrega permissão nenhuma: a
 cada chamada, o servidor lê o dono e usa o papel, a marca e a conta ativa dele naquele momento. Quem for
-desativado ou deixar de ser Administrador do grupo perde o MCP na hora, sem precisar revogar.
+desativado perde o MCP na hora, sem precisar revogar; quem muda de papel ou de marca passa a ver o do novo papel.
 """
 
 import hashlib
@@ -17,8 +17,7 @@ from sqlalchemy.orm import Session
 
 from src import models as m
 from src.config import settings
-from src.entities.marca import GRUPO
-from src.entities.papeis import ACESSO
+from src.entities.papeis import pode_acessar
 from src.repositories import token_mcp_repository as repo
 from src.use_cases.assistente.ferramentas import Execucao
 from src.utils.datas import agora, ms
@@ -100,12 +99,13 @@ def revogar(db: Session, usuario: m.Usuario, token_id: int) -> m.TokenMcp:
 
 
 def pode_usar(usuario: m.Usuario) -> bool:
-    """O MCP é do Administrador do grupo (decisão 110): papel Administrador e as duas marcas, com a conta ativa."""
-    return bool(usuario.ativo) and usuario.papel in ACESSO["administracao"] and usuario.marca == GRUPO
+    """O MCP é de toda a equipe com acesso ao Assistente IA, com a conta ativa (decisão 115, que substitui a 110).
+    O que cada um vê não sai daqui: cada consulta confere o papel e a marca do dono, como no copiloto do painel."""
+    return bool(usuario.ativo) and pode_acessar(usuario.papel, "inteligencia")
 
 
 def autenticar(db: Session, texto: str | None) -> m.TokenMcp | None:
-    """Token válido de um Administrador do grupo ativo; senão None (o servidor responde 401)."""
+    """Token válido de alguém da equipe ativo e com acesso ao Assistente IA; senão None (o servidor responde 401)."""
     if not texto or not texto.startswith(PREFIXO) or len(texto) > 100:
         return None
     token = repo.por_hash(db, _hash(texto))
