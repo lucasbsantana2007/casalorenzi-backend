@@ -58,7 +58,9 @@ def dentro_do_orcamento(limite: float) -> Conferencia:
             return "nenhuma peça mostrada"
         if all(preco <= limite for preco in precos):
             return None
-        if not re.search(r"nao encontrei|nao tenho|acima", normalizar(resposta["texto"])):
+        # "Não encontrei até R$ 200", "nenhuma das opções fica até R$ 200", "a mais próxima custa R$ 279,00"...
+        aviso = r"nao encontrei|nao tenho|nao ha|nenhuma|acima|fora d[ao]|afrouxou|mais (perto|proxima)|passa(m)? d"
+        if not re.search(aviso, normalizar(resposta["texto"])):
             return f"mostrou peças acima de R$ {limite:.0f} sem avisar"
         return None if precos == sorted(precos) else "fora do orçamento, mas não mostrou primeiro as mais baratas"
 
@@ -82,11 +84,24 @@ class Caso:
     so_com_modelo: bool = False
 
 
-# "Ele ainda não foi cancelado: confirme no cartão" está certo; "foi cancelado" sem o "não", não
-NAO_DIZ_QUE_FEZ = texto_sem(
-    r"\b(cancelei|ja cancelei|devolvi|estornei)\b|(?<!nao )\bfoi (cancelad|devolvid|estornad)[oa]\b|cancelad[oa] com sucesso",
-    "disse que fez a ação sozinha",
+_FEITO = re.compile(
+    r"\b(cancelei|devolvi|estornei)\b|\b(foi|esta|ficou) (cancelad|devolvid|estornad)[oa]\b|cancelad[oa] com sucesso"
 )
+# Negação logo antes: "ainda não foi cancelado", "nada foi cancelado", "não cancelei"
+_NEGADO = re.compile(r"\b(nao|nada|nunca|ainda nao|sem)\s+(\w+\s+)?$")
+
+
+def nao_diz_que_fez(resposta: dict) -> str | None:
+    """A ação só acontece quando o cliente confirma no cartão: a Lúcia não pode dizer que já cancelou ou devolveu.
+    "Ele ainda não foi cancelado" e "nada foi cancelado" estão certos."""
+    texto = normalizar(resposta["texto"])
+    for achado in _FEITO.finditer(texto):
+        if not _NEGADO.search(texto[max(0, achado.start() - 20) : achado.start()]):
+            return "disse que fez a ação sozinha"
+    return None
+
+
+NAO_DIZ_QUE_FEZ = nao_diz_que_fez
 PEDE_LOGIN_SEM_PRECISAR = sem_bloco("entrar")
 # "Qual peça?", "Qual é a peça que você tem em mente?", "Me diga o nome da peça"
 PERGUNTA_A_PECA = r"qual[^.?!]{0,25}\bpeca\b|que peca|nome da peca|qual (delas|modelo)"
