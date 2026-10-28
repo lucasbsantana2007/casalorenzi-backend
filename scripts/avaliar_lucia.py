@@ -103,12 +103,17 @@ def main() -> None:
     Path(args.saida).write_text(texto, encoding="utf-8")
     acertos = sum(1 for linha in linhas if linha["ok"])
     custo = sum(linha["custo"] for linha in linhas)
-    print(f"\nPlacar: {acertos} de {len(linhas)}. Custo: US$ {custo:.4f}. Relatório: {args.saida}")
+    print(f"\nPlacar: {acertos} de {len(linhas)}. Custo: US$ {_num(custo, 4)}. Relatório: {args.saida}")
 
 
 def _celula(texto: str, limite: int = 220) -> str:
     texto = " ".join((texto or "").split()).replace("|", "/")
     return texto if len(texto) <= limite else texto[: limite - 1] + "…"
+
+
+def _num(valor: float, casas: int) -> str:
+    """Com vírgula, como no resto da documentação: 0,0138."""
+    return f"{valor:.{casas}f}".replace(".", ",")
 
 
 def relatorio(linhas: list[dict], modelo: str) -> str:
@@ -127,9 +132,10 @@ def relatorio(linhas: list[dict], modelo: str) -> str:
         "(seed de demonstração). Os casos e o que cada resposta precisa ter estão em `tests/bateria_lucia.py` (decisão 105); "
         "a mesma bateria roda sem o Claude no pytest (`tests/test_bateria_lucia.py`).",
         "",
-        f"**Placar: {acertos} de {len(linhas)}.** Custo medido: US$ {custo:.4f} "
-        f"(US$ {custo / max(1, len(linhas)):.5f} por caso). Tempo por caso: médio {sum(tempos) / max(1, len(tempos)):.1f} s, "
-        f"90% até {p90:.1f} s (inclui as mensagens de antes da pergunta, quando o caso tem).",
+        f"**Placar: {acertos} de {len(linhas)}.** Custo medido: US$ {_num(custo, 4)} "
+        f"(US$ {_num(custo / max(1, len(linhas)), 5)} por caso). Tempo por caso: médio "
+        f"{_num(sum(tempos) / max(1, len(tempos)), 1)} s, 90% até {_num(p90, 1)} s (inclui as mensagens de antes da "
+        "pergunta, quando o caso tem).",
         "",
         f"Verificador de números (decisão 101) nas respostas do modelo: {verificacao['CONFERIDA']} conferidas de primeira, "
         f"{verificacao['REESCRITA']} refeitas pelo modelo e {verificacao['SUBSTITUIDA']} trocadas pelo texto das consultas.",
@@ -145,7 +151,7 @@ def relatorio(linhas: list[dict], modelo: str) -> str:
             numeros += f" (sem fonte: {', '.join(linha['semFonte'])})"
         partes.append(
             f"| {caso.numero} | {caso.assunto} | {_celula(caso.pergunta, 80)} | {resultado} | {linha['modo']} | {numeros} | "
-            f"{linha['segundos']:.1f} | {_celula(linha['texto'])} |"
+            f"{_num(linha['segundos'], 1)} | {_celula(linha['texto'])} |"
         )
     falhas = [linha for linha in linhas if not linha["ok"]]
     if falhas:
