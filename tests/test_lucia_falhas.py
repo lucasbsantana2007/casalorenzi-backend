@@ -3,6 +3,7 @@ responder, o cliente diz que não serviu ou repete a pergunta), ela mesma oferec
 
 from src.integrations import ia
 from src.use_cases.assistente import escalonamento
+from src.use_cases.assistente.orquestrador import Rodada
 from tests.ia_falsa import ProvedorFalso, texto
 from tests.util_assistente import abrir_site, blocos, diga, entrar, sql
 
@@ -54,6 +55,20 @@ def test_outra_pergunta_parecida_nao_e_repeticao():
     assert not escalonamento.repetiu("tem camisa azul M?", "tem camisa azul G?")
     assert not escalonamento.repetiu("sim", "sim")
     assert not escalonamento.repetiu("camisa azul", "calça preta")
+
+
+def test_frases_do_modelo_que_contam_como_falha():
+    # Frases que o Claude escreveu de verdade na avaliação (scripts/avaliar_lucia.py), mais as variações próximas
+    for frase in [
+        "Desculpe, não entendi. Pode reformular a pergunta?",
+        "Desculpe, continuo sem entender o que você quer dizer. Você pode me contar em outras palavras o que precisa?",
+        "Sua mensagem parece incompleta. Pode explicar melhor?",
+        "Não consegui responder agora.",
+        "Não tenho essa informação no cadastro da loja.",
+    ]:
+        assert escalonamento.lucia_falhou(Rodada(frase)), frase
+    for frase in ["Encontrei 3 camisas azuis. Qual tamanho você procura?", "Posso ajudar com mais alguma coisa?"]:
+        assert not escalonamento.lucia_falhou(Rodada(frase)), frase
 
 
 def test_modelo_que_nao_entende_e_cliente_frustrado(client):

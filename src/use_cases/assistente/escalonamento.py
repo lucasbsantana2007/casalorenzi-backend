@@ -30,9 +30,12 @@ FRUSTRACAO = re.compile(
     r"nao adianta|ja (te )?(falei|disse|expliquei|perguntei)|de novo isso|continua errad[oa]|(esta|ta) errad[oa]|"
     r"resposta errada|nada a ver|inutil|robo burro|que saco)\b"
 )
-# A Lúcia dizendo, com as palavras do modelo, que não conseguiu
+# A Lúcia dizendo, com as palavras do modelo, que não conseguiu. O modelo varia a frase ("continuo sem entender",
+# "me conta em outras palavras"): cada variação vista na avaliação com o Claude entra aqui e no teste
 NAO_CONSEGUIU = re.compile(
-    r"\b(nao entendi|nao consegui entender|nao ficou claro|pode reformular|poderia reformular|pode explicar melhor|"
+    r"\b(nao entendi|nao consegui entender|(continuo |ainda |fiquei )?sem entender|nao (estou|to) entendendo|"
+    r"nao compreendi|nao ficou claro|nao reconheci|(pode|poderia|consegue) (reformular|reescrever|explicar melhor)|"
+    r"em outras palavras|mensagem (parece |ficou |veio )?(incompleta|confusa|cortada)|"
     r"nao consegui (responder|confirmar|consultar)|nao tenho (essa|esta) informacao|"
     r"nao tenho como (saber|ver|consultar|responder))\b"
 )
