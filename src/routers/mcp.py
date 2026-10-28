@@ -3,8 +3,8 @@
 POST /api/conector-mcp: o endpoint MCP (Streamable HTTP, respostas em JSON, sem sessão). Autenticação pelo token pessoal
 (Authorization: Bearer clmcp_...) ou pelo acesso do login OAuth do claude.ai (clmcpa_..., decisão 114), não pelo
 login do painel. GET e DELETE: 405 (não há stream nem sessão).
-/api/mcp/tokens: o Administrador do grupo cria, vê e revoga os seus. O MCP é a cúpula de informação da
-liderança (decisões 109 e 110): só quem vê as duas marcas; os outros usam o copiloto no painel.
+/api/mcp/tokens: cada pessoa da equipe cria, vê e revoga os seus (decisão 115). Cada consulta vale o que o papel e a
+marca do dono permitem, como no copiloto do painel: o lojista não vê faturamento, quem é de uma marca não vê a outra.
 
 Antivírus que inspecionam tráfego MCP (visto com o Avast, em 28/10/2026) reescrevem as respostas com
 Content-Length das requisições com o cabeçalho MCP-Protocol-Version ou em endereços terminados em /mcp ou /sse:
@@ -39,9 +39,9 @@ router = APIRouter(tags=["MCP (copiloto em apps de IA)"])
 
 
 def acesso(usuario: m.Usuario = Depends(usuario_atual)) -> m.Usuario:
-    """Só o Administrador do grupo (decisão 110); os outros perfis da equipe recebem 403."""
+    """Toda a equipe com acesso ao Assistente IA (decisão 115). O que cada um consulta depende do papel e da marca."""
     if not tokens_mcp.pode_usar(usuario):
-        raise SemPermissao("O acesso pelo Claude é exclusivo do Administrador do grupo.")
+        raise SemPermissao("O seu perfil não tem acesso ao Assistente IA.")
     return usuario
 
 
