@@ -26,6 +26,8 @@ class MensagemDoWhatsApp(Entrada):
     id_mensagem: str | None = Field(None, max_length=256)
     # O nome do perfil do WhatsApp, para o chamado de atendimento
     nome: str | None = Field(None, max_length=120)
+    # Botão tocado (o id do button_reply da Meta): LUCIA, EQUIPE ou MENU (decisão 114)
+    botao: str | None = Field(None, max_length=40)
 
 
 def _canal_liberado(x_canal_segredo: str | None = Header(default=None)) -> None:
@@ -37,9 +39,11 @@ def _canal_liberado(x_canal_segredo: str | None = Header(default=None)) -> None:
 
 @router.post("/whatsapp/mensagens", dependencies=[Depends(_canal_liberado)])
 def mensagem_do_whatsapp(dados: MensagemDoWhatsApp, db: Session = Depends(get_db)):
-    """Responde a uma mensagem do WhatsApp com a Lúcia. Devolve { responder, texto, conversaId, protocolo }:
-    com responder=false (mensagem repetida), o n8n não manda nada."""
+    """Responde a uma mensagem do WhatsApp. Devolve { responder, texto, mensagem, conversaId, protocolo }: "mensagem"
+    é o corpo pronto para a Meta (texto ou botões); com responder=false (mensagem repetida), o n8n não manda nada."""
     telefone = canal_whatsapp.telefone_valido(dados.telefone)
     if telefone is None:
         raise DadosInvalidos("Telefone inválido: use só os números, com DDI e DDD.")
-    return canal_whatsapp.responder(db, telefone=telefone, texto=dados.texto, id_mensagem=dados.id_mensagem, nome=dados.nome)
+    return canal_whatsapp.responder(
+        db, telefone=telefone, texto=dados.texto, id_mensagem=dados.id_mensagem, nome=dados.nome, botao=dados.botao
+    )

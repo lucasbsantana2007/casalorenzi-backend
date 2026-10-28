@@ -1,4 +1,4 @@
-# A Lúcia no WhatsApp (decisão 108)
+# A Lúcia no WhatsApp (decisões 108 e 114)
 
 O n8n recebe e entrega as mensagens; quem responde é a API, com o mesmo assistente do site.
 
@@ -20,8 +20,22 @@ Corpo (JSON):
 | `idMensagem` | O id da mensagem na Meta (`wamid...`) |
 | `nome` | O nome do perfil do WhatsApp (vai para o chamado de atendimento) |
 
-Resposta: `{ "responder": true, "texto": "...", "conversaId": "...", "protocolo": null }`. Com `responder: false`
-(a Meta entregou a mesma mensagem de novo), o n8n não envia nada.
+| `botao` | O id do botão tocado (`interactive.button_reply.id` da Meta): `LUCIA`, `EQUIPE` ou `MENU` |
+
+Resposta: `{ "responder": true, "texto": "...", "mensagem": {...}, "conversaId": "...", "protocolo": null }`.
+`mensagem` é o corpo pronto para `POST /{phone-number-id}/messages` da Graph API: texto ou botões, já com o
+destinatário. Com `responder: false` (a Meta entregou a mesma mensagem de novo), o n8n não envia nada.
+
+### O menu (decisão 114)
+
+1. **Primeira mensagem:** cumprimento pelo horário com o primeiro nome do perfil ("Boa tarde, Ana! Aqui é a
+   Lúcia...") e dois botões: **Respostas rápidas** e **Falar com a equipe**. Responder 1 ou 2 também vale. Se a
+   primeira mensagem era uma pergunta, ela fica guardada e é respondida quando o cliente escolher a Lúcia.
+2. **Respostas rápidas:** a Lúcia responde como no site, e toda resposta traz o botão **Falar com a equipe**
+   (ou, se o texto passar de 1.024 caracteres, a dica "responda 2").
+3. **Equipe:** o chamado abre na hora, com o resumo e o telefone. As mensagens seguintes entram no mesmo
+   chamado, e o cliente recebe a confirmação com o protocolo e o botão **Respostas rápidas** para voltar.
+4. **"menu"** mostra as opções de novo. Chamado encerrado: a próxima mensagem recomeça pelo menu.
 
 Como a conversa funciona:
 - **Uma conversa por telefone**, enquanto estiver ativa. Depois de 24 h sem mensagem, começa outra, como no site.
@@ -54,7 +68,7 @@ Como a conversa funciona:
 | 2 | **IF** | `{{ Array.isArray($json.messages) && $json.messages.length > 0 }}` com o operador **Boolean > is true** e **Convert types where required** ligado. A Meta também manda avisos de entrega e leitura (`statuses`), que param aqui |
 | 3 | **HTTP Request** | `POST https://casalorenzi-api.onrender.com/api/canais/whatsapp/mensagens`; credencial Header Auth (`X-Canal-Segredo`); **Send Body** ligado, JSON com os campos abaixo, cada valor em modo Expression; tempo máximo de 60 s; em *Settings*, **Retry On Fail** com 5 tentativas a cada 5 s (a API do plano grátis do Render dorme e responde 503 enquanto acorda) |
 | 4 | **IF** | `{{ $json.responder }}` com **Boolean > is true** |
-| 5 | **WhatsApp** (*Send message*) | *Phone number ID* do número; destinatário `{{ $('WhatsApp Trigger').item.json.messages[0].from }}`; texto `{{ $json.texto }}` |
+| 5 | **HTTP Request** (envio) | `POST https://graph.facebook.com/v25.0/{phone-number-id}/messages`; credencial Header Auth com *Name* `Authorization` e *Value* `Bearer {token permanente}`; *Send Body* ligado, *Body Content Type* JSON, *Specify Body* **Using JSON**, com `{{ JSON.stringify($json.mensagem) }}` |
 
 Corpo do nó 3:
 
@@ -63,8 +77,12 @@ Corpo do nó 3:
   "telefone": "{{ $json.messages[0].from }}",
   "texto": "{{ $json.messages[0].text ? $json.messages[0].text.body : '' }}",
   "idMensagem": "{{ $json.messages[0].id }}",
-  "nome": "{{ $json.contacts[0].profile.name }}"
+  "nome": "{{ $json.contacts[0].profile.name }}",
+  "botao": "{{ $json.messages[0].interactive ? $json.messages[0].interactive.button_reply.id : '' }}"
 }
+
+O nó **WhatsApp > Send message** não manda botões; por isso o envio é o HTTP Request do passo 5, que publica a
+`mensagem` que a API montou.
 ```
 
 Conferido em 28/10/2026: o WhatsApp Trigger entrega `messages` e `contacts` no primeiro nível do item (os caminhos

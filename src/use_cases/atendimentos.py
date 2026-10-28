@@ -261,6 +261,17 @@ def responder_como_cliente(
     return atendimento
 
 
+def mensagem_do_whatsapp(db: Session, atendimento: m.Atendimento, conteudo: str) -> m.Atendimento:
+    """Mensagem que o cliente mandou pelo WhatsApp depois de pedir a equipe (decisão 114): entra no mesmo chamado,
+    para a equipe ler no painel. O telefone já está no chamado; sem login, não há conta a conferir."""
+    momento = agora()
+    _nova_mensagem(db, atendimento, autor_tipo="CLIENTE", autor_id=None, conteudo=conteudo, anexo=None, quando=momento)
+    atendimento.status = status_apos_mensagem(atendimento.status, "CLIENTE")
+    atendimento.atualizado_em = momento
+    sessao.confirmar(db, atendimento)
+    return atendimento
+
+
 def totais_do_cliente(db: Session, cliente_id: int | None) -> tuple[int, int]:
     """(pedidos, atendimentos) do cliente, mostrados no detalhe do atendimento (zero sem cliente identificado)."""
     if cliente_id is None:
