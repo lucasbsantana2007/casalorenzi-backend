@@ -1,4 +1,4 @@
-# A Lúcia no WhatsApp (decisões 108 e 114)
+# A Lúcia no WhatsApp (decisões 108, 114 e 115)
 
 O n8n recebe e entrega as mensagens; quem responde é a API, com o mesmo assistente do site.
 
@@ -37,6 +37,20 @@ destinatário. Com `responder: false` (a Meta entregou a mesma mensagem de novo)
    chamado, e o cliente recebe a confirmação com o protocolo e o botão **Respostas rápidas** para voltar.
 4. **"menu"** mostra as opções de novo. Chamado encerrado: a próxima mensagem recomeça pelo menu.
 
+### Um lugar só para o atendimento humano (decisão 115)
+
+- **Um número:** `WHATSAPP_ATENDIMENTO` no Render é o mesmo número da Meta. O botão "Continuar no WhatsApp" do
+  site abre esse número com o protocolo escrito; a mensagem chega com o protocolo e entra no chamado que já
+  existe ("Recebi o seu protocolo..."), sem abrir outro.
+- **Uma caixa:** a equipe responde no painel, em Atendimento. Em chamado do WhatsApp, a resposta vai para o
+  cliente pelo n8n, assinada "Equipe Casa Lorenzi e Vulto · protocolo ...", com o botão Respostas rápidas.
+  Passadas 24 h da última mensagem do cliente, a Meta não aceita mensagem livre: a resposta não sai e o chamado
+  registra o aviso.
+- **Ciclo de 4 horas** (`WHATSAPP_CICLO_HORAS`): se o cliente fica 4 h sem responder depois da equipe, a
+  automação `encerrar_whatsapp` encerra o chamado e avisa o cliente. Se ele voltar antes de a automação rodar,
+  o chamado é encerrado na hora e a conversa recomeça pelo cumprimento e pelo menu. Se a última mensagem é do
+  cliente, o ciclo não fecha: quem deve resposta é a equipe. Conversa com a Lúcia parada 4 h também recomeça.
+
 Como a conversa funciona:
 - **Uma conversa por telefone**, enquanto estiver ativa. Depois de 24 h sem mensagem, começa outra, como no site.
 - **O número não fica salvo na conversa.** Ela é achada pelo HMAC do telefone, calculado com o segredo do canal.
@@ -54,7 +68,8 @@ Como a conversa funciona:
 
 ## Configuração
 
-1. **Render** (Environment): `CANAL_WHATSAPP_SEGREDO` com um valor longo e aleatório (por exemplo, a saída de
+1. **Render** (Environment): `WHATSAPP_ATENDIMENTO` com o número da Meta (só dígitos, com DDI), `N8N_ENVIO_URL`
+   com a URL do webhook de envio do n8n e `CANAL_WHATSAPP_SEGREDO` com um valor longo e aleatório (por exemplo, a saída de
    `python -c "import secrets; print(secrets.token_urlsafe(32))"`). Opcional: `CANAL_WHATSAPP_MARCA`
    (`LORENZI`, o padrão, ou `VULTO`): a vitrine do número. Nunca no git.
 2. **Meta for Developers:** app do tipo Business com o produto WhatsApp. Anote o *Phone number ID* do número de
@@ -83,6 +98,17 @@ Corpo do nó 3:
 
 O nó **WhatsApp > Send message** não manda botões; por isso o envio é o HTTP Request do passo 5, que publica a
 `mensagem` que a API montou.
+
+### Segundo fluxo: envio da equipe (decisão 115)
+
+A API chama este fluxo quando a equipe responde no painel ou quando o ciclo fecha.
+
+| # | Nó | Configuração |
+| --- | --- | --- |
+| 1 | **Webhook** | *HTTP Method* POST; *Path* `envio-whatsapp`; *Authentication* Header Auth com a mesma credencial do segredo do canal (`X-Canal-Segredo`); *Respond* Immediately |
+| 2 | **HTTP Request** | Igual ao passo 5 do primeiro fluxo (Graph API, credencial `Authorization: Bearer ...`), com o JSON `{{ JSON.stringify($json.body.mensagem) }}` |
+
+Depois de publicar, copie a **Production URL** do Webhook e ponha no Render em `N8N_ENVIO_URL`.
 ```
 
 Conferido em 28/10/2026: o WhatsApp Trigger entrega `messages` e `contacts` no primeiro nível do item (os caminhos
@@ -102,8 +128,6 @@ mensagens rodam a versão anterior.
 
 ## Limitações
 
-- **A equipe responde por fora.** O chamado aparece no painel de Atendimento com o telefone do cliente. A resposta da
-  equipe ainda não volta pelo n8n: a equipe fala com o cliente pelo WhatsApp do atendimento.
 - **Mensagens iniciadas pela empresa** (avisos de pontos, sacola) precisam de modelo aprovado pela Meta; fora da
   janela de 24 h, só elas são permitidas.
 - **No modo regras** (sem chave da API ou com o modelo fora do ar), alguns textos prontos ainda são do site. A API

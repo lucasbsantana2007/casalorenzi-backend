@@ -154,6 +154,7 @@ AUTOMACOES = (
     "aviso_estoque",
     "lembrete_sacola",
     "limpeza_conversas",
+    "encerrar_whatsapp",
 )
 STATUS_EXECUCAO = ("EM_ANDAMENTO", "SUCESSO", "ERRO", "IGNORADA")
 # Execução terminada há menos que isso não roda de novo (dois cliques ou dois agendadores)
