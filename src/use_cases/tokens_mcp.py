@@ -1,10 +1,11 @@
-"""Tokens pessoais do servidor MCP (decisões 106 e 109): cada Administrador (a liderança) cria os seus no painel
+"""Tokens pessoais do servidor MCP (decisões 106, 109 e 110): só o Administrador do grupo (o que vê as duas
+marcas; hoje, a Helena) cria os seus no painel
 (Inteligência > Conectar ao Claude), cola no app que vai usar (Claude Code, Claude Desktop, n8n) e revoga quando
 quiser.
 
 O token em si aparece uma vez, na criação; o banco guarda só o sha256. Ele não carrega permissão nenhuma: a
 cada chamada, o servidor lê o dono e usa o papel, a marca e a conta ativa dele naquele momento. Quem for
-desativado ou deixar de ser Administrador perde o MCP na hora, sem precisar revogar.
+desativado ou deixar de ser Administrador do grupo perde o MCP na hora, sem precisar revogar.
 """
 
 import hashlib
@@ -16,6 +17,7 @@ from sqlalchemy.orm import Session
 
 from src import models as m
 from src.config import settings
+from src.entities.marca import GRUPO
 from src.entities.papeis import ACESSO
 from src.repositories import token_mcp_repository as repo
 from src.use_cases.assistente.ferramentas import Execucao
@@ -97,15 +99,20 @@ def revogar(db: Session, usuario: m.Usuario, token_id: int) -> m.TokenMcp:
     return token
 
 
+def pode_usar(usuario: m.Usuario) -> bool:
+    """O MCP é do Administrador do grupo (decisão 110): papel Administrador e as duas marcas, com a conta ativa."""
+    return bool(usuario.ativo) and usuario.papel in ACESSO["administracao"] and usuario.marca == GRUPO
+
+
 def autenticar(db: Session, texto: str | None) -> m.TokenMcp | None:
-    """Token válido de um Administrador ativo; senão None (o servidor responde 401)."""
+    """Token válido de um Administrador do grupo ativo; senão None (o servidor responde 401)."""
     if not texto or not texto.startswith(PREFIXO) or len(texto) > 100:
         return None
     token = repo.por_hash(db, _hash(texto))
     if token is None or situacao(token) != ATIVO:
         return None
     usuario = token.usuario
-    if not usuario.ativo or usuario.papel not in ACESSO["administracao"]:
+    if not pode_usar(usuario):
         return None
     momento = agora()
     if token.ultimo_uso_em is None or momento - token.ultimo_uso_em >= _INTERVALO_ULTIMO_USO:

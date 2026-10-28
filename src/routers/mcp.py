@@ -2,8 +2,8 @@
 
 POST /api/conector-mcp: o endpoint MCP (Streamable HTTP, respostas em JSON, sem sessão). Autenticação pelo token pessoal
 (Authorization: Bearer clmcp_...), não pelo login do painel. GET e DELETE: 405 (não há stream nem sessão).
-/api/mcp/tokens: cada Administrador cria, vê e revoga os seus. O MCP é a cúpula de informação da liderança
-(decisão 109): Lojista e Operador usam o copiloto só no painel.
+/api/mcp/tokens: o Administrador do grupo cria, vê e revoga os seus. O MCP é a cúpula de informação da
+liderança (decisões 109 e 110): só quem vê as duas marcas; os outros usam o copiloto no painel.
 
 Antivírus que inspecionam tráfego MCP (visto com o Avast, em 28/10/2026) reescrevem as respostas com
 Content-Length das requisições com o cabeçalho MCP-Protocol-Version ou em endereços terminados em /mcp ou /sse:
@@ -25,15 +25,21 @@ from starlette.concurrency import run_in_threadpool
 from src import models as m
 from src.config.settings import CORS_ORIGINS
 from src.database.connection import SessionLocal, get_db
-from src.middlewares.autenticacao import exigir_modulo
+from src.middlewares.autenticacao import usuario_atual
 from src.schemas.comum import Entrada
 from src.use_cases import tokens_mcp
 from src.use_cases.assistente import servidor_mcp
 from src.use_cases.assistente.servidor_mcp import ERRO_JSON, Resposta
+from src.utils.erros import SemPermissao
 
 log = logging.getLogger(__name__)
 router = APIRouter(tags=["MCP (copiloto em apps de IA)"])
-acesso = exigir_modulo("administracao")  # só a liderança (decisão 109)
+def acesso(usuario: m.Usuario = Depends(usuario_atual)) -> m.Usuario:
+    """Só o Administrador do grupo (decisão 110); os outros perfis da equipe recebem 403."""
+    if not tokens_mcp.pode_usar(usuario):
+        raise SemPermissao("O acesso pelo Claude é exclusivo do Administrador do grupo.")
+    return usuario
+
 
 # Corpo maior que isso não é uma chamada de ferramenta do copiloto
 TAMANHO_MAXIMO = 64 * 1024
