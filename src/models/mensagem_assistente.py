@@ -42,11 +42,13 @@ class MensagemAssistente(Base):
     responde_a_id: Mapped[int | None] = mapped_column(ForeignKey("mensagens_assistente.id", ondelete="SET NULL"))
     request_id: Mapped[str | None] = mapped_column(String(32))
     criada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True))
-    # Qualidade da resposta (decisões 98 e 99): o verificador de números (CONFERIDA ou CORRIGIDA), os números
-    # sem fonte e o texto que o modelo tinha escrito quando foi trocado; se a rodada falhou e se a Lúcia passou o
-    # cliente para uma pessoa depois de falhas seguidas. Nulo nas mensagens do usuário e do sistema.
-    auditoria: Mapped[dict | None] = mapped_column(JSON)
-    # Avaliação do cliente (decisão 101): 1 = ajudou, -1 = não ajudou, com um comentário opcional
+    # Qualidade da resposta (decisões 101 e 102): a conferência dos números (CONFERIDA, REESCRITA pelo modelo ou
+    # SUBSTITUIDA pelo texto das ferramentas), os números sem fonte e o texto que o modelo tinha escrito; se a rodada
+    # falhou, o sinal do cliente (frustração, repetição) e se a Lúcia ofereceu a equipe depois de falhas seguidas.
+    # Nulo nas mensagens do usuário e do sistema e nas respostas sem nada a registrar (none_as_null: NULL de verdade,
+    # não o JSON null).
+    auditoria: Mapped[dict | None] = mapped_column(JSON(none_as_null=True))
+    # Avaliação do cliente (decisão 104): 1 = ajudou, -1 = não ajudou, com um comentário opcional
     avaliacao: Mapped[int | None] = mapped_column(SmallInteger)
     avaliacao_comentario: Mapped[str | None] = mapped_column(Text)
     avaliada_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
