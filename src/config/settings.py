@@ -79,6 +79,11 @@ IA_RETENCAO_DIAS = int(os.getenv("IA_RETENCAO_DIAS", "90"))
 # Respostas prontas (sem LLM) para mensagens simples: saudação, agradecimento, pedido de atendente
 IA_RESPOSTAS_DIRETAS = os.getenv("IA_RESPOSTAS_DIRETAS", "true").lower() == "true"
 
+# Servidor MCP do copiloto (decisão 106, docs/mcp.md): validade de cada token pessoal e quantos tokens ativos
+# cada pessoa pode ter ao mesmo tempo
+MCP_TOKEN_VALIDADE_DIAS = int(os.getenv("MCP_TOKEN_VALIDADE_DIAS", "90"))
+MCP_TOKENS_POR_USUARIO = int(os.getenv("MCP_TOKENS_POR_USUARIO", "5"))
+
 # WhatsApp do atendimento, só números com DDI e DDD (5511999999999). Com ele, o assistente do site oferece
 # "Continuar no WhatsApp": abre o chamado com o resumo da conversa e um link wa.me com o protocolo.
 # Vazio: só o chamado pelo site (decisão 81).

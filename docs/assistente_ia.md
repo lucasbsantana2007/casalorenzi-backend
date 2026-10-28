@@ -10,6 +10,8 @@ Dois assistentes integrados à plataforma existente, mais automações operacion
    definição da métrica e a data dos dados.
 3. **Automações**: alertas de estoque baixo, estoque parado, sugestões de transferência e pontos a vencer,
    idempotentes, com log de execução; mais a limpeza das conversas pela política de retenção.
+4. **Copiloto no Claude** (decisão 106): as ferramentas do copiloto no Claude Code, no Claude Desktop ou no n8n,
+   por um servidor MCP com token pessoal, com as mesmas permissões e só leitura. Detalhes em [mcp.md](mcp.md).
 
 Custos e escolha do modelo: [custos_ia.md](custos_ia.md). Roteiro para a banca: [roteiro_demonstracao.md](roteiro_demonstracao.md).
 
@@ -95,6 +97,7 @@ SUBSTITUIDA), `numeros`, `semFonte`, `textoModelo` (o que o modelo tinha escrito
 | `src/use_cases/analises.py` | Análises da operação (copiloto e automações), só leitura |
 | `src/use_cases/automacoes.py`, `src/automacoes/` | Automações e a linha de comando `python -m src.automacoes` |
 | `src/routers/assistente.py`, `copiloto.py`, `alertas.py` | Rotas da API |
+| `src/use_cases/assistente/servidor_mcp.py`, `src/use_cases/tokens_mcp.py`, `src/routers/mcp.py` | Servidor MCP do copiloto e os tokens pessoais (decisão 106, [mcp.md](mcp.md)) |
 | `src/repositories/assistente_repository.py`, `alerta_repository.py`, `analise_repository.py` | Consultas (SQLAlchemy, sempre com parâmetros) |
 | `src/models/conversa_assistente.py` e outros 5 | Tabelas novas (ver "Banco de dados") |
 | `scripts/estimar_custos_ia.py` | Estimativa de custo mensal |
@@ -106,7 +109,7 @@ SUBSTITUIDA), `numeros`, `semFonte`, `textoModelo` (o que o modelo tinha escrito
 | `src/components/assistente/ChatWidget.jsx` | Botão flutuante (vitrine Casa Lorenzi, vitrine Vulto e área do cliente; some no checkout) |
 | `src/components/assistente/PainelChat.jsx`, `BlocosChat.jsx` | Janela do chat (carregada só ao abrir) e os blocos: peças, disponibilidade, lojas, pontos, pedidos, sacola, atendimento |
 | `src/hooks/useAssistente.js` | Conversa no navegador (id + chave), nova conversa ao trocar de conta, reenvio sem duplicar, conversa vencida |
-| `src/pages/admin/InteligenciaPage.jsx` | Página `/inteligencia`: Assistente, Alertas e Uso e custo da IA |
+| `src/pages/admin/InteligenciaPage.jsx` | Página `/inteligencia`: Assistente, Alertas, Conectar ao Claude e Uso e custo da IA |
 | `src/components/copiloto/*` | Indicadores, tabelas, gráficos (recharts, já usado no Financeiro), fonte, alertas e uso |
 | `src/services/assistenteService.js`, `copilotoService.js` | Chamadas à API (a chave do modelo nunca passa pelo navegador) |
 
@@ -269,6 +272,7 @@ botão "Atualizar alertas agora" (Administrador) na aba Alertas. No banco local,
 | `IA_MAX_RODADAS` / `IA_MAX_FERRAMENTAS` | 4 / 6 | Limites por mensagem |
 | `IA_CONVERSA_EXPIRA_HORAS` / `IA_RETENCAO_DIAS` | 24 / 90 | Memória e retenção |
 | `IA_RESPOSTAS_DIRETAS` | true | Mensagens simples sem modelo |
+| `MCP_TOKEN_VALIDADE_DIAS` / `MCP_TOKENS_POR_USUARIO` | 90 / 5 | Tokens do servidor MCP (decisão 106) |
 | `DATABASE_URL_LEITURA` | = `DATABASE_URL` | Usuário só leitura (opcional) |
 | `CONSULTA_TIMEOUT_MS` | 8000 | Tempo máximo de cada consulta das análises |
 | `ALERTA_ESTOQUE_BAIXO_JANELA_DIAS` / `ALERTA_ESTOQUE_PARADO_DIAS` / `ALERTA_PONTOS_DIAS` | 60 / 90 / 30 | Automações |
