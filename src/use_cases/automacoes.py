@@ -6,6 +6,9 @@
 - pontos_a_vencer: pontos Lupe+ que vencem em ALERTA_PONTOS_DIAS dias (números agregados, para a equipe);
 - aviso_pontos: e-mail a cada cliente 30 dias antes de os pontos vencerem (decisão 82; use_cases/avisos_pontos.py).
   Desligado por padrão (AVISO_PONTOS_ENVIAR). Aqui "criados" é o número de avisos enviados;
+- aviso_estoque: e-mail a quem pediu "Avise-me quando chegar" e a peça voltou (decisão 99; use_cases/avisos_cliente.py);
+- lembrete_sacola: lembrete de sacola abandonada, só para quem aceita marketing (decisão 100). Os dois desligados
+  por padrão (AVISO_ESTOQUE_ENVIAR, LEMBRETE_SACOLA_ENVIAR); "criados" é o número de e-mails enviados;
 - limpeza_conversas: apaga as conversas dos assistentes sem atividade além da retenção (IA_RETENCAO_DIAS).
 
 Garantias: uma execução por vez de cada automação (trava do Postgres, vale entre servidores); a mesma situação
@@ -27,7 +30,7 @@ from src.config import settings
 from src.database.connection import SessionLocal
 from src.entities import assistente as regra
 from src.repositories import alerta_repository
-from src.use_cases import analises, avisos_pontos
+from src.use_cases import analises, avisos_cliente, avisos_pontos
 from src.use_cases.assistente import conversas
 from src.use_cases.assistente.formatacao import brl, cru, numero
 from src.utils.datas import agora, ms
@@ -260,6 +263,16 @@ def _aviso_pontos(db: Session) -> Placar:
     return Placar(criados=resultado.enviados, detalhe=resultado.detalhe)
 
 
+def _aviso_estoque(db: Session) -> Placar:
+    resultado = avisos_cliente.enviar_avisos_estoque(db)
+    return Placar(criados=resultado.enviados, detalhe=resultado.detalhe)
+
+
+def _lembrete_sacola(db: Session) -> Placar:
+    resultado = avisos_cliente.enviar_lembretes_sacola(db)
+    return Placar(criados=resultado.enviados, detalhe=resultado.detalhe)
+
+
 def _limpeza(db: Session) -> Placar:
     apagadas = conversas.apagar_vencidas(db)
     return Placar(resolvidos=0, detalhe=[f"{apagadas} conversa(s) apagada(s) pela retenção de {settings.IA_RETENCAO_DIAS} dias"])
@@ -271,6 +284,8 @@ AUTOMACOES: dict[str, Callable[[Session], Placar]] = {
     "sugestoes_transferencia": _sugestoes_transferencia,
     "pontos_a_vencer": _pontos_a_vencer,
     "aviso_pontos": _aviso_pontos,
+    "aviso_estoque": _aviso_estoque,
+    "lembrete_sacola": _lembrete_sacola,
     "limpeza_conversas": _limpeza,
 }
 DESCRICOES = {
@@ -279,6 +294,8 @@ DESCRICOES = {
     "sugestoes_transferencia": "Sobra num local e falta com demanda em outro (só sugestão)",
     "pontos_a_vencer": "Pontos Lupe+ que vencem em breve (números agregados)",
     "aviso_pontos": "E-mail aos clientes 30 dias antes de os pontos vencerem (desligado por padrão)",
+    "aviso_estoque": "E-mail a quem pediu \"Avise-me\" quando a peça volta ao estoque (desligado por padrão)",
+    "lembrete_sacola": "Lembrete de sacola parada há 24 h, para quem aceita e-mails (desligado por padrão)",
     "limpeza_conversas": "Apaga conversas dos assistentes além da retenção",
 }
 

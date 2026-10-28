@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from src import models as m
 from src.entities.cliente import SENHA_MINIMA, email_valido, normalizar_email
 from src.repositories import cliente_repository, sessao, usuario_repository
+from src.use_cases import avisos_cliente
 from src.utils.datas import agora
 from src.utils.erros import Conflito, DadosInvalidos
 from src.utils.seguranca import confere_hash, gerar_hash
@@ -80,4 +81,5 @@ def excluir(db: Session, cliente: m.Cliente, *, senha: str) -> None:
     cliente.senha_hash = None
     cliente.loja_preferida_id = None
     cliente.excluido_em = momento
+    avisos_cliente.apagar_do_cliente(db, cliente.id)
     sessao.confirmar(db)
