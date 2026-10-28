@@ -14,6 +14,7 @@ from src.entities.periodo import MESES
 from src.repositories import cadastro_repository
 from src.use_cases.assistente.ferramentas import Contexto
 from src.use_cases.assistente.orquestrador import Rodada
+from src.use_cases.assistente.regras_cliente import so_cortesia
 from src.utils.datas import hoje
 from src.utils.texto import normalizar
 
@@ -165,7 +166,8 @@ def direta(texto: str, ctx: Contexto, executar) -> Rodada | None:
             "Posso consultar vendas e faturamento, produtos mais vendidos, cancelamentos, estoque baixo e parado, concentração de estoque, avarias, sugestões de transferência, alertas e os números do Lupe+. Escolha uma pergunta ou escreva a sua.",
             [{"tipo": "sugestoes", "itens": SUGESTOES[:6]}],
         )
-    if re.match(r"^(obrigad[oa]|valeu|vlw|perfeito|otimo|show)\b", n) and len(n.split()) <= 4:
+    # Só agradecimento: "perfeito, e por loja?" traz pergunta e vai para o modelo
+    if so_cortesia(texto) is not None:
         return Rodada("Por nada! Se quiser, aprofundo por loja, marca ou período.")
     return None
 
