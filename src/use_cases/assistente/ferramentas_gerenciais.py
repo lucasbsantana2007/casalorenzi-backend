@@ -10,11 +10,13 @@ reaproveita o financeiro, o estoque e o Lupe+ oficiais. As consultas rodam numa 
 from typing import Literal
 
 from pydantic import Field
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from src import models as m
 from src.entities.assistente import DEFINICOES, MODULO_DO_ALERTA
 from src.entities.marca import na_marca
-from src.entities.papeis import pode_acessar
+from src.entities.papeis import loja_do_escopo, pode_acessar
 from src.entities.pedido import CANAIS
 from src.entities.periodo import PERIODO_PADRAO, PERIODOS, Periodo, resolver
 from src.repositories import alerta_repository, analise_repository, cadastro_repository
@@ -30,7 +32,7 @@ from src.use_cases.assistente.formatacao import (
     numero,
     pct,
 )
-from src.utils.datas import hoje, ler_data
+from src.utils.datas import fim_do_dia, hoje, inicio_do_dia, ler_data
 
 NomePeriodo = Literal[PERIODOS]  # type: ignore[valid-type]
 Marca = Literal["LORENZI", "VULTO"]
@@ -901,6 +903,220 @@ def consultar_alertas(db: Session, ctx: Contexto, entrada: ConsultarAlertas) -> 
     return Resultado(dados=dados, blocos=blocos, texto=texto)
 
 
+# ---------- Pedidos e atendimentos (decisão 118) ----------
+
+
+class Pedidos(ComPeriodo, ComEscopo):
+    status: Literal["PROCESSANDO", "ENVIADO", "ENTREGUE", "CANCELADO"] | None = Field(
+        None, description="Só um status. PROCESSANDO (em separação) traz os pendentes de qualquer data."
+    )
+    canal: Literal["Loja física", "E-commerce", "App"] | None = None
+    limite: int = Field(15, ge=1, le=30)
+
+
+def _loja_da_pessoa(db: Session, ctx: Contexto) -> int | None:
+    """Lojista e Operador: a própria loja (como na tela Pedidos); Administrador: None (a rede)."""
+    usuario = db.get(m.Usuario, ctx.usuario_id) if ctx.usuario_id else None
+    return loja_do_escopo(ctx.papel or "", usuario.loja_id if usuario else None)
+
+
+def consultar_pedidos(db: Session, ctx: Contexto, entrada: Pedidos) -> Resultado:
+    periodo = _periodo(entrada)
+    marca, lojas, nome_loja = _escopo(db, ctx, entrada.marca, entrada.loja_id)
+    propria = _loja_da_pessoa(db, ctx)
+    if propria is not None:
+        if lojas and lojas != [propria]:
+            raise FalhaFerramenta("SEM_PERMISSAO: o seu perfil vê só os pedidos da sua loja.")
+        loja = cadastro_repository.loja(db, propria)
+        lojas, nome_loja = [propria], loja.nome if loja else None
+    filtros_sql = []
+    if marca:
+        filtros_sql.append(m.Pedido.loja_id.in_(select(m.Loja.id).where(m.Loja.marca == marca)))
+    if lojas:
+        filtros_sql.append(m.Pedido.loja_id.in_(lojas))
+    if entrada.canal:
+        filtros_sql.append(m.Pedido.canal == entrada.canal)
+    no_periodo = [m.Pedido.criado_em >= inicio_do_dia(periodo.inicio), m.Pedido.criado_em <= fim_do_dia(periodo.fim)]
+    por_status = dict(
+        db.execute(select(m.Pedido.status, func.count()).where(*filtros_sql, *no_periodo).group_by(m.Pedido.status)).all()
+    )
+    pendentes = db.scalar(select(func.count()).where(*filtros_sql, m.Pedido.status == "PROCESSANDO")) or 0
+    lista = select(m.Pedido).where(*filtros_sql)
+    if entrada.status == "PROCESSANDO":
+        lista = lista.where(m.Pedido.status == "PROCESSANDO")
+    else:
+        lista = lista.where(*no_periodo)
+        if entrada.status:
+            lista = lista.where(m.Pedido.status == entrada.status)
+    pedidos = db.scalars(lista.order_by(m.Pedido.criado_em.desc(), m.Pedido.id.desc()).limit(entrada.limite)).unique().all()
+    linhas = [
+        {
+            "numero": p.numero,
+            "data": data(p.criado_em),
+            "status": p.status.capitalize().replace("_", " "),
+            "canal": p.canal,
+            "loja": p.loja.nome if p.loja else None,
+            "total": float(p.total),
+            "rastreio": p.codigo_rastreio or "",
+        }
+        for p in pedidos
+    ]
+    filtros = _filtros(marca, nome_loja, entrada.canal)
+    total = sum(por_status.values())
+    dados = {
+        "periodo": periodo.descricao,
+        "filtros": filtros,
+        "pedidosNoPeriodo": numero(total),
+        "porStatus": {
+            status: numero(por_status.get(status, 0)) for status in ("PROCESSANDO", "ENVIADO", "ENTREGUE", "CANCELADO")
+        },
+        "emSeparacaoDeQualquerData": numero(pendentes),
+        "pedidos": [{**linha, "total": brl(linha["total"])} for linha in linhas],
+        "definicao": DEFINICOES["pedidos"],
+    }
+    blocos = [
+        bloco_indicadores(
+            [
+                ("Pedidos no período", total, "numero"),
+                ("Em separação (qualquer data)", pendentes, "numero"),
+                ("Enviados", por_status.get("ENVIADO", 0), "numero"),
+                ("Entregues", por_status.get("ENTREGUE", 0), "numero"),
+                ("Cancelados", por_status.get("CANCELADO", 0), "numero"),
+            ],
+            f"Pedidos · {periodo.rotulo}",
+        )
+    ]
+    if linhas:
+        blocos.append(
+            bloco_tabela(
+                "Em separação" if entrada.status == "PROCESSANDO" else "Mais recentes",
+                [
+                    ("numero", "Pedido", "texto"),
+                    ("data", "Data", "texto"),
+                    ("status", "Status", "texto"),
+                    ("canal", "Canal", "texto"),
+                    ("loja", "Loja", "texto"),
+                    ("total", "Total", "moeda"),
+                    ("rastreio", "Rastreio", "texto"),
+                ],
+                linhas,
+            )
+        )
+    blocos.append(bloco_fonte("consultar_pedidos", periodo.rotulo, filtros, DEFINICOES["pedidos"], None))
+    texto = (
+        f"{periodo.frase[:1].upper()}{periodo.frase[1:]}, {dados['pedidosNoPeriodo']} pedidos"
+        f"{' em ' + nome_loja if nome_loja else ''}. Em separação agora: {dados['emSeparacaoDeQualquerData']}."
+    )
+    return Resultado(dados=dados, blocos=blocos, texto=texto)
+
+
+class Atendimentos(ComEscopo):
+    status: Literal["ABERTO", "EM_ANDAMENTO", "AGUARDANDO_CLIENTE", "CONCLUIDO"] | None = Field(
+        None, description="Só um status. Vazio: os que ainda não foram concluídos."
+    )
+    limite: int = Field(15, ge=1, le=30)
+
+
+EM_ABERTO = ("ABERTO", "EM_ANDAMENTO", "AGUARDANDO_CLIENTE")
+ROTULO_ATENDIMENTO = {
+    "ABERTO": "Aberto",
+    "EM_ANDAMENTO": "Em andamento",
+    "AGUARDANDO_CLIENTE": "Aguardando o cliente",
+    "CONCLUIDO": "Concluído",
+}
+
+
+def consultar_atendimentos(db: Session, ctx: Contexto, entrada: Atendimentos) -> Resultado:
+    marca, lojas, nome_loja = _escopo(db, ctx, entrada.marca, entrada.loja_id)
+    filtros_sql = []
+    if marca:
+        filtros_sql.append(m.Atendimento.marca == marca)
+    if lojas:
+        filtros_sql.append(m.Atendimento.loja_id.in_(lojas))
+    por_status = dict(
+        db.execute(select(m.Atendimento.status, func.count()).where(*filtros_sql).group_by(m.Atendimento.status)).all()
+    )
+    estados = (entrada.status,) if entrada.status else EM_ABERTO
+    por_tipo = db.execute(
+        select(m.TipoSolicitacao.titulo, func.count())
+        .join(m.Atendimento.tipo_solicitacao)
+        .where(*filtros_sql, m.Atendimento.status.in_(estados))
+        .group_by(m.TipoSolicitacao.titulo)
+        .order_by(func.count().desc())
+    ).all()
+    atendimentos = (
+        db.scalars(
+            select(m.Atendimento)
+            .where(*filtros_sql, m.Atendimento.status.in_(estados))
+            .order_by(m.Atendimento.atualizado_em.desc())
+            .limit(entrada.limite)
+        )
+        .unique()
+        .all()
+    )
+    linhas = [
+        {
+            "protocolo": a.protocolo,
+            "tipo": a.tipo_solicitacao.titulo,
+            "status": ROTULO_ATENDIMENTO.get(a.status, a.status),
+            "canal": a.canal,
+            "loja": a.loja.nome if a.loja else "Central da marca",
+            "responsavel": a.responsavel.nome if a.responsavel else "Sem responsável",
+            "abertoEm": data(a.criado_em),
+            "atualizadoEm": data(a.atualizado_em),
+        }
+        for a in atendimentos
+    ]
+    filtros = _filtros(marca, nome_loja)
+    em_aberto = sum(por_status.get(s, 0) for s in EM_ABERTO)
+    dados = {
+        "filtros": filtros,
+        "porStatus": {ROTULO_ATENDIMENTO[s]: numero(por_status.get(s, 0)) for s in ROTULO_ATENDIMENTO},
+        "emAberto": numero(em_aberto),
+        "porTipo": [{"tipo": tipo, "quantidade": numero(qtd)} for tipo, qtd in por_tipo],
+        "atendimentos": linhas,
+        "definicao": DEFINICOES["atendimentos"],
+    }
+    blocos = [
+        bloco_indicadores(
+            [
+                ("Em aberto", em_aberto, "numero"),
+                ("Abertos, sem andamento", por_status.get("ABERTO", 0), "numero"),
+                ("Aguardando o cliente", por_status.get("AGUARDANDO_CLIENTE", 0), "numero"),
+                ("Concluídos", por_status.get("CONCLUIDO", 0), "numero"),
+            ],
+            "Atendimentos",
+        )
+    ]
+    if por_tipo:
+        blocos.append(
+            bloco_tabela(
+                "Por tipo",
+                [("tipo", "Tipo", "texto"), ("quantidade", "Atendimentos", "numero")],
+                [{"tipo": t, "quantidade": q} for t, q in por_tipo],
+            )
+        )
+    if linhas:
+        blocos.append(
+            bloco_tabela(
+                "Mais recentes",
+                [
+                    ("protocolo", "Protocolo", "texto"),
+                    ("tipo", "Tipo", "texto"),
+                    ("status", "Status", "texto"),
+                    ("loja", "Loja", "texto"),
+                    ("responsavel", "Responsável", "texto"),
+                    ("atualizadoEm", "Atualizado", "texto"),
+                ],
+                linhas,
+            )
+        )
+    blocos.append({"tipo": "link", "rotulo": "Abrir o Atendimento", "destino": "/atendimento"})
+    blocos.append(bloco_fonte("consultar_atendimentos", None, filtros, DEFINICOES["atendimentos"], None))
+    texto = f"Há {dados['emAberto']} atendimentos em aberto" + (f" ({nome_loja})." if nome_loja else ".")
+    return Resultado(dados=dados, blocos=blocos, texto=texto)
+
+
 # ---------- Registro ----------
 
 FERRAMENTAS = [
@@ -974,7 +1190,24 @@ FERRAMENTAS = [
         "Números do Lupe+ sem dado pessoal: pontos válidos e valor, clientes por categoria e pontos que vencem nos próximos dias.",
         Fidelidade,
         consultar_fidelidade,
-        modulo="financeiro",
+        modulo="fidelidade",
+    ),
+    Ferramenta(
+        "consultar_pedidos",
+        "Pedidos por status (em separação, enviados, entregues, cancelados) no período e a lista dos mais recentes, com número, "
+        "canal, loja, total e rastreio, sem dados do cliente. Lojista e Operador veem só a própria loja. Use para 'pedidos "
+        "pendentes', 'o que falta enviar', 'pedidos de hoje'.",
+        Pedidos,
+        consultar_pedidos,
+        modulo="pedidos",
+    ),
+    Ferramenta(
+        "consultar_atendimentos",
+        "Atendimentos (solicitações de clientes) por status e por tipo, com protocolo, loja e responsável, sem nome, contato ou "
+        "mensagens do cliente. Use para 'chamados em aberto', 'atendimentos sem responsável', 'o que está aguardando'.",
+        Atendimentos,
+        consultar_atendimentos,
+        modulo="atendimento",
     ),
     Ferramenta(
         "consultar_alertas",

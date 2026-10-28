@@ -163,7 +163,7 @@ def direta(texto: str, ctx: Contexto, executar) -> Rodada | None:
         r"^(oi+|ola+|bom dia|boa tarde|boa noite|e ai|ajuda|help|o que voce faz\??|o que posso perguntar\??)$", n
     ):
         return Rodada(
-            "Posso consultar vendas e faturamento, produtos mais vendidos, cancelamentos, estoque baixo e parado, concentração de estoque, avarias, sugestões de transferência, alertas e os números do Lupe+. Escolha uma pergunta ou escreva a sua.",
+            "Posso consultar vendas e faturamento, produtos mais vendidos, cancelamentos, pedidos, atendimentos, estoque baixo e parado, concentração de estoque, avarias, sugestões de transferência, alertas e os números do Lupe+. Escolha uma pergunta ou escreva a sua.",
             [{"tipo": "sugestoes", "itens": SUGESTOES[:6]}],
         )
     # Só agradecimento: "perfeito, e por loja?" traz pergunta e vai para o modelo
@@ -184,6 +184,21 @@ def responder(texto: str, ctx: Contexto, executar) -> Rodada:
 
     if re.search(r"\balertas?\b", n):
         return _consultar(executar, "consultar_alertas", {})
+    # Pedidos e atendimentos (decisão 118): "vendas" e "faturamento" continuam no financeiro
+    if re.search(r"\batendimentos?\b|\bchamados?\b|\bsolicitac|\bprotocolos?\b|\bsac\b", n):
+        status = "CONCLUIDO" if re.search(r"\bconcluid|\bresolvid|\bfechad", n) else None
+        return _consultar(executar, "consultar_atendimentos", {"marca": marca, "loja_id": loja_id, "status": status})
+    if re.search(r"\bpedidos?\b", n) and not re.search(r"\bcancel|\bfatur|\breceita|\bticket", n):
+        status = (
+            "PROCESSANDO"
+            if re.search(r"\bseparac|\bpendent|\bfalta enviar|\bpara enviar|\ba enviar|\bprocessando", n)
+            else "ENVIADO"
+            if re.search(r"\benviad|\ba caminho|\bem transito", n)
+            else "ENTREGUE"
+            if re.search(r"\bentregue", n)
+            else None
+        )
+        return _consultar(executar, "consultar_pedidos", {**escopo, **periodo, "canal": canal, "status": status})
     if re.search(r"\btransfer", n):
         return _consultar(executar, "sugerir_transferencias", {"marca": marca})
     if re.search(r"\bavari|\bdefeito|\bdanificad", n):
@@ -248,6 +263,6 @@ def responder(texto: str, ctx: Contexto, executar) -> Rodada:
             executar, "consultar_faturamento", {**escopo, **periodo, "canal": canal, "agrupar_por": agrupar, "comparar": comparar}
         )
     return Rodada(
-        "Não entendi a pergunta. Posso consultar vendas e faturamento, mais vendidos, cancelamentos, estoque baixo ou parado, concentração de estoque, avarias, transferências, alertas e Lupe+.",
+        "Não entendi a pergunta. Posso consultar vendas e faturamento, mais vendidos, cancelamentos, pedidos, atendimentos, estoque baixo ou parado, concentração de estoque, avarias, transferências, alertas e Lupe+.",
         [{"tipo": "sugestoes", "itens": SUGESTOES[:6]}],
     )

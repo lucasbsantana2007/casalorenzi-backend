@@ -33,8 +33,12 @@ SUGESTOES = [
     ("Quais produtos têm mais unidades disponíveis?", "estoque"),
     ("Quais produtos têm avarias?", "estoque"),
     ("Que transferências você sugere?", "transferencias"),
-    ("Quantos clientes têm pontos vencendo nos próximos 30 dias?", "financeiro"),
-    ("Quantos clientes temos em cada categoria do Lupe+?", "financeiro"),
+    ("Quantos clientes têm pontos vencendo nos próximos 30 dias?", "fidelidade"),
+    ("Quantos clientes temos em cada categoria do Lupe+?", "fidelidade"),
+    ("Quais pedidos estão em separação?", "pedidos"),
+    ("Quantos pedidos tivemos este mês?", "pedidos"),
+    ("Quais atendimentos estão em aberto?", "atendimento"),
+    ("Quais atendimentos estão sem responsável?", "atendimento"),
 ]
 
 
@@ -51,6 +55,9 @@ def sugestoes(usuario: m.Usuario = Depends(acesso)):
         "sugestoes": [texto for texto, modulo in SUGESTOES if pode_acessar(usuario.papel, modulo)],
         "permissoes": {
             "vendas": pode_acessar(usuario.papel, "financeiro"),
+            "fidelidade": pode_acessar(usuario.papel, "fidelidade"),
+            "pedidos": pode_acessar(usuario.papel, "pedidos"),
+            "atendimento": pode_acessar(usuario.papel, "atendimento"),
             "estoque": pode_acessar(usuario.papel, "estoque"),
             "transferencias": pode_acessar(usuario.papel, "transferencias"),
             "usoDaIA": pode_acessar(usuario.papel, "administracao"),

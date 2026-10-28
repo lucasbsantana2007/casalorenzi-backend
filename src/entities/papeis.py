@@ -23,6 +23,8 @@ ACESSO = {
     "financeiro": (ADMINISTRADOR,),
     # Central administrativa: funcionários, lojas, frete e log de ações
     "administracao": (ADMINISTRADOR,),
+    # Números do Lupe+ no Assistente IA (decisão 118): o Lojista vê, sem ver faturamento (que é do financeiro)
+    "fidelidade": (ADMINISTRADOR, LOJISTA),
     # Inteligência de Negócios (copiloto de IA e alertas): toda a equipe abre a tela, mas cada consulta
     # confere o módulo do assunto (vendas = financeiro, estoque = estoque...). Ver src/use_cases/assistente
     "inteligencia": (ADMINISTRADOR, LOJISTA, OPERADOR),
