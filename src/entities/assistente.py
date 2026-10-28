@@ -93,6 +93,13 @@ DEFINICOES = {
     "receita_categoria": (
         "Receita em itens da categoria: preço × quantidade das peças vendidas (sem frete e antes do desconto do pedido)."
     ),
+    "pedidos": (
+        "Pedidos de todos os canais criados no período, pelo status atual. Lojista e Operador veem só os da própria "
+        "loja, como na tela Pedidos. Pedidos em separação aparecem de qualquer data. Sem dados do cliente."
+    ),
+    "atendimentos": (
+        "Solicitações de atendimento da marca, pelo status atual e pelo tipo. Sem nome, contato ou mensagens do cliente."
+    ),
     "cancelamentos": (
         "Pedidos de venda com status CANCELADO criados no período (na Vulto, inclui cancelada, estornada, "
         "chargeback e aguardando pagamento). Não entram no faturamento."
@@ -135,7 +142,7 @@ MODULO_DO_ALERTA = {
     ALERTA_ESTOQUE_BAIXO: "estoque",
     ALERTA_ESTOQUE_PARADO: "estoque",
     ALERTA_TRANSFERENCIA: "transferencias",
-    ALERTA_PONTOS: "financeiro",
+    ALERTA_PONTOS: "fidelidade",
 }
 
 ABERTO = "ABERTO"
