@@ -34,7 +34,7 @@ from src.schemas.produtos import imagem_url
 from src.use_cases import fidelidade
 from src.use_cases import frete as frete_config
 from src.use_cases import produtos as produtos_uc
-from src.use_cases.assistente import catalogo
+from src.use_cases.assistente import catalogo, perfil_cliente
 from src.use_cases.assistente.ferramentas import Contexto, Entrada, FalhaFerramenta, Ferramenta, Resultado
 from src.use_cases.assistente.formatacao import brl, data, numero
 from src.utils.datas import hoje, ms
@@ -111,7 +111,9 @@ def _frase_do_afrouxado(rotulo: str) -> str:
     return f"em {rotulo}"
 
 
-def texto_da_busca(resultado: catalogo.ResultadoBusca, cards: list[dict], loja_nome: str | None) -> str:
+def texto_da_busca(
+    resultado: catalogo.ResultadoBusca, cards: list[dict], loja_nome: str | None, habitual: str | None = None
+) -> str:
     pedido = resultado.pedido
     descricao = descrever(_sem_desconhecidas(resultado))
     onde = f" na {loja_nome}" if loja_nome else ""
@@ -133,6 +135,8 @@ def texto_da_busca(resultado: catalogo.ResultadoBusca, cards: list[dict], loja_n
         texto = f"Encontrei {quantidade} de {descricao}{onde}."
     if pedido.tamanho is None and set(pedido.tipos) & TIPOS_COM_TAMANHO:
         texto += " Qual tamanho você procura?"
+        if habitual:
+            texto += f" Nas suas compras, você costuma levar {habitual}."
     elif len(cards) > 1:
         texto += " Quer ver alguma delas de perto?"
     return texto
@@ -164,8 +168,13 @@ def buscar_produtos(db: Session, ctx: Contexto, entrada: BuscarProdutos) -> Resu
     if loja:
         memoria["lojaEmFoco"] = loja.id
         memoria["lojaEmFocoNome"] = loja.nome
+    # Sem tamanho na busca: o que o cliente logado costuma levar nesse tipo, como sugestão (decisão 100)
+    habitual = None
+    if cards and ctx.cliente_id and pedido.tamanho is None and set(pedido.tipos) & TIPOS_COM_TAMANHO:
+        habitual = perfil_cliente.tamanho_habitual(db, ctx.cliente_id, pedido.tipos)
     dados = {
         "busca": descrever(_sem_desconhecidas(resultado)),
+        "tamanhoQueCostumaLevar": habitual,
         "loja": loja.nome if loja else None,
         "encontrados": resultado.total,
         "pecas": [
@@ -178,7 +187,10 @@ def buscar_produtos(db: Session, ctx: Contexto, entrada: BuscarProdutos) -> Resu
     }
     blocos = [{"tipo": "produtos", "titulo": None, "itens": cards}] if cards else []
     return Resultado(
-        dados=dados, blocos=blocos, memoria=memoria, texto=texto_da_busca(resultado, cards, loja.nome if loja else None)
+        dados=dados,
+        blocos=blocos,
+        memoria=memoria,
+        texto=texto_da_busca(resultado, cards, loja.nome if loja else None, habitual),
     )
 
 

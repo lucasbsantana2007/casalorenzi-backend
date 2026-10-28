@@ -113,12 +113,21 @@ def _memoria_cliente(memoria: dict) -> list[str]:
     return linhas
 
 
-def contexto_cliente(*, memoria: dict, marca_site: str | None, logado: bool, primeiro_nome: str | None, lojas: list[dict]) -> str:
+def contexto_cliente(
+    *,
+    memoria: dict,
+    marca_site: str | None,
+    logado: bool,
+    primeiro_nome: str | None,
+    lojas: list[dict],
+    perfil: list[str] | None = None,
+) -> str:
     linhas = [
         "Contexto desta mensagem (do sistema, não do cliente):",
         f"- Agora: {agora_texto()}.",
         f"- Vitrine aberta: {NOME_MARCA.get(marca_site or '', 'Casa Lorenzi')}.",
         f"- Cliente: logado (primeiro nome: {primeiro_nome})." if logado else "- Cliente: não logado.",
+        *(perfil or []),
         *_memoria_cliente(memoria),
         "- Lojas físicas (id: nome, cidade): "
         + "; ".join(f"{loja['id']}: {loja['nome']}, {loja['cidade']}" for loja in lojas)

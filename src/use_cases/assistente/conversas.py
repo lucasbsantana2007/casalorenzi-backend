@@ -31,6 +31,7 @@ from src.use_cases.assistente import (
     ferramentas_cliente,
     ferramentas_conta,
     ferramentas_gerenciais,
+    perfil_cliente,
     prompts,
     regras_cliente,
     regras_gerenciais,
@@ -128,7 +129,16 @@ def conversa_saida(db: Session, conversa: m.ConversaAssistente, com_mensagens: b
 # ---------- Abrir e conferir o dono ----------
 
 
-def _nova(db: Session, *, tipo: str, cliente_id=None, usuario_id=None, marca=None, chave_hash=None) -> m.ConversaAssistente:
+def _nova(
+    db: Session,
+    *,
+    tipo: str,
+    cliente_id=None,
+    usuario_id=None,
+    marca=None,
+    chave_hash=None,
+    saudacao: tuple[str, list[str]] | None = None,
+) -> m.ConversaAssistente:
     momento = agora()
     conversa = m.ConversaAssistente(
         id=uuid.uuid4().hex,
@@ -145,13 +155,15 @@ def _nova(db: Session, *, tipo: str, cliente_id=None, usuario_id=None, marca=Non
     )
     sessao.adicionar(db, conversa)
     sessao.gerar_ids(db)
+    texto, sugestoes = saudacao or (
+        prompts.BOAS_VINDAS[tipo],
+        regras_cliente.SUGESTOES if tipo == regra.CLIENTE else regras_gerenciais.SUGESTOES[:4],
+    )
     boas_vindas = m.MensagemAssistente(
         conversa_id=conversa.id,
         papel=regra.ASSISTENTE,
-        conteudo=prompts.BOAS_VINDAS[tipo],
-        blocos=[
-            {"tipo": "sugestoes", "itens": regras_cliente.SUGESTOES if tipo == regra.CLIENTE else regras_gerenciais.SUGESTOES[:4]}
-        ],
+        conteudo=texto,
+        blocos=[{"tipo": "sugestoes", "itens": sugestoes}],
         modo=regra.REGRAS,
         criada_em=momento,
     )
@@ -160,9 +172,20 @@ def _nova(db: Session, *, tipo: str, cliente_id=None, usuario_id=None, marca=Non
 
 
 def abrir_cliente(db: Session, *, cliente: m.Cliente | None, marca: str | None) -> tuple[m.ConversaAssistente, str]:
-    """Conversa nova no site. Devolve a chave (só agora: no banco fica o hash)."""
+    """Conversa nova no site. Devolve a chave (só agora: no banco fica o hash). Cliente logado: a saudação já
+    traz os pontos a vencer e atalhos do jeito dele (decisão 100)."""
     chave = secrets.token_urlsafe(24)
-    conversa = _nova(db, tipo=regra.CLIENTE, cliente_id=cliente.id if cliente else None, marca=marca, chave_hash=_hash(chave))
+    saudacao = None
+    if cliente is not None:
+        saudacao = perfil_cliente.saudacao(perfil_cliente.perfil(db, cliente), prompts.NOME_ASSISTENTE, regras_cliente.SUGESTOES)
+    conversa = _nova(
+        db,
+        tipo=regra.CLIENTE,
+        cliente_id=cliente.id if cliente else None,
+        marca=marca,
+        chave_hash=_hash(chave),
+        saudacao=saudacao,
+    )
     sessao.confirmar(db)
     return conversa, chave
 
@@ -242,8 +265,14 @@ def _dinamico_cliente(db: Session, ctx: Contexto, cliente: m.Cliente | None):
             for loja in cadastro_repository.lojas(db, somente_ativas=True, tipo="LOJA")
         ]
         primeiro = cliente.nome.split()[0] if cliente and cliente.nome else None
+        perfil = perfil_cliente.linhas_do_contexto(perfil_cliente.perfil(db, cliente)) if cliente else []
         return prompts.contexto_cliente(
-            memoria=ctx.memoria, marca_site=ctx.marca_site, logado=cliente is not None, primeiro_nome=primeiro, lojas=lojas
+            memoria=ctx.memoria,
+            marca_site=ctx.marca_site,
+            logado=cliente is not None,
+            primeiro_nome=primeiro,
+            lojas=lojas,
+            perfil=perfil,
         )
 
     return montar
