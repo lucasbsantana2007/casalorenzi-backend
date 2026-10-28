@@ -39,6 +39,13 @@ def so_cortesia(texto: str) -> str | None:
     return None  # só "ok", "entao"...: não é agradecimento
 
 
+# O mesmo agradecimento no começo de uma frase com pergunta, no texto original (o tamanho "M" depende da maiúscula)
+_AGRADECIMENTO_NO_INICIO = re.compile(
+    r"^\s*(?:(?:muito|mt|obrigad[oa]s?|valeu|vlw|brigad[oa]|agrade[cç]o|obg|show de bola|show|perfeito|[oó]timo|blz|beleza|mesmo|demais)"
+    r"[\s,!.;:]+)+",
+    re.IGNORECASE,
+)
+
 
 HUMANO = re.compile(
     r"\b(atendente|humano|pessoa de verdade|alguem da (equipe|loja)|falar com (a equipe|alguem|um vendedor|o vendedor|uma pessoa)|"
@@ -224,6 +231,8 @@ def direta(texto: str, ctx: Contexto, executar) -> Rodada | None:
 
 
 def responder(texto: str, ctx: Contexto, executar) -> Rodada:
+    # "Valeu, e no M?": a pergunta é "e no M?" (o agradecimento não vira termo de busca)
+    texto = _AGRADECIMENTO_NO_INICIO.sub("", texto) or texto
     n = _limpo(texto)
     memoria = ctx.memoria
     oferta = memoria.get("oferta")
