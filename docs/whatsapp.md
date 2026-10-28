@@ -124,6 +124,7 @@ mensagens rodam a versão anterior.
 | HTTP Request com "Field required" | Send Body desligado | Ligar Send Body com os 4 campos |
 | Execução verde, mas a resposta não chega | A Meta recusa a entrega; o motivo vem no aviso seguinte (`statuses[0].errors`) | Abrir a execução do aviso e ler o código do erro |
 | Erro 131031 "Business Account locked" | A Meta bloqueou a conta do WhatsApp Business (conta do Facebook recém-criada) | Pedir revisão em Business Support Home ou criar o app com uma conta do Facebook antiga |
+| Resposta da equipe no painel com "Não consegui entregar esta resposta no WhatsApp" e nenhuma execução no fluxo de envio | O Webhook do fluxo de envio estava com a credencial `Authorization: Bearer` (a da Meta) em vez da `X-Canal-Segredo`; o n8n recusa antes de executar | No nó Webhook, escolher a credencial do segredo do canal e publicar de novo |
 | Resposta não chega no número com o 9 | O WhatsApp identifica muitos números antigos de MG sem o nono dígito (`from` = 553184139032) | Cadastrar em **To**, na Meta, as duas versões do número |
 
 ## Limitações
