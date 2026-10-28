@@ -1,4 +1,4 @@
-"""O que a Lúcia já sabe do cliente logado, para a conversa começar do ponto dele (decisão 100).
+"""O que a Lúcia já sabe do cliente logado, para a conversa começar do ponto dele (decisão 103).
 
 - Pontos Lupe+ vencendo nos próximos 30 dias: a mesma conta do aviso por e-mail (avisos_pontos), só lendo. Ponto
   que vence sem uso é a dor do CRM; a saudação lembra antes de vencer.

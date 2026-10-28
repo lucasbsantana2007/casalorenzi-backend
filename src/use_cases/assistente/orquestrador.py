@@ -7,7 +7,7 @@ Ordem de decisão:
 3. Sem chave: as regras determinísticas respondem com as mesmas ferramentas (modo REGRAS).
 4. O modelo falhou (fora do ar, tempo esgotado, resposta inválida): se alguma consulta já tinha dado certo,
    a resposta usa o resultado dela; senão, as regras respondem (modo CONTINGENCIA). O usuário nunca vê o erro técnico.
-5. Todo número da resposta do modelo é conferido antes de sair (verificacao.py, decisão 98). Número sem fonte: o
+5. Todo número da resposta do modelo é conferido antes de sair (verificacao.py, decisão 101). Número sem fonte: o
    modelo tem uma chance de refazer (com as ferramentas, porque pode ter faltado uma consulta); se errar de novo, a
    resposta vira o texto pronto das ferramentas ou "não consegui confirmar". A auditoria guarda o que aconteceu.
 """
@@ -40,9 +40,9 @@ class Rodada:
     execucoes: list[Execucao] = field(default_factory=list)
     consumos: list[dict] = field(default_factory=list)
     # A rodada não resolveu (não entendeu, não conseguiu responder ou não confirmou o número): conta para
-    # "duas falhas seguidas → pessoa" (decisão 99)
+    # "duas falhas seguidas → pessoa" (decisão 102)
     falhou: bool = False
-    # Conferência dos números da resposta do modelo (decisão 98), gravada com a mensagem
+    # Conferência dos números da resposta do modelo (decisão 101), gravada com a mensagem
     auditoria: dict | None = None
 
 
@@ -57,7 +57,7 @@ class Assistente:
     direta: Callable[[str, Contexto, Callable], Rodada | None]
     regras: Callable[[str, Contexto, Callable], Rodada]
     # Passo final, depois de qualquer modo (rodada, texto, contexto, histórico, executar) -> Rodada: no site, conta
-    # as falhas seguidas e oferece a equipe (escalonamento.py, decisão 99)
+    # as falhas seguidas e oferece a equipe (escalonamento.py, decisão 102)
     depois: Callable[[Rodada, str, Contexto, list, Callable], Rodada] | None = None
 
 
@@ -162,7 +162,7 @@ def _resultado_para_modelo(execucao: Execucao) -> dict:
 
 
 def _fontes(assistente: Assistente, lista, contexto_dinamico: str, coletor: Coletor, historico, texto: str):
-    """(fontes fortes, fontes do usuário) para conferir os números da resposta do modelo (decisão 98)."""
+    """(fontes fortes, fontes do usuário) para conferir os números da resposta do modelo (decisão 101)."""
     saidas = [
         (e.resultado.dados, e.resultado.blocos, e.resultado.texto) if e.sucesso and e.resultado else e.erro
         for e in coletor.execucoes

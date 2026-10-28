@@ -173,7 +173,7 @@ def _nova(
 
 def abrir_cliente(db: Session, *, cliente: m.Cliente | None, marca: str | None) -> tuple[m.ConversaAssistente, str]:
     """Conversa nova no site. Devolve a chave (só agora: no banco fica o hash). Cliente logado: a saudação já
-    traz os pontos a vencer e atalhos do jeito dele (decisão 100)."""
+    traz os pontos a vencer e atalhos do jeito dele (decisão 103)."""
     chave = secrets.token_urlsafe(24)
     saudacao = None
     if cliente is not None:

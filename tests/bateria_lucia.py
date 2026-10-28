@@ -1,4 +1,4 @@
-"""Bateria da Lúcia (decisão 102): as perguntas difíceis de 4a entrega/bateria_lucia.md, cada uma com o que a
+"""Bateria da Lúcia (decisão 105): as perguntas difíceis de 4a entrega/bateria_lucia.md, cada uma com o que a
 resposta precisa ter. Roda de dois jeitos, com os mesmos casos:
 - tests/test_bateria_lucia.py: sem o Claude (só as regras, a contingência da produção), a cada mudança, no pytest;
 - scripts/avaliar_lucia.py: com o Claude de verdade, antes de mexer no prompt, nas ferramentas ou no modelo; gera o
@@ -335,7 +335,7 @@ CASOS: list[Caso] = [
         "Oferece a equipe (WhatsApp ou chamado).",
         [bloco("acao_atendimento")],
     ),
-    # ---------- Tarefas da conta e falhas (decisões 93 a 99) ----------
+    # ---------- Tarefas da conta e falhas (decisões 93 a 102) ----------
     Caso(
         31,
         "acao",

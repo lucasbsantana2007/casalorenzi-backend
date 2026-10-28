@@ -168,7 +168,7 @@ RECUSA_SEGURA = {
     "CLIENTE": "Não consigo ajudar com isso por aqui. Posso encontrar peças, ver a disponibilidade nas lojas, informar horários ou consultar seus pontos Lupe+.",
     "GERENCIAL": "Não consigo responder isso. Posso consultar vendas, estoque, transferências, alertas e os números do Lupe+.",
 }
-# Conferência dos números (decisão 98). CORRIGIR_NUMEROS vai para o modelo quando a resposta trouxe número sem fonte
+# Conferência dos números (decisão 101). CORRIGIR_NUMEROS vai para o modelo quando a resposta trouxe número sem fonte
 # (uma chance de refazer); SEM_CONFIRMACAO é o que o usuário vê se ele errar de novo e nenhuma consulta tiver texto pronto
 CORRIGIR_NUMEROS = (
     "[Verificação automática do sistema, não é o cliente] Estes números da sua resposta não vieram de nenhuma ferramenta "

@@ -1,4 +1,4 @@
-"""Duas falhas seguidas → pessoa (decisão 99).
+"""Duas falhas seguidas → pessoa (decisão 102).
 
 A dor (atendimento, no kickoff): o cliente repete a pergunta, o robô repete que não entendeu, e o cliente desiste ou
 chega irritado no atendimento humano. Regra: quando a Lúcia falha duas vezes seguidas na mesma conversa, ela mesma

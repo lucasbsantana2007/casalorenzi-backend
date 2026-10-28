@@ -1,4 +1,4 @@
-"""Verificador de números das respostas do modelo (decisão 98).
+"""Verificador de números das respostas do modelo (decisão 101).
 
 "Ponto é dívida com o cliente. Se essa coisa disser que alguém tem mil pontos e ele tiver cem [...] o problema é
 meu. Prefiro que ela diga 'não sei' do que invente." (CFO, no kickoff)

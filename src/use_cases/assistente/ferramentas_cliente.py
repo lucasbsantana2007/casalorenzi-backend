@@ -172,7 +172,7 @@ def buscar_produtos(db: Session, ctx: Contexto, entrada: BuscarProdutos) -> Resu
     if loja:
         memoria["lojaEmFoco"] = loja.id
         memoria["lojaEmFocoNome"] = loja.nome
-    # Sem tamanho na busca: o que o cliente logado costuma levar nesse tipo, como sugestão (decisão 100)
+    # Sem tamanho na busca: o que o cliente logado costuma levar nesse tipo, como sugestão (decisão 103)
     habitual = None
     if cards and ctx.cliente_id and pedido.tamanho is None and set(pedido.tipos) & TIPOS_COM_TAMANHO:
         habitual = perfil_cliente.tamanho_habitual(db, ctx.cliente_id, pedido.tipos)

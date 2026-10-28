@@ -1,4 +1,4 @@
-"""Verificador de números (decisão 98): todo número da resposta do modelo precisa ter fonte (as ferramentas, o
+"""Verificador de números (decisão 101): todo número da resposta do modelo precisa ter fonte (as ferramentas, o
 contexto do sistema ou, para o que não é dinheiro nem pontos, o próprio cliente). Sem fonte, o modelo refaz uma vez;
 se errar de novo, sai o texto pronto das ferramentas ou "não consegui confirmar". A dor é a do CFO: "prefiro que
 ela diga 'não sei' do que invente"."""

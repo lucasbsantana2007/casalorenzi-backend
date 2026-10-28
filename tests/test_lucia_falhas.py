@@ -1,4 +1,4 @@
-"""Duas falhas seguidas → pessoa (decisão 99): quando a Lúcia falha duas vezes seguidas (não entende, não consegue
+"""Duas falhas seguidas → pessoa (decisão 102): quando a Lúcia falha duas vezes seguidas (não entende, não consegue
 responder, o cliente diz que não serviu ou repete a pergunta), ela mesma oferece a equipe, com o resumo."""
 
 from src.integrations import ia

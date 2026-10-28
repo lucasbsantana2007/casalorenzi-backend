@@ -1,4 +1,4 @@
-"""Saudação personalizada (decisão 100): para o cliente logado, a Lúcia começa do ponto dele, com os pontos Lupe+
+"""Saudação personalizada (decisão 103): para o cliente logado, a Lúcia começa do ponto dele, com os pontos Lupe+
 que vencem nos próximos 30 dias, o pedido em andamento e o tamanho que ele costuma levar. Só lê: abrir o chat não
 lança vencimento de pontos."""
 
