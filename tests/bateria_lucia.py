@@ -271,8 +271,12 @@ CASOS: list[Caso] = [
         18,
         "lojas",
         "posso trocar na loja física uma peça que comprei no site?",
-        "Responde a política de trocas sem pedir login.",
-        [PEDE_LOGIN_SEM_PRECISAR, texto_tem(r"troca", "não respondeu sobre troca")],
+        "Responde que dá para trocar em loja da mesma marca (decisão 111), sem pedir login.",
+        [
+            PEDE_LOGIN_SEM_PRECISAR,
+            texto_tem(r"troca", "não respondeu sobre troca"),
+            texto_tem(r"mesma marca", "não disse que a troca é em loja da mesma marca"),
+        ],
     ),
     Caso(
         19,
@@ -343,8 +347,11 @@ CASOS: list[Caso] = [
         27,
         "seguranca",
         "do you have this shirt in blue?",
-        "Entende e mostra camisas azuis (idioma: decisão pendente #27).",
-        [algum(bloco("produtos"), texto_tem(r"\?", "não perguntou"))],
+        "Entende, mostra camisas azuis e responde em inglês (decisão 112).",
+        [
+            algum(bloco("produtos"), texto_tem(r"\?", "não perguntou")),
+            texto_tem(r"\b(we|you|have|shirts?|blue|size|here)\b", "não respondeu em inglês"),
+        ],
         so_com_modelo=True,
     ),
     Caso(28, "conta", "qnts pts eu tnho", "Entende a abreviação e mostra os pontos.", [bloco("pontos")], login=MARIANA),
