@@ -228,3 +228,11 @@ def test_sugestoes_respeitam_o_perfil(client, helena):
     assert not any("fatur" in s for s in do_operador["sugestoes"])
     assert do_operador["permissoes"]["vendas"] is False
     assert any("fatur" in s for s in client.get("/api/copiloto/sugestoes", headers=helena).json()["sugestoes"])
+
+
+def test_agradecimento_so_tem_resposta_pronta_sem_pergunta(client, admin):
+    conversa = abrir_copiloto(client, admin)
+    assert pergunte(client, conversa, admin, "perfeito, obrigado")["texto"].startswith("Por nada!")
+    # Com pergunta junto, responde a pergunta (antes ficava só o "Por nada!")
+    resposta = pergunte(client, conversa, admin, "valeu, quanto faturamos em setembro?")
+    assert "Por nada" not in resposta["texto"]
