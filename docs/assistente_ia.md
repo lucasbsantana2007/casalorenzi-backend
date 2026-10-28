@@ -56,6 +56,11 @@ Cada resposta registra o modo (`mensagens_assistente.modo`):
 | `REGRAS` | Sem chave, ou mensagem simples (saudação, agradecimento, pedido de atendente) | Zero |
 | `CONTINGENCIA` | O modelo falhou (tempo esgotado, sem conexão, 5xx, resposta inválida): as regras respondem com as mesmas ferramentas; se uma consulta já tinha dado certo, usa o resultado dela | Zero após a falha |
 
+A resposta pronta de agradecimento ou despedida só vale quando a mensagem é **só isso** ("obrigada!", "valeu, tchau").
+Com uma pergunta junto ("valeu, tem no G?", "perfeito, e na cor preta?"), a mensagem segue para o modelo; sem modelo,
+as regras tiram o agradecimento do começo e respondem a pergunta (`so_cortesia` em `regras_cliente.py`, usada também
+pelo copiloto).
+
 As regras (`src/use_cases/assistente/regras_*.py`) entendem as perguntas mais comuns: tipo de peça, cor,
 tamanho, faixa de preço, marca, loja ("loja do shopping", "em BH"), continuações ("M", "e na outra loja?",
 "a segunda", "sim"), períodos ("hoje", "nesta semana", "em setembro", "últimos 30 dias", "de 01/09 a 15/09").

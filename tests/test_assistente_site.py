@@ -492,3 +492,40 @@ def test_botao_quero_esta_mantem_o_tamanho_ja_dito(client):
     )
     assert "coloque na sua sacola" in resposta["texto"]
     assert blocos(diga(client, conversa, chave, "sim"), "acao_sacola")[0]["item"]["tamanho"] == "M"
+
+
+@pytest.mark.parametrize(
+    ("mensagem", "resposta"),
+    [
+        ("Obrigada!", "Por nada!"),
+        ("muito obrigado pela ajuda", "Por nada!"),
+        ("valeu, tchau", "Até mais!"),
+        ("era isso", "Até mais!"),
+        ("show de bola", "Por nada!"),
+    ],
+)
+def test_cortesia_tem_resposta_pronta_sem_modelo(client, mensagem, resposta):
+    falso = ProvedorFalso()
+    ia.definir_provedor(falso)
+    conversa, chave = abrir_site(client)
+    resultado = diga(client, conversa, chave, mensagem)
+    assert resultado["texto"].startswith(resposta) and resultado["modo"] == regra.REGRAS
+    assert falso.pedidos == []  # não chamou o modelo
+
+
+@pytest.mark.parametrize("mensagem", ["valeu, tem no G?", "perfeito, e na cor preta?", "show de bola, tem camisa?"])
+def test_agradecimento_com_pergunta_vai_para_o_modelo(client, mensagem):
+    """Antes, "valeu, tem no G?" recebia "Por nada!" e a pergunta ficava sem resposta."""
+    falso = ProvedorFalso(texto("Resposta do modelo."))
+    ia.definir_provedor(falso)
+    conversa, chave = abrir_site(client)
+    resultado = diga(client, conversa, chave, mensagem)
+    assert resultado["texto"] == "Resposta do modelo." and len(falso.pedidos) == 1
+
+
+def test_agradecimento_com_pergunta_sem_modelo_responde_a_pergunta(client):
+    conversa, chave = abrir_site(client)
+    diga(client, conversa, chave, "Tem camisa azul?")
+    resultado = diga(client, conversa, chave, "valeu, e no M?")
+    # Sem o modelo, as regras respondem à pergunta como se fosse só "e no M?"
+    assert "Por nada" not in resultado["texto"] and "camisa na cor azul, tamanho M" in resultado["texto"]

@@ -17,8 +17,36 @@ from src.use_cases.assistente.prompts import APRESENTACAO, BOAS_VINDAS
 from src.utils.texto import normalizar
 
 SAUDACAO = re.compile(r"^(oi+|ola+|opa|bom dia|boa tarde|boa noite|e ai|eai|hey|hello|hi|salve)( (tudo bem|tudo bom|como vai))?$")
-AGRADECIMENTO = re.compile(r"^(muito )?(obrigad[oa]|valeu|vlw|brigad[oa]|agradeco|obg|show|perfeito|otimo|blz|beleza)\b")
-DESPEDIDA = re.compile(r"^(tchau|ate mais|ate logo|falou|flw|so isso|era isso)\b")
+# Agradecimento e despedida só têm resposta pronta quando a mensagem é só isso. "Valeu, tem no G?" traz uma
+# pergunta junto e vai para o modelo (ou para as regras), para a pergunta não ficar sem resposta.
+AGRADECIMENTO = r"obrigad[oa]s?|valeu|vlw|brigad[oa]|agradeco|obg|show de bola|show|perfeito|otimo|blz|beleza"
+DESPEDIDA = r"tchau|ate mais|ate logo|ate a proxima|falou|flw|so isso|era isso"
+# Palavras que acompanham o agradecimento sem pedir nada
+_CORTESIA = r"muito|mt|mesmo|demais|pela ajuda|pela atencao|por tudo|viu|ai|entao|e|ok|lucia"
+_SO_CORTESIA = re.compile(rf"(?:{AGRADECIMENTO}|{DESPEDIDA}|{_CORTESIA})(?: (?:{AGRADECIMENTO}|{DESPEDIDA}|{_CORTESIA}))*")
+
+
+def so_cortesia(texto: str) -> str | None:
+    """ "AGRADECIMENTO" ou "DESPEDIDA" quando a mensagem é só isso ("muito obrigada pela ajuda, tchau");
+    None quando traz qualquer outra coisa ("valeu, tem no G?", "perfeito, e na cor preta?")."""
+    palavras = " ".join(re.findall(r"[a-z0-9]+", normalizar(texto)))
+    if not palavras or not _SO_CORTESIA.fullmatch(palavras):
+        return None
+    if re.search(rf"\b(?:{DESPEDIDA})\b", palavras):
+        return "DESPEDIDA"
+    if re.search(rf"\b(?:{AGRADECIMENTO})\b", palavras):
+        return "AGRADECIMENTO"
+    return None  # só "ok", "entao"...: não é agradecimento
+
+
+# O mesmo agradecimento no começo de uma frase com pergunta, no texto original (o tamanho "M" depende da maiúscula)
+_AGRADECIMENTO_NO_INICIO = re.compile(
+    r"^\s*(?:(?:muito|mt|obrigad[oa]s?|valeu|vlw|brigad[oa]|agrade[cç]o|obg|show de bola|show|perfeito|[oó]timo|blz|beleza|mesmo|demais)"
+    r"[\s,!.;:]+)+",
+    re.IGNORECASE,
+)
+
+
 HUMANO = re.compile(
     r"\b(atendente|humano|pessoa de verdade|alguem da (equipe|loja)|falar com (a equipe|alguem|um vendedor|o vendedor|uma pessoa)|"
     r"vendedor|vendedora|suporte|reclamacao|reclamar|sac)\b"
@@ -180,9 +208,10 @@ def direta(texto: str, ctx: Contexto, executar) -> Rodada | None:
     n = _limpo(texto)
     if not n or SAUDACAO.match(n):
         return Rodada(BOAS_VINDAS["CLIENTE"], [_sugestoes()])
-    if AGRADECIMENTO.match(n) and len(n.split()) <= 4:
+    cortesia = so_cortesia(texto)
+    if cortesia == "AGRADECIMENTO":
         return Rodada("Por nada! Se precisar de mais alguma peça ou informação, é só chamar.")
-    if DESPEDIDA.match(n):
+    if cortesia == "DESPEDIDA":
         return Rodada("Até mais! Quando quiser, estou por aqui.")
     if INJECAO.search(n):
         return Rodada(
@@ -202,6 +231,8 @@ def direta(texto: str, ctx: Contexto, executar) -> Rodada | None:
 
 
 def responder(texto: str, ctx: Contexto, executar) -> Rodada:
+    # "Valeu, e no M?": a pergunta é "e no M?" (o agradecimento não vira termo de busca)
+    texto = _AGRADECIMENTO_NO_INICIO.sub("", texto) or texto
     n = _limpo(texto)
     memoria = ctx.memoria
     oferta = memoria.get("oferta")
