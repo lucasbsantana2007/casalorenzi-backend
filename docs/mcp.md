@@ -9,14 +9,17 @@ usa as mesmas consultas, as mesmas regras e as mesmas permissões do painel. Mud
 | --- | --- | --- |
 | Administrador do grupo | Tudo, nas duas marcas | — |
 | Administrador de uma marca | Tudo, só na marca dele | A outra marca |
-| Lojista | Estoque e alertas | Faturamento, vendas, Lupe+, transferências |
-| Operador | Estoque, transferências e alertas | Faturamento, vendas, Lupe+ |
+| Lojista | Lupe+, pedidos **da própria loja**, atendimentos da marca, estoque e alertas (decisão 118) | Faturamento, vendas, transferências |
+| Operador | Pedidos **da própria loja**, estoque, transferências e alertas | Faturamento, vendas, Lupe+, atendimentos |
+
+Pedidos e atendimentos saem sem nome, contato ou mensagens do cliente; nos pedidos, também sem a soma dos valores
+(que seria faturamento).
 
 | O quê | Como |
 | --- | --- |
 | Endereço | `https://<api>/api/conector-mcp` (local: `http://127.0.0.1:8000/api/conector-mcp`) |
 | Login | **claude.ai**: login OAuth, com o e-mail e a senha do painel (decisão 114). **Claude Code, Claude Desktop e n8n**: token pessoal (`Authorization: Bearer clmcp_...`), criado em **Inteligência > Conectar ao Claude** |
-| O que dá para consultar | As 11 ferramentas do copiloto e `ver_contexto` (data de hoje, até quando há vendas, lojas com os ids, categorias, permissões e definições das métricas) |
+| O que dá para consultar | As 13 ferramentas do copiloto (com pedidos e atendimentos, decisão 118) e `ver_contexto` (data de hoje, até quando há vendas, lojas com os ids, categorias, permissões e definições das métricas) |
 | O que não sai | Nada do cliente: pedidos, pontos, devoluções e conta ficam só na Lúcia, no site |
 | Permissão | Toda a equipe, conferida **a cada chamada**: papel, marca e conta ativa do dono, como no copiloto do painel |
 | Escrita | Nenhuma. As consultas rodam em transação READ ONLY, como no copiloto |

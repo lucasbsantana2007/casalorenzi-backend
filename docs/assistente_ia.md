@@ -94,7 +94,7 @@ SUBSTITUIDA), `numeros`, `semFonte`, `textoModelo` (o que o modelo tinha escrito
 | `src/entities/periodo.py` | Períodos em datas do fuso da plataforma (`FUSO_HORARIO`) |
 | `src/use_cases/assistente/ferramentas.py` | Contrato das ferramentas, checagem de permissão, execução isolada e auditável |
 | `src/use_cases/assistente/ferramentas_cliente.py`, `ferramentas_conta.py` | As 16 ferramentas do site (catálogo, lojas, políticas, sacola, atendimento; conta do cliente e ações com confirmação) |
-| `src/use_cases/assistente/ferramentas_gerenciais.py` | As 11 ferramentas do copiloto |
+| `src/use_cases/assistente/ferramentas_gerenciais.py` | As 13 ferramentas do copiloto |
 | `src/use_cases/assistente/catalogo.py` | Busca no catálogo e disponibilidade por loja (regras da vitrine) |
 | `src/use_cases/assistente/orquestrador.py` | Uma rodada: resposta direta, modelo com ferramentas ou regras; limites e contingência |
 | `src/use_cases/assistente/regras_cliente.py`, `regras_gerenciais.py` | Respostas sem modelo |
