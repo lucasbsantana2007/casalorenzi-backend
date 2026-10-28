@@ -64,6 +64,8 @@ estoque parado da loja dele".
 | Parâmetro a mais (ex.: `cliente_id`) | Recusado pelo contrato (`extra="forbid"`), como no copiloto |
 | Abuso | 60 consultas a cada 10 minutos por token; corpo de até 64 KB |
 | Site malicioso no navegador (DNS rebinding) | Requisição com `Origin` de outro site recebe 403 |
+| Corpo fora do padrão | `NaN`, `Infinity`, JSON aninhado sem fim ou lote de mensagens: 400 antes de chegar ao banco. Falha não prevista (banco fora do ar): erro JSON-RPC `-32603`, sem detalhe interno |
+| Dois pedidos de token ao mesmo tempo | A criação trava a linha da pessoa: o limite de 5 ativos vale mesmo assim |
 | Rastreabilidade | Cada chamada em `chamadas_mcp`: token, pessoa, ferramenta, parâmetros, sucesso, erro, duração e o app que chamou |
 
 **O que muda em relação ao painel:** fora do painel, quem escreve a resposta é o modelo do app da pessoa, e não o
