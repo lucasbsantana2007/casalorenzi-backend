@@ -36,6 +36,7 @@ from src.models.pedido import Pedido
 from src.models.produto import Produto
 from src.models.sacola import Sacola
 from src.models.tipo_solicitacao import TipoSolicitacao
+from src.models.token_mcp import ChamadaMcp, TokenMcp
 from src.models.token_senha import TokenSenha
 from src.models.transferencia import Transferencia
 from src.models.usuario import Usuario
@@ -78,4 +79,6 @@ __all__ = [
     "Alerta",
     "ExecucaoAutomacao",
     "AvisoPontos",
+    "TokenMcp",
+    "ChamadaMcp",
 ]
