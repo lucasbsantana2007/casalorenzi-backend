@@ -172,6 +172,24 @@ def direta(texto: str, ctx: Contexto, executar) -> Rodada | None:
     return None
 
 
+_EMAIL = re.compile(r"[^\s@]+@[^\s@]+\.[^\s@?!,;]+")
+_CPF = re.compile(r"\b\d{3}\.?\d{3}\.?\d{3}-?\d{2}\b")
+_NOME_DEPOIS_DE_CLIENTE = re.compile(
+    r"\b(?:o|a|do|da)?\s*client[ea]s?\s+([A-ZÀ-Ý][\wÀ-ÿ'-]+(?:\s+(?:d[aeo]s?\s+)?[A-ZÀ-Ý][\wÀ-ÿ'-]+)*)"
+)
+
+
+def _cliente_citado(texto: str) -> str | None:
+    """O e-mail, o CPF ou o nome (com maiúscula, depois de "cliente") citados na pergunta."""
+    if achado := _EMAIL.search(texto):
+        return achado.group(0)
+    if achado := _CPF.search(texto):
+        return achado.group(0)
+    if achado := _NOME_DEPOIS_DE_CLIENTE.search(texto):
+        return achado.group(1)
+    return None
+
+
 def responder(texto: str, ctx: Contexto, executar) -> Rodada:
     if (rapida := direta(texto, ctx, executar)) is not None:
         return rapida
@@ -219,6 +237,10 @@ def responder(texto: str, ctx: Contexto, executar) -> Rodada:
         r"\bestoque baixo|\bacabando|\bruptura|\bzerad|\bsem estoque|\brepor\b|\breposicao|\bem falta|\bfaltando|\bminimo", n
     ):
         return _consultar(executar, "consultar_estoque_baixo", {**escopo, "categoria": _categoria(n)})
+    # Pontos de um cliente (decisão 119): "quantos pontos a cliente Mariana Costa tem?", "pontos do ana@email.com"
+    if re.search(r"\bpontos\b|\blupe\b", n):
+        if quem := _cliente_citado(texto):
+            return _consultar(executar, "consultar_pontos_cliente", {"busca": quem})
     if re.search(
         r"(\blupe\b|vulto\+|vulto mais|\bpontos\b|\bfidelidade\b|\bpassivo\b|\bcategorias? de clientes?\b|\bclientes?\b.*\bcategorias?\b)",
         n,
