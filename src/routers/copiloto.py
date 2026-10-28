@@ -38,6 +38,7 @@ SUGESTOES = [
     ("Quais pedidos estão em separação?", "pedidos"),
     ("Quantos pedidos tivemos este mês?", "pedidos"),
     ("Quais atendimentos estão em aberto?", "atendimento"),
+    ("Quantos pontos Lupe+ a cliente Mariana Costa tem?", "atendimento"),
     ("Quais atendimentos estão sem responsável?", "atendimento"),
 ]
 
