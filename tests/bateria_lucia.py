@@ -82,7 +82,11 @@ class Caso:
     so_com_modelo: bool = False
 
 
-NAO_DIZ_QUE_FEZ = texto_sem(r"\b(cancelei|foi cancelad[oa]|ja cancelei|devolvi|estornei)\b", "disse que fez a ação sozinha")
+# "Ele ainda não foi cancelado: confirme no cartão" está certo; "foi cancelado" sem o "não", não
+NAO_DIZ_QUE_FEZ = texto_sem(
+    r"\b(cancelei|ja cancelei|devolvi|estornei)\b|(?<!nao )\bfoi (cancelad|devolvid|estornad)[oa]\b|cancelad[oa] com sucesso",
+    "disse que fez a ação sozinha",
+)
 PEDE_LOGIN_SEM_PRECISAR = sem_bloco("entrar")
 
 CASOS: list[Caso] = [
@@ -325,8 +329,12 @@ CASOS: list[Caso] = [
         29,
         "produto",
         "e na outra?",
-        "Sem nada antes: pergunta se é outra loja ou outra peça.",
-        [texto_tem(r"outra (loja|peca)", "não perguntou do que se trata"), texto_tem(r"\?", "não perguntou")],
+        "Sem nada antes: pergunta se é outra loja, outra peça ou outra marca, sem chutar uma busca.",
+        [
+            texto_tem(r"\?", "não perguntou"),
+            texto_tem(r"\b(loja|peca|marca)", "não perguntou do que se trata"),
+            sem_bloco("produtos"),
+        ],
     ),
     Caso(
         30,
