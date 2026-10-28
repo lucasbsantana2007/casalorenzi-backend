@@ -240,7 +240,7 @@ def conversas_do_usuario(db: Session, usuario: m.Usuario) -> list[dict]:
 # ---------- Enviar mensagem ----------
 
 
-def _contexto_cliente(db: Session, conversa: m.ConversaAssistente, cliente: m.Cliente | None) -> Contexto:
+def _contexto_cliente(db: Session, conversa: m.ConversaAssistente, cliente: m.Cliente | None, canal: str = "SITE") -> Contexto:
     atendimento = db.get(m.Atendimento, conversa.atendimento_id) if conversa.atendimento_id else None
     return Contexto(
         tipo=regra.CLIENTE,
@@ -250,6 +250,7 @@ def _contexto_cliente(db: Session, conversa: m.ConversaAssistente, cliente: m.Cl
         marca_site=conversa.marca,
         memoria=dict(conversa.contexto or {}),
         atendimento_protocolo=atendimento.protocolo if atendimento else None,
+        canal=canal,
     )
 
 
@@ -273,7 +274,7 @@ def _dinamico_cliente(db: Session, ctx: Contexto, cliente: m.Cliente | None):
         ]
         primeiro = cliente.nome.split()[0] if cliente and cliente.nome else None
         perfil = perfil_cliente.linhas_do_contexto(perfil_cliente.perfil(db, cliente)) if cliente else []
-        return prompts.contexto_cliente(
+        contexto = prompts.contexto_cliente(
             memoria=ctx.memoria,
             marca_site=ctx.marca_site,
             logado=cliente is not None,
@@ -281,8 +282,20 @@ def _dinamico_cliente(db: Session, ctx: Contexto, cliente: m.Cliente | None):
             lojas=lojas,
             perfil=perfil,
         )
+        if ctx.canal == "WHATSAPP":
+            contexto += "\n" + NOTA_WHATSAPP.format(site=settings.URL_FRONTEND)
+        return contexto
 
     return montar
+
+
+# O que muda para o modelo quando o cliente fala pelo WhatsApp (decisão 108): só texto, sem botões, sem login
+NOTA_WHATSAPP = (
+    "- Canal: WhatsApp. Aqui não há cards, botões, sacola nem login: responda em texto curto, com no máximo 5 peças, e "
+    "não diga para tocar em botões. O link de cada peça vai junto da resposta: para comprar, o cliente abre o link. "
+    "Pedidos, pontos e dados da conta só no site, com login ({site}/login). Para falar com alguém da equipe, use "
+    "solicitar_atendimento_humano: a equipe recebe o resumo e continua pelo WhatsApp."
+)
 
 
 def _dinamico_gerencial(db: Session, ctx: Contexto, usuario: m.Usuario):
@@ -327,6 +340,7 @@ def enviar(
     usuario: m.Usuario | None = None,
     marca_escopo: str | None = None,
     request_id: str | None = None,
+    canal: str = "SITE",
 ) -> tuple[m.MensagemAssistente, m.MensagemAssistente]:
     """(pergunta, resposta). Trava a conversa durante a resposta e grava tudo numa transação."""
     texto = (texto or "").strip()
@@ -368,7 +382,7 @@ def enviar(
         sessao.gerar_ids(db)
 
     if conversa.tipo == regra.CLIENTE:
-        ctx = _contexto_cliente(db, conversa, cliente)
+        ctx = _contexto_cliente(db, conversa, cliente, canal)
         _aplicar_acao(db, ctx, acao)
         rodada = responder(ASSISTENTE_CLIENTE, texto, ctx, historico, _dinamico_cliente(db, ctx, cliente))
     else:
