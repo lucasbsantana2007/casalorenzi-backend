@@ -111,7 +111,7 @@ consultas feitas.
 | 👍/👎 embaixo da última resposta; no 👎, escrever o que faltou | Aparece em **Uso e custo da IA** (Helena), junto com respostas conferidas, refeitas e trocadas. |
 | (Parte técnica) `pytest tests/test_bateria_lucia.py` | A bateria de 38 perguntas difíceis roda a cada mudança. Com o Claude: 38 de 38 (`docs/avaliacao_lucia.md`). |
 
-## 9. Copiloto no Claude (MCP, decisão 106)
+## 9. Copiloto no Claude: a cúpula da liderança (MCP, decisões 106 e 109)
 
 No Claude Code (ou no Claude Desktop) com o conector da Casa Lorenzi configurado:
 
@@ -121,7 +121,8 @@ No Claude Code (ou no Claude Desktop) com o conector da Casa Lorenzi configurado
 | `Monte um e-mail para cada gerente com o estoque parado da loja dele` | O Claude usa o nosso servidor e escreve o e-mail: o copiloto junto com o resto do trabalho. |
 | No painel, **Inteligência > Conectar ao Claude** | O token pessoal (aparece uma vez), o último uso, as consultas e o **Revogar**, que corta o acesso na hora. |
 
-Apontar: só leitura, nenhum dado de cliente, e cada pessoa vê pelo Claude o mesmo que vê no painel (papel e marca).
+Apontar: só a liderança (Administradores) usa; só leitura, nenhum dado de cliente e a mesma marca que a pessoa
+vê no painel. Entrar como Diego (Operador): a aba Conectar ao Claude nem aparece.
 
 ## 10. A Lúcia no WhatsApp (decisão 108)
 
