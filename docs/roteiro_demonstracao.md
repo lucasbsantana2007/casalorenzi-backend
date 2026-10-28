@@ -1,6 +1,6 @@
 # Roteiro de demonstração — Entrega 4 (assistentes de IA)
 
-Cerca de 12 minutos. Cada passo diz o que digitar e o que apontar para a banca. As respostas citadas abaixo são as
+Cerca de 18 minutos (os passos 8 a 10 são da reta final: qualidade, copiloto no Claude e WhatsApp). Cada passo diz o que digitar e o que apontar para a banca. As respostas citadas abaixo são as
 do banco local com a carga da Vulto (vendas até 03/10/2026); em outro banco, os números mudam, mas o comportamento é
 o mesmo.
 
@@ -13,6 +13,10 @@ o mesmo.
 - [ ] Duas janelas: uma anônima (cliente) e outra logada como Helena (Administradora do grupo). Senha de
       demonstração em `src/database/seed/dados.py`.
 - [ ] Sacola vazia na janela do cliente.
+- [ ] Depois da recarga de produção: token MCP da Helena criado (Inteligência > Conectar ao Claude) e o Claude Code
+      configurado com ele (passo 9).
+- [ ] WhatsApp: `CANAL_WHATSAPP_SEGREDO` no Render, fluxo do n8n ativo e o celular da demonstração cadastrado no
+      número de teste da Meta (passo 10, `docs/whatsapp.md`).
 
 ## 1. O cliente encontra uma peça (vitrine da Vulto, sem login)
 
@@ -32,8 +36,8 @@ Apontar: nada foi inventado; os cards vêm do banco, não do texto do modelo.
 
 | Digitar | Mostrar |
 | --- | --- |
-| `pode adicionar na sacola` | O assistente confere peça, cor, tamanho, preço e estoque e mostra o botão "Adicionar à sacola". Ele **não** diz que adicionou. |
-| Tocar em **Adicionar à sacola** | A sacola lateral do site abre com a peça (a mesma sacola da página do produto). O botão vira "Na sacola". |
+| `pode adicionar na sacola` | O assistente confere peça, cor, tamanho, preço e estoque e coloca a peça na sacola na hora (decisão 94), com **Desfazer** e **Finalizar compra**. A sacola lateral do site mostra a peça. |
+| Tocar em **Desfazer** | A peça sai da sacola. Sacola não é compra: nada foi cobrado. |
 
 Apontar: o assistente não compra, não cobra e não fecha pedido; quem finaliza é o cliente no checkout, que recalcula
 preço e frete no servidor.
@@ -49,7 +53,9 @@ preço e frete no servidor.
 
 ## 4. Cliente logado: Lupe+, pedidos e chamado
 
-Entrar como `mariana.costa@gmail.com` e abrir o assistente (na área do cliente ou na vitrine). No banco local, as
+Entrar como `mariana.costa@gmail.com` e abrir o assistente (na área do cliente ou na vitrine). A primeira mensagem já
+é dela (decisão 103): o nome, os pontos que vencem em 30 dias (se houver), o pedido em andamento e um atalho do
+tipo de peça que ela mais compra, no tamanho que costuma levar. No banco local, as
 contas de demonstração ainda não têm pontos: finalize antes, como Mariana, a compra da camisa que o assistente pôs na
 sacola (passo 2; o pagamento é simulado e aprovado). A compra pelo site gera 2 pontos por real em produtos.
 
@@ -96,8 +102,44 @@ consultas feitas.
 - Custos: Haiku 5.5 por padrão; cerca de US$ 0,002 por conversa; 10 mil conversas + copiloto ≈ US$ 22 por mês
   (`docs/custos_ia.md`, `python scripts/estimar_custos_ia.py`). Trocar de modelo é uma variável de ambiente.
 
+## 8. Qualidade das respostas (decisões 101 a 105)
+
+| Fazer | Mostrar |
+| --- | --- |
+| Logada como Mariana: `tenho 5000 pontos, certo?` | Mostra o saldo real e não confirma o número que ela disse. Todo número da resposta precisa ter vindo de uma consulta (verificador). |
+| Duas mensagens sem sentido seguidas (ex.: `asdf qwer`) | Na segunda, a Lúcia oferece falar com a equipe, com o resumo: o cliente não fica repetindo a pergunta. |
+| 👍/👎 embaixo da última resposta; no 👎, escrever o que faltou | Aparece em **Uso e custo da IA** (Helena), junto com respostas conferidas, refeitas e trocadas. |
+| (Parte técnica) `pytest tests/test_bateria_lucia.py` | A bateria de 38 perguntas difíceis roda a cada mudança. Com o Claude: 38 de 38 (`docs/avaliacao_lucia.md`). |
+
+## 9. Copiloto no Claude (MCP, decisão 106)
+
+No Claude Code (ou no Claude Desktop) com o conector da Casa Lorenzi configurado:
+
+| Perguntar | Mostrar |
+| --- | --- |
+| `Quanto faturamos no mês passado, por loja?` | Os mesmos números do copiloto do painel, com período e definição. A ferramenta chamada aparece na tela do Claude. |
+| `Monte um e-mail para cada gerente com o estoque parado da loja dele` | O Claude usa o nosso servidor e escreve o e-mail: o copiloto junto com o resto do trabalho. |
+| No painel, **Inteligência > Conectar ao Claude** | O token pessoal (aparece uma vez), o último uso, as consultas e o **Revogar**, que corta o acesso na hora. |
+
+Apontar: só leitura, nenhum dado de cliente, e cada pessoa vê pelo Claude o mesmo que vê no painel (papel e marca).
+
+## 10. A Lúcia no WhatsApp (decisão 108)
+
+Do celular cadastrado no número de teste da Meta:
+
+| Mandar | Mostrar |
+| --- | --- |
+| `oi, vocês têm camisa de linho azul até 400 reais?` | A mesma Lúcia do site, em texto: a peça com preço e o link para comprar. |
+| `qual o horário da loja de Curitiba hoje?` | As lojas com o horário de hoje, do cadastro. |
+| `quero falar com alguém da equipe` | O chamado abre na hora, com o protocolo. No painel (Atendimento), o chamado com o resumo e o telefone. |
+
+Apontar: o n8n só leva e traz as mensagens; quem responde, confere os números e decide é a API, com as mesmas regras do site.
+
 ## Se algo der errado na hora
 
 - Site sem resposta: a API do Render pode estar dormindo (plano grátis); abrir `/api/health` e esperar ~1 minuto.
 - "Muitas mensagens seguidas" (429): é o limite de uso; abrir uma conversa nova (botão ↺) ou esperar 10 minutos.
 - Alertas vazios: rodar `python -m src.automacoes` ou o botão "Atualizar alertas agora".
+- Claude Code não conecta no MCP com `InvalidHTTPResponse`: antivírus que inspeciona tráfego MCP (o Avast faz isso);
+  liberar o endereço da API no antivírus ou usar outra máquina (`docs/mcp.md`).
+- WhatsApp sem resposta: conferir se o fluxo do n8n está ativo e se o celular está na lista de números de teste da Meta.

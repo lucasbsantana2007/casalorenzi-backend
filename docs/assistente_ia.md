@@ -102,6 +102,7 @@ SUBSTITUIDA), `numeros`, `semFonte`, `textoModelo` (o que o modelo tinha escrito
 | `src/use_cases/analises.py` | Análises da operação (copiloto e automações), só leitura |
 | `src/use_cases/automacoes.py`, `src/automacoes/` | Automações e a linha de comando `python -m src.automacoes` |
 | `src/routers/assistente.py`, `copiloto.py`, `alertas.py` | Rotas da API |
+| `src/use_cases/assistente/canal_whatsapp.py`, `src/routers/canais.py` | A Lúcia no WhatsApp: o n8n chama a API e entrega a resposta (decisão 108, [whatsapp.md](whatsapp.md)) |
 | `src/use_cases/assistente/servidor_mcp.py`, `src/use_cases/tokens_mcp.py`, `src/routers/mcp.py` | Servidor MCP do copiloto e os tokens pessoais (decisão 106, [mcp.md](mcp.md)) |
 | `src/repositories/assistente_repository.py`, `alerta_repository.py`, `analise_repository.py` | Consultas (SQLAlchemy, sempre com parâmetros) |
 | `src/models/conversa_assistente.py` e outros 5 | Tabelas novas (ver "Banco de dados") |
@@ -278,6 +279,7 @@ botão "Atualizar alertas agora" (Administrador) na aba Alertas. No banco local,
 | `IA_CONVERSA_EXPIRA_HORAS` / `IA_RETENCAO_DIAS` | 24 / 90 | Memória e retenção |
 | `IA_RESPOSTAS_DIRETAS` | true | Mensagens simples sem modelo |
 | `MCP_TOKEN_VALIDADE_DIAS` / `MCP_TOKENS_POR_USUARIO` | 90 / 5 | Tokens do servidor MCP (decisão 106) |
+| `CANAL_WHATSAPP_SEGREDO` / `CANAL_WHATSAPP_MARCA` | vazio / `LORENZI` | A Lúcia no WhatsApp pelo n8n (decisão 108, [whatsapp.md](whatsapp.md)). Vazio: rota desligada |
 | `DATABASE_URL_LEITURA` | = `DATABASE_URL` | Usuário só leitura (opcional) |
 | `CONSULTA_TIMEOUT_MS` | 8000 | Tempo máximo de cada consulta das análises |
 | `ALERTA_ESTOQUE_BAIXO_JANELA_DIAS` / `ALERTA_ESTOQUE_PARADO_DIAS` / `ALERTA_PONTOS_DIAS` | 60 / 90 / 30 | Automações |

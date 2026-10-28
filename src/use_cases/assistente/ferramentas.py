@@ -56,6 +56,8 @@ class Contexto:
     acao: dict | None = None
     # Site: a conversa já foi encaminhada para a equipe (protocolo do atendimento)
     atendimento_protocolo: str | None = None
+    # Por onde o cliente fala: SITE (cards e botões) ou WHATSAPP (só texto; decisão 108)
+    canal: str = "SITE"
 
 
 @dataclass

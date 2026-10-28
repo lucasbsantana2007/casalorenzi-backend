@@ -89,6 +89,11 @@ MCP_TOKENS_POR_USUARIO = int(os.getenv("MCP_TOKENS_POR_USUARIO", "5"))
 # Vazio: só o chamado pelo site (decisão 81).
 WHATSAPP_ATENDIMENTO = "".join(c for c in os.getenv("WHATSAPP_ATENDIMENTO", "") if c.isdigit())
 
+# A Lúcia no WhatsApp (decisão 108): o n8n recebe a mensagem na Meta e chama POST /api/canais/whatsapp/mensagens
+# com este segredo no cabeçalho X-Canal-Segredo. Vazio: a rota não existe (404). Marca: a vitrine do número.
+CANAL_WHATSAPP_SEGREDO = os.getenv("CANAL_WHATSAPP_SEGREDO", "")
+CANAL_WHATSAPP_MARCA = os.getenv("CANAL_WHATSAPP_MARCA", "LORENZI")
+
 # Banco só de leitura para o copiloto e as automações (opcional): um usuário do Postgres só com SELECT.
 # Vazio: usa DATABASE_URL, e cada consulta roda numa transação READ ONLY com tempo máximo.
 DATABASE_URL_LEITURA = os.getenv("DATABASE_URL_LEITURA", "") or DATABASE_URL
