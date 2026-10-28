@@ -104,7 +104,7 @@ def nao_diz_que_fez(resposta: dict) -> str | None:
 NAO_DIZ_QUE_FEZ = nao_diz_que_fez
 PEDE_LOGIN_SEM_PRECISAR = sem_bloco("entrar")
 # "Qual peça?", "Qual é a peça que você tem em mente?", "Me diga o nome da peça"
-PERGUNTA_A_PECA = r"qual[^.?!]{0,25}\bpeca\b|que peca|nome da peca|qual (delas|modelo)"
+PERGUNTA_A_PECA = r"(qual|que|nome|tipo)[^.?!]{0,25}\bpeca\b|qual (delas|modelo)"
 
 CASOS: list[Caso] = [
     # ---------- Meu caso (precisa da conta) ----------
@@ -186,8 +186,13 @@ CASOS: list[Caso] = [
         9,
         "produto",
         "tem essa no M na loja do shopping?",
-        "Sem peça antes: pergunta qual peça.",
-        [texto_tem(PERGUNTA_A_PECA, "não perguntou qual peça"), sem_bloco("lojas")],
+        "Sem peça antes: pergunta qual peça, sem chutar a disponibilidade de alguma.",
+        [
+            texto_tem(PERGUNTA_A_PECA, "não perguntou qual peça"),
+            texto_tem(r"\?", "não perguntou"),
+            sem_bloco("disponibilidade"),
+            sem_bloco("lojas"),
+        ],
     ),
     Caso(
         10,
@@ -201,7 +206,8 @@ CASOS: list[Caso] = [
         "produto",
         "vocês vendem tênis?",
         "Diz que não tem tênis e oferece outra peça.",
-        [texto_tem(r"nao (encontrei|temos|trabalhamos|vendemos|tenho)", "não disse que não tem")],
+        # "Não encontrei tênis", "não há calçados no catálogo", "não trabalhamos com tênis"
+        [texto_tem(r"\bn(ao|o) (encontrei|temos|trabalhamos|vendemos|tenho)|\bnao ha\b|\bnenhum", "não disse que não tem")],
     ),
     Caso(
         12,
