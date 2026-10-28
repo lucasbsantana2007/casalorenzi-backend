@@ -283,7 +283,7 @@ def test_discover_moderno(client, admin):
 def test_chamada_moderna_e_nome_em_base64(client, admin):
     token = criar_token(client, admin)
     lista = moderno(client, token, "tools/list").json()["result"]
-    assert lista["resultType"] == "complete" and len(lista["tools"]) == 14
+    assert lista["resultType"] == "complete" and len(lista["tools"]) == 15
     nome = "ver_contexto"
     codificado = "=?base64?" + base64.b64encode(nome.encode()).decode() + "?="
     resposta = moderno(client, token, "tools/call", {"name": nome, "arguments": {}}, cabecalhos={"Mcp-Name": codificado})
@@ -323,7 +323,7 @@ def test_versao_de_2025_em_meta_e_atendida_como_2025(client, admin):
     """A lista de versões suportadas inclui as de 2025: quem tentar de novo com uma delas não fica sem resposta."""
     token = criar_token(client, admin)
     resposta = moderno(client, token, "tools/list", versao="2025-11-25")
-    assert resposta.status_code == 200 and len(resposta.json()["result"]["tools"]) == 14
+    assert resposta.status_code == 200 and len(resposta.json()["result"]["tools"]) == 15
     assert "resultType" not in resposta.json()["result"]
 
 
