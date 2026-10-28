@@ -77,9 +77,9 @@ def test_tabelas_novas_e_existentes():
     tabelas = set(inspect(engine).get_table_names())
     novas = {"fornecedores", "movimentos_pontos", "decisoes_migracao", "de_para"}
     assert novas <= tabelas
-    # Nenhuma tabela da Casa Lorenzi foi apagada: 23 + 4 novas da união + 11 da Entrega 4 (6 dos assistentes de
+    # Nenhuma tabela da Casa Lorenzi foi apagada: 23 + 4 novas da união + 14 da Entrega 4 (6 dos assistentes de
     # IA, docs/assistente_ia.md, a dos avisos de pontos, decisão 82, as do "Avise-me" e da sacola, decisões 99
-    # e 100, e as duas do servidor MCP, decisão 106), mais alembic_version. Sem lista de
+    # e 100, as duas do servidor MCP, decisão 106, e as três do login OAuth, decisão 114), mais alembic_version. Sem lista de
     # pendências: as pendências das planilhas da Vulto viraram decisões (docs/registro_decisoes_uniao.md)
     assistentes = {
         "conversas_assistente",
@@ -93,6 +93,9 @@ def test_tabelas_novas_e_existentes():
         "sacolas",
         "tokens_mcp",
         "chamadas_mcp",
+        "oauth_clientes",
+        "oauth_codigos",
+        "oauth_tokens",
     }
     assert assistentes <= tabelas
     assert len(tabelas - {"alembic_version"} - assistentes) == 27 and "pendencias" not in tabelas
