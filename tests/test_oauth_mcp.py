@@ -15,13 +15,13 @@ from src.database.seed import SENHA_DEMO
 from src.use_cases import oauth_mcp
 from src.utils.datas import agora
 from tests.conftest import _entrar
-from tests.test_mcp import legado
+from tests.test_mcp import chamar, legado
 from tests.util_assistente import sql
 
 BASE = "http://testserver"
 RECURSO = f"{BASE}/api/conector-mcp"
 VOLTA = "https://claude.ai/api/mcp/auth_callback"
-HELENA = "helena@casalorenzi.com.br"  # Administradora do grupo: a única que pode usar o MCP (decisão 110)
+HELENA = "helena@casalorenzi.com.br"  # Administradora do grupo (vê as duas marcas)
 PAULA = "paula.ferraz@vulto.com.br"  # Administradora só da Vulto
 
 
@@ -162,7 +162,6 @@ def test_cancelar_volta_com_access_denied(client):
     [
         (HELENA, "senha-errada", "E-mail ou senha incorretos."),
         ("ninguem@exemplo.com", SENHA_DEMO, "E-mail ou senha incorretos."),
-        (PAULA, SENHA_DEMO, "exclusivo do Administrador do grupo"),
         ("mariana.costa@gmail.com", SENHA_DEMO, "E-mail ou senha incorretos."),  # cliente da loja não é da equipe
     ],
 )
@@ -297,10 +296,46 @@ def test_acesso_vencido_recebe_401(client):
     assert _ferramentas(client, tokens["access_token"]).status_code == 401
 
 
-def test_quem_perde_o_papel_perde_o_acesso(client):
+def test_quem_e_desativado_perde_o_acesso(client):
     _, tokens = _conectar(client)
-    sql("UPDATE usuarios SET marca = 'LORENZI' WHERE email = :e", e=HELENA)
+    sql("UPDATE usuarios SET ativo = false WHERE email = :e", e=HELENA)
     assert _ferramentas(client, tokens["access_token"]).status_code == 401
+
+
+def test_conta_desativada_nao_autoriza(client):
+    sql("UPDATE usuarios SET ativo = false WHERE email = :e", e=PAULA)
+    app = _registrar(client)
+    _, desafio = _pkce()
+    resposta = _login(client, app, desafio, email=PAULA)
+    assert resposta.status_code == 401 and "desativada ou não tem acesso" in resposta.text
+
+
+@pytest.mark.parametrize(
+    ("email", "permitida", "recusada"),
+    [
+        ("rafael.monteiro@casalorenzi.com.br", "consultar_estoque_baixo", "consultar_faturamento"),  # Lojista
+        ("diego.almeida@casalorenzi.com.br", "sugerir_transferencias", "consultar_fidelidade"),  # Operador
+    ],
+)
+def test_lojista_e_operador_pelo_claude_ai_veem_so_o_do_perfil(client, email, permitida, recusada):
+    """Decisão 115: pelo login do claude.ai, cada perfil consulta só o que consulta no painel."""
+    app = _registrar(client)
+    verificador, desafio = _pkce()
+    codigo = _codigo(_login(client, app, desafio, email=email))["code"]
+    acesso = _trocar(client, app, codigo, verificador).json()["access_token"]
+    assert chamar(client, acesso, permitida)["isError"] is False
+    negada = chamar(client, acesso, recusada)
+    assert negada["isError"] is True and "SEM_PERMISSAO" in negada["content"][0]["text"]
+
+
+def test_administradora_de_uma_marca_ve_so_a_dela(client):
+    app = _registrar(client)
+    verificador, desafio = _pkce()
+    codigo = _codigo(_login(client, app, desafio, email=PAULA))["code"]
+    acesso = _trocar(client, app, codigo, verificador).json()["access_token"]
+    assert chamar(client, acesso, "ver_contexto")["structuredContent"]["marcasQuePodeVer"] == ["Vulto"]
+    outra = chamar(client, acesso, "consultar_faturamento", {"marca": "LORENZI"})
+    assert outra["isError"] is True and "SEM_PERMISSAO" in outra["content"][0]["text"]
 
 
 def test_conectar_o_mesmo_app_de_novo_substitui_a_conexao(client, admin):

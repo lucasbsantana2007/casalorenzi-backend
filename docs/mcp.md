@@ -1,10 +1,16 @@
-# Copiloto no Claude: o servidor MCP (decisões 106, 109, 110 e 114)
+# Copiloto no Claude: o servidor MCP (decisões 106, 109, 114 e 115)
 
-O copiloto gerencial também atende fora do painel, como a **cúpula de informação da liderança**: no **Claude
-Code**, no **Claude Desktop** ou num agente do **n8n**, pelo protocolo MCP (Model Context Protocol). Só o
-**Administrador do grupo** usa, o que vê as duas marcas; hoje, a Helena (decisão 110). Os outros perfis usam o
-copiloto no painel. Quem pergunta usa as mesmas consultas, as mesmas regras e as
-mesmas permissões do painel. Muda só o lugar da conversa.
+O copiloto gerencial também atende fora do painel: no **claude.ai**, no **Claude Code**, no **Claude Desktop** ou
+num agente do **n8n**, pelo protocolo MCP (Model Context Protocol). **Toda a equipe** com acesso ao Assistente IA
+usa (decisão 115, que substitui a 110), e cada pessoa vê só o que o perfil e a marca dela permitem. Quem pergunta
+usa as mesmas consultas, as mesmas regras e as mesmas permissões do painel. Muda só o lugar da conversa.
+
+| Perfil | Consulta | Não consulta |
+| --- | --- | --- |
+| Administrador do grupo | Tudo, nas duas marcas | — |
+| Administrador de uma marca | Tudo, só na marca dele | A outra marca |
+| Lojista | Estoque e alertas | Faturamento, vendas, Lupe+, transferências |
+| Operador | Estoque, transferências e alertas | Faturamento, vendas, Lupe+ |
 
 | O quê | Como |
 | --- | --- |
@@ -12,7 +18,7 @@ mesmas permissões do painel. Muda só o lugar da conversa.
 | Login | **claude.ai**: login OAuth, com o e-mail e a senha do painel (decisão 114). **Claude Code, Claude Desktop e n8n**: token pessoal (`Authorization: Bearer clmcp_...`), criado em **Inteligência > Conectar ao Claude** |
 | O que dá para consultar | As 11 ferramentas do copiloto e `ver_contexto` (data de hoje, até quando há vendas, lojas com os ids, categorias, permissões e definições das métricas) |
 | O que não sai | Nada do cliente: pedidos, pontos, devoluções e conta ficam só na Lúcia, no site |
-| Permissão | Só o Administrador do grupo, conferido **a cada chamada**: papel, marca (as duas) e conta ativa |
+| Permissão | Toda a equipe, conferida **a cada chamada**: papel, marca e conta ativa do dono, como no copiloto do painel |
 | Escrita | Nenhuma. As consultas rodam em transação READ ONLY, como no copiloto |
 
 ## Conectar no claude.ai (login, decisão 114)
@@ -21,7 +27,7 @@ mesmas permissões do painel. Muda só o lugar da conversa.
 2. Dê um nome (por exemplo "Casa Lorenzi") e cole o endereço `https://casalorenzi-api.onrender.com/api/conector-mcp`.
    Não preencha client ID nem segredo: o claude.ai se cadastra sozinho.
 3. Clique em **Conectar**. Abre a página "Conectar Claude à Casa Lorenzi": entre com o e-mail e a senha do painel
-   da Administradora do grupo e clique em **Entrar e autorizar**.
+   (cada pessoa com a própria conta) e clique em **Entrar e autorizar**.
 4. De volta ao claude.ai, ative o conector na conversa e pergunte.
 
 A conexão aparece em **Inteligência > Conectar ao Claude** com o nome "Claude (login)" e se revoga por lá, como um
@@ -85,7 +91,8 @@ estoque parado da loja dele".
 
 - Valem **90 dias** (`MCP_TOKEN_VALIDADE_DIAS`). Cada pessoa tem no máximo **5 ativos** (`MCP_TOKENS_POR_USUARIO`).
 - **Revogar** na mesma tela corta o acesso na hora: a próxima chamada recebe 401.
-- Quem é desativado ou deixa de ser Administrador do grupo perde o MCP na hora, sem precisar revogar.
+- Quem é desativado perde o MCP na hora, sem precisar revogar. Quem muda de papel ou de marca passa a ver o do novo
+  papel na próxima consulta.
 - A tela mostra o último uso e quantas consultas cada token fez.
 - Quem tiver o token consulta o que o dono consulta. Não mande por e-mail nem cole em lugar público.
 

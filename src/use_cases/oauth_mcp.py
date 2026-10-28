@@ -5,8 +5,9 @@ O claude.ai não aceita colar um token: ele pede o login. O fluxo segue a especi
 2. O app lê a ficha do servidor de autorização (RFC 8414) e se cadastra: pelo cadastro automático (DCR, RFC 7591)
    ou apontando para uma ficha publicada no próprio domínio (Client ID Metadata Document), aceita só dos domínios
    de OAUTH_CIMD_DOMINIOS.
-3. A pessoa entra com o login do painel e autoriza. Só o Administrador do grupo pode (decisão 110), como no
-   token pessoal. Sai um código de autorização: 10 minutos, uma vez só, preso ao PKCE (S256) e ao endereço de volta.
+3. A pessoa da equipe entra com o login do painel e autoriza (decisão 115). O app passa a consultar o que o papel e
+   a marca dela permitem, como no copiloto do painel e no token pessoal. Sai um código de autorização: 10 minutos,
+   uma vez só, preso ao PKCE (S256) e ao endereço de volta.
 4. O app troca o código por um acesso (OAUTH_ACESSO_MINUTOS) e uma renovação (OAUTH_RENOVACAO_DIAS), trocada a
    cada uso; renovação usada de novo derruba a conexão (sinal de roubo).
 
@@ -48,9 +49,7 @@ _INTERVALO_ULTIMO_USO = timedelta(minutes=1)
 _LOOPBACK = {"localhost", "127.0.0.1", "::1"}
 _METODOS_AUTH = ("none", "client_secret_post", "client_secret_basic")
 
-CONTA_NAO_AUTORIZADA = (
-    "O acesso pelo Claude é exclusivo do Administrador do grupo. Entre com essa conta ou use o copiloto no painel."
-)
+CONTA_NAO_AUTORIZADA = "Esta conta está desativada ou não tem acesso ao Assistente IA. Fale com o administrador."
 CREDENCIAIS_INVALIDAS = "E-mail ou senha incorretos."
 
 

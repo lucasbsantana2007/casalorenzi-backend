@@ -360,20 +360,40 @@ def test_faturamento_igual_ao_do_copiloto(client, admin):
     assert dados["faturamento"] == f"R$ {centavos}"
 
 
-def test_so_o_administrador_do_grupo_usa_o_mcp(client, admin, lojista, operador, paula):
-    """Decisão 110: o MCP é do Administrador do grupo (hoje, a Helena). Administrador de uma marca (Paula, Otávio),
-    Lojista e Operador não criam nem veem tokens; quem deixa de ver as duas marcas perde o MCP na hora."""
-    otavio = _entrar(client, "otavio.vasconcelos@casalorenzi.com.br")
-    for perfil in (paula, otavio, lojista, operador):
-        recusado = client.post("/api/mcp/tokens", json={"nome": "x"}, headers=perfil)
-        assert recusado.status_code == 403 and "Administrador do grupo" in recusado.json()["detail"]
-        assert client.get("/api/mcp/tokens", headers=perfil).status_code == 403
-    token = criar_token(client, admin)
-    assert legado(client, token, "tools/list").status_code == 200
+def _recusa(resultado) -> str:
+    assert resultado["isError"] is True, resultado
+    return resultado["content"][0]["text"]
+
+
+def test_toda_a_equipe_usa_o_mcp_e_cada_um_ve_o_seu(client, admin, lojista, operador, paula):
+    """Decisão 115 (substitui a 110): toda a equipe com acesso ao Assistente IA usa o MCP, e cada consulta vale o
+    que o papel e a marca do dono permitem, como no copiloto do painel."""
+    tokens = {
+        nome: criar_token(client, perfil) for nome, perfil in [("lojista", lojista), ("operador", operador), ("paula", paula)]
+    }
+
+    # Lojista: estoque sim; faturamento, Lupe+ e transferências não
+    assert chamar(client, tokens["lojista"], "consultar_estoque_baixo")["isError"] is False
+    for ferramenta in ("consultar_faturamento", "consultar_fidelidade", "sugerir_transferencias"):
+        assert "SEM_PERMISSAO: o perfil Lojista" in _recusa(chamar(client, tokens["lojista"], ferramenta))
+
+    # Operador: estoque e transferências sim; faturamento não
+    assert chamar(client, tokens["operador"], "sugerir_transferencias")["isError"] is False
+    assert "SEM_PERMISSAO: o perfil Operador" in _recusa(chamar(client, tokens["operador"], "consultar_faturamento"))
+
+    # Administradora só da Vulto: faturamento só da Vulto; a Casa Lorenzi é recusada
+    contexto = chamar(client, tokens["paula"], "ver_contexto")["structuredContent"]
+    assert contexto["marcasQuePodeVer"] == ["Vulto"]
+    assert "SEM_PERMISSAO" in _recusa(chamar(client, tokens["paula"], "consultar_faturamento", {"marca": "LORENZI"}))
+    vulto = chamar(client, tokens["paula"], "consultar_faturamento")
+    assert vulto["isError"] is False and "Vulto" in " ".join(vulto["structuredContent"]["filtros"])
+
+    # Quem é desativado perde o MCP na hora
     with SessionLocal() as db:
-        db.execute(text("UPDATE usuarios SET marca = 'LORENZI' WHERE email = 'helena@casalorenzi.com.br'"))
+        db.execute(text("UPDATE usuarios SET ativo = false WHERE email = 'rafael.monteiro@casalorenzi.com.br'"))
         db.commit()
-    assert legado(client, token, "tools/list").status_code == 401
+    assert legado(client, tokens["lojista"], "tools/list").status_code == 401
+    assert legado(client, tokens["operador"], "tools/list").status_code == 200
 
 
 def test_o_administrador_do_grupo_ve_as_duas_marcas(client, admin):
