@@ -4,7 +4,8 @@ com acesso ao Assistente IA (decisão 115): cada um vê o que o seu papel e a su
 
 O que vale aqui é o mesmo do copiloto: só leitura, permissão por papel e marca de quem é dono do token, conferida
 a cada chamada, parâmetros validados pelo mesmo contrato (campo a mais é recusado) e valores já formatados. Fica de
-fora tudo que é do cliente (pedidos, pontos, devoluções): nenhum dado pessoal sai por aqui. A diferença é quem
+fora quase tudo que é do cliente: a única consulta com dado pessoal é o saldo do Lupe+ de um cliente
+(consultar_pontos_cliente, decisão 119), para quem já vê a ficha do cliente no painel (Administrador e Lojista). A diferença é quem
 escreve a resposta final: o modelo do app da pessoa, e não o nosso; por isso o verificador de números não roda, e
 as instruções do servidor pedem para copiar os valores como vieram.
 
@@ -72,7 +73,9 @@ INSTRUCOES = (
     "do painel. Comece por ver_contexto: ele diz a data de hoje, até quando há vendas registradas, as lojas (com os "
     "ids que as ferramentas pedem), as categorias e o que este usuário pode consultar. Os valores já vêm formatados: "
     "copie-os como vieram, sem somar, arredondar ou calcular por conta própria, e diga o período e a definição da "
-    "métrica usados. Número que não veio de uma ferramenta não é dado da empresa. Responda em português."
+    "métrica usados. Número que não veio de uma ferramenta não é dado da empresa. Dados de um cliente, só quando "
+    "perguntarem por um cliente específico, e só o que consultar_pontos_cliente trouxe: não repita CPF, telefone ou "
+    "e-mail completo. Responda em português."
 )
 LIMITE_DE_CONSULTAS = "LIMITE_DE_CONSULTAS: muitas consultas seguidas com este token. Aguarde alguns minutos."
 
