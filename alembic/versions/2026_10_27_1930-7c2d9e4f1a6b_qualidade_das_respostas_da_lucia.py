@@ -1,12 +1,12 @@
 """qualidade das respostas da lucia
 
-Decisões 98, 99 e 101 (docs/registro_decisoes_e4.md): em mensagens_assistente,
+Decisões 101, 102 e 104 (docs/registro_decisoes_e4.md): em mensagens_assistente,
 - auditoria (JSON): verificação dos números, se a rodada falhou e se a Lúcia passou o cliente para uma pessoa;
 - avaliacao, avaliacao_comentario e avaliada_em: o 👍/👎 do cliente em cada resposta.
 Só colunas novas, todas opcionais; o downgrade as remove.
 
 Revision ID: 7c2d9e4f1a6b
-Revises: 5b7e1c9a3f20
+Revises: c41d7e2a9b10
 Create Date: 2026-10-27 19:30:00.000000
 
 """
@@ -18,7 +18,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision: str = '7c2d9e4f1a6b'
-down_revision: Union[str, Sequence[str], None] = '5b7e1c9a3f20'
+down_revision: Union[str, Sequence[str], None] = 'c41d7e2a9b10'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
