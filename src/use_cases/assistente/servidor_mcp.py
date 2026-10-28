@@ -83,7 +83,11 @@ class _SemParametros(Entrada):
 
 def _ver_contexto(db: Session, ctx: Contexto, _: BaseModel) -> Resultado:
     usuario = db.get(m.Usuario, ctx.usuario_id)
-    modulos = [modulo for modulo in ("financeiro", "estoque", "transferencias") if modulo in ACESSO]
+    modulos = [
+        modulo
+        for modulo in ("financeiro", "fidelidade", "pedidos", "atendimento", "estoque", "transferencias")
+        if modulo in ACESSO
+    ]
     marcas = [NOME_MARCA[ctx.marca_escopo]] if ctx.marca_escopo else list(NOME_MARCA.values())
     dados = {
         "agora": agora_texto(),
