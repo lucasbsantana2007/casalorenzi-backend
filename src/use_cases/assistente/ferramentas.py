@@ -29,10 +29,12 @@ log = logging.getLogger("casalorenzi.assistente")
 
 ROTULO_PAPEL = {"ADMINISTRADOR": "Administrador", "LOJISTA": "Lojista", "OPERADOR": "Operador"}
 ROTULO_MODULO = {
-    "financeiro": "dados financeiros (vendas, faturamento e Lupe+)",
+    "financeiro": "dados financeiros (vendas e faturamento)",
+    "fidelidade": "números do Lupe+",
+    "pedidos": "pedidos",
     "estoque": "estoque",
     "transferencias": "transferências",
-    "atendimento": "dados de clientes e do Lupe+",
+    "atendimento": "atendimentos",
     "dashboard": "indicadores do painel",
 }
 
