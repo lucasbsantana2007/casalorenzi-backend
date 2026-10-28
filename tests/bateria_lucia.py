@@ -88,6 +88,8 @@ NAO_DIZ_QUE_FEZ = texto_sem(
     "disse que fez a ação sozinha",
 )
 PEDE_LOGIN_SEM_PRECISAR = sem_bloco("entrar")
+# "Qual peça?", "Qual é a peça que você tem em mente?", "Me diga o nome da peça"
+PERGUNTA_A_PECA = r"qual[^.?!]{0,25}\bpeca\b|que peca|nome da peca|qual (delas|modelo)"
 
 CASOS: list[Caso] = [
     # ---------- Meu caso (precisa da conta) ----------
@@ -170,7 +172,7 @@ CASOS: list[Caso] = [
         "produto",
         "tem essa no M na loja do shopping?",
         "Sem peça antes: pergunta qual peça.",
-        [texto_tem(r"qual (peca|delas|modelo)|que peca|nome da peca", "não perguntou qual peça"), sem_bloco("lojas")],
+        [texto_tem(PERGUNTA_A_PECA, "não perguntou qual peça"), sem_bloco("lojas")],
     ),
     Caso(
         10,
@@ -201,7 +203,7 @@ CASOS: list[Caso] = [
         "Não inventa instrução de lavagem: pergunta a peça ou usa o cadastro.",
         [
             algum(
-                texto_tem(r"qual peca|que peca|nome da peca|qual (e a )?peca", "não perguntou a peça"),
+                texto_tem(PERGUNTA_A_PECA, "não perguntou a peça"),
                 texto_tem(r"cuidado|nao tenho", "não usou o cadastro nem disse que não tem"),
             )
         ],
