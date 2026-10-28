@@ -30,6 +30,7 @@ from src.routers import (
     financeiro,
     frete,
     mcp,
+    oauth_mcp,
     pagamentos,
     pedidos,
     produtos,
@@ -90,11 +91,14 @@ for modulo in (
     copiloto,
     alertas,
     mcp,
+    oauth_mcp,
     canais,
 ):
     api.include_router(modulo.router)
 
 app.include_router(api)
+# Fichas do OAuth do servidor MCP: os apps procuram na raiz do domínio (/.well-known/...)
+app.include_router(oauth_mcp.raiz)
 
 # Mantido por compatibilidade com quem já usava /health
 app.add_api_route("/health", health, include_in_schema=False)
