@@ -19,6 +19,7 @@ from src.routers import (
     autenticacao,
     avisos_cliente,
     cadastros,
+    canais,
     checkout,
     clientes,
     conta,
@@ -89,6 +90,7 @@ for modulo in (
     copiloto,
     alertas,
     mcp,
+    canais,
 ):
     api.include_router(modulo.router)
 
