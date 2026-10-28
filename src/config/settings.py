@@ -93,6 +93,11 @@ WHATSAPP_ATENDIMENTO = "".join(c for c in os.getenv("WHATSAPP_ATENDIMENTO", "") 
 # com este segredo no cabeçalho X-Canal-Segredo. Vazio: a rota não existe (404). Marca: a vitrine do número.
 CANAL_WHATSAPP_SEGREDO = os.getenv("CANAL_WHATSAPP_SEGREDO", "")
 CANAL_WHATSAPP_MARCA = os.getenv("CANAL_WHATSAPP_MARCA", "LORENZI")
+# Atendimento humano num lugar só (decisão 115): a resposta da equipe no painel volta para o WhatsApp pelo
+# webhook de envio do n8n (vazio: fica só no painel). O ciclo fecha quando o cliente fica tantas horas sem
+# responder depois da equipe; conversa com a Lúcia parada esse tempo também recomeça pelo menu.
+N8N_ENVIO_URL = os.getenv("N8N_ENVIO_URL", "").strip()
+WHATSAPP_CICLO_HORAS = int(os.getenv("WHATSAPP_CICLO_HORAS", "4"))
 
 # Banco só de leitura para o copiloto e as automações (opcional): um usuário do Postgres só com SELECT.
 # Vazio: usa DATABASE_URL, e cada consulta roda numa transação READ ONLY com tempo máximo.

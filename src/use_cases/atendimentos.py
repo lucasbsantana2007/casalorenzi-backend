@@ -241,6 +241,11 @@ def enviar_mensagem(
     atendimento.status = status_apos_mensagem(atendimento.status, "ATENDENTE")
     atendimento.atualizado_em = momento
     sessao.confirmar(db, atendimento)
+    if atendimento.canal == "WHATSAPP" and conteudo.strip():
+        # Chamado do WhatsApp: a resposta também vai para o cliente, pelo n8n (decisão 115)
+        from src.use_cases.assistente import canal_whatsapp
+
+        canal_whatsapp.entregar_resposta_da_equipe(db, atendimento, conteudo)
     return atendimento
 
 

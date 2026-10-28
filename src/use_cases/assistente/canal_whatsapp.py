@@ -18,16 +18,19 @@ o formato: sem cards nem botões, tudo vira texto com os links das peças.
 
 import hashlib
 import hmac
+import logging
 import re
 import time
 from datetime import timedelta
 
+import httpx
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from src import models as m
 from src.config import settings
 from src.entities import assistente as regra
+from src.entities.atendimento import EM_ABERTO
 from src.middlewares import limite
 from src.repositories import assistente_repository, sessao
 from src.use_cases import atendimentos
@@ -35,6 +38,8 @@ from src.use_cases.assistente import catalogo, conversas, regras_cliente
 from src.utils.datas import agora
 from src.utils.erros import Conflito, DadosInvalidos, Expirado, MuitasTentativas
 from src.utils.texto import normalizar
+
+log = logging.getLogger(__name__)
 
 CANAL = "WHATSAPP"
 # WhatsApp aceita até 4.096 caracteres por mensagem
@@ -63,7 +68,7 @@ def _chave(telefone: str) -> str:
 def _conversa_do_telefone(db: Session, telefone: str) -> m.ConversaAssistente:
     """A conversa ativa deste número; se não houver (primeira mensagem ou a anterior venceu), uma nova."""
     chave_hash = conversas._hash(_chave(telefone))
-    limite_de_atividade = agora() - timedelta(hours=settings.IA_CONVERSA_EXPIRA_HORAS)
+    limite_de_atividade = agora() - timedelta(hours=settings.WHATSAPP_CICLO_HORAS)
     conversa = db.scalar(
         select(m.ConversaAssistente)
         .where(
@@ -77,6 +82,9 @@ def _conversa_do_telefone(db: Session, telefone: str) -> m.ConversaAssistente:
     )
     if conversa is not None:
         return conversa
+    # Ciclo novo: fecha o chamado em que a equipe ficou esperando o cliente (se a automação ainda não fechou)
+    for atendimento in _parados(db, telefone):
+        _encerrar(db, atendimento, avisar=False)
     conversa = conversas._nova(db, tipo=regra.CLIENTE, marca=settings.CANAL_WHATSAPP_MARCA, chave_hash=chave_hash)
     sessao.confirmar(db)
     return conversa
@@ -312,6 +320,140 @@ def _para_a_equipe(db, conversa, telefone, nome, motivo) -> dict:
     return _saida(telefone, aviso, [BOTAO_LUCIA], conversa, db)
 
 
+# ---------- Um lugar só para o atendimento humano (decisão 115) ----------
+# O chamado do WhatsApp é o mesmo do painel: o cliente que vem do site com o protocolo cai no chamado que já existe;
+# a resposta da equipe no painel volta para o WhatsApp do cliente (pelo n8n); e o ciclo fecha sozinho quando o
+# cliente fica 4 horas sem responder depois da equipe.
+
+PROTOCOLO = re.compile(r"\bATD-\d{6}\b")
+# A Meta só aceita mensagem livre até 24 h depois da última mensagem do cliente; depois, só modelo aprovado
+JANELA_DA_META = timedelta(hours=24)
+ENCERRAMENTO = (
+    "Como não tivemos mais notícias, encerramos este atendimento (protocolo {protocolo}). Obrigada pelo contato! "
+    "Se precisar de algo, é só mandar uma mensagem por aqui."
+)
+NOTA_ENCERRADO = "Encerrado automaticamente: o cliente ficou {horas} horas sem responder depois da equipe."
+
+
+def _vindo_do_site(db: Session, conversa: m.ConversaAssistente, telefone: str, texto: str, nome: str | None) -> dict | None:
+    """Cliente que tocou em "Continuar no WhatsApp" no site: a mensagem traz o protocolo. Liga a conversa ao chamado
+    que já existe (com o resumo do site), em vez de abrir outro. Protocolo de outro canal, encerrado ou inexistente:
+    None (segue o menu)."""
+    achado = PROTOCOLO.search(texto)
+    if not achado:
+        return None
+    atendimento = db.scalar(select(m.Atendimento).where(m.Atendimento.protocolo == achado.group(0)))
+    if atendimento is None or atendimento.canal != CANAL or atendimento.status == "CONCLUIDO":
+        return None
+    if not (atendimento.contato or "").startswith("+"):
+        atendimento.contato = f"+{telefone}"
+    if (nome or "").strip() and atendimento.contato_nome in (None, "Visitante do site"):
+        atendimento.contato_nome = nome.strip()[:120]
+    conversa.atendimento_id = atendimento.id
+    conversa.status = regra.ENCAMINHADA
+    sessao.confirmar(db)
+    atendimentos.mensagem_do_whatsapp(db, atendimento, texto)
+    _guardar(db, conversa, whatsappModo=EQUIPE, perguntaPendente=None)
+    primeiro = re.match(r"[^\W\d_]+", (nome or "").strip())
+    saudacao = f"{cumprimento()}, {primeiro.group(0)[:30]}!" if primeiro else f"{cumprimento()}!"
+    texto_resposta = (
+        f"{saudacao} Recebi o seu protocolo {atendimento.protocolo}. A nossa equipe já tem o resumo da sua conversa no "
+        "site e continua com você por aqui."
+    )
+    return _saida(telefone, texto_resposta, [BOTAO_LUCIA], conversa, db)
+
+
+def _telefone_do_chamado(atendimento: m.Atendimento) -> str | None:
+    digitos = "".join(c for c in (atendimento.contato or "") if c.isdigit())
+    return digitos if (atendimento.contato or "").startswith("+") and 10 <= len(digitos) <= 15 else None
+
+
+def _ultima_do_cliente(atendimento: m.Atendimento):
+    return max((msg.enviado_em for msg in atendimento.mensagens if msg.autor_tipo == "CLIENTE"), default=None)
+
+
+def _entregar(mensagem: dict) -> bool:
+    """Entrega pelo n8n (decisão 108): POST no webhook de envio, com o segredo do canal. Sem webhook: False."""
+    if not settings.N8N_ENVIO_URL:
+        return False
+    try:
+        resposta = httpx.post(
+            settings.N8N_ENVIO_URL,
+            json={"mensagem": mensagem},
+            headers={"X-Canal-Segredo": settings.CANAL_WHATSAPP_SEGREDO},
+            timeout=10,
+        )
+        return resposta.status_code < 300
+    except httpx.HTTPError:
+        log.warning("Falha ao entregar mensagem da equipe pelo n8n", exc_info=True)
+        return False
+
+
+def entregar_resposta_da_equipe(db: Session, atendimento: m.Atendimento, conteudo: str) -> bool | None:
+    """Resposta da equipe no painel, num chamado do WhatsApp: vai para o WhatsApp do cliente. None quando não se
+    aplica (outro canal ou sem telefone); False quando não deu para entregar (fica registrado no chamado)."""
+    telefone = _telefone_do_chamado(atendimento) if atendimento.canal == CANAL else None
+    if telefone is None:
+        return None
+    ultima = _ultima_do_cliente(atendimento)
+    if ultima is None or agora() - ultima > JANELA_DA_META:
+        atendimentos.registrar_evento(
+            db,
+            atendimento,
+            "Resposta não enviada pelo WhatsApp: passaram mais de 24 h desde a última mensagem do cliente (regra da "
+            "Meta). Fale com o cliente pelo telefone do chamado.",
+        )
+        sessao.confirmar(db)
+        return False
+    # A resposta da equipe renova o ciclo da conversa: o cliente tem 4 h a partir dela
+    for conversa in db.scalars(select(m.ConversaAssistente).where(m.ConversaAssistente.atendimento_id == atendimento.id)):
+        conversa.atualizada_em = agora()
+    sessao.confirmar(db)
+    texto = f"{conteudo.strip()}\n\nEquipe Casa Lorenzi e Vulto · protocolo {atendimento.protocolo}"
+    entregue = _entregar(mensagem_da_meta(telefone, texto[:TAMANHO_MAXIMO], [BOTAO_LUCIA]))
+    if not entregue:
+        atendimentos.registrar_evento(
+            db, atendimento, "Não consegui entregar esta resposta no WhatsApp do cliente. Tente de novo em instantes."
+        )
+        sessao.confirmar(db)
+    return entregue
+
+
+def _parados(db: Session, telefone: str | None = None) -> list[m.Atendimento]:
+    """Chamados do WhatsApp em aberto cuja última mensagem é da equipe e tem mais de WHATSAPP_CICLO_HORAS horas.
+    Se a última é do cliente, quem deve resposta é a equipe: não fecha."""
+    consulta = select(m.Atendimento).where(m.Atendimento.canal == CANAL, m.Atendimento.status.in_(EM_ABERTO))
+    if telefone:
+        consulta = consulta.where(m.Atendimento.contato == f"+{telefone}")
+    limite_de_espera = agora() - timedelta(hours=settings.WHATSAPP_CICLO_HORAS)
+    parados = []
+    for atendimento in db.scalars(consulta):
+        conversa_real = [msg for msg in atendimento.mensagens if msg.autor_tipo in ("CLIENTE", "ATENDENTE")]
+        if conversa_real and conversa_real[-1].autor_tipo == "ATENDENTE" and conversa_real[-1].enviado_em <= limite_de_espera:
+            parados.append(atendimento)
+    return parados
+
+
+def _encerrar(db: Session, atendimento: m.Atendimento, avisar: bool) -> None:
+    atendimento.status = "CONCLUIDO"
+    atendimento.atualizado_em = agora()
+    atendimentos.registrar_evento(db, atendimento, NOTA_ENCERRADO.format(horas=settings.WHATSAPP_CICLO_HORAS))
+    sessao.confirmar(db)
+    telefone = _telefone_do_chamado(atendimento)
+    ultima = _ultima_do_cliente(atendimento)
+    if avisar and telefone and ultima is not None and agora() - ultima <= JANELA_DA_META:
+        _entregar(mensagem_da_meta(telefone, ENCERRAMENTO.format(protocolo=atendimento.protocolo)))
+
+
+def encerrar_ciclos(db: Session) -> int:
+    """Automação encerrar_whatsapp: fecha os chamados do WhatsApp em que o cliente ficou 4 horas sem responder depois
+    da equipe, e avisa o cliente (dentro da janela de 24 h da Meta). Devolve quantos fechou."""
+    parados = _parados(db)
+    for atendimento in parados:
+        _encerrar(db, atendimento, avisar=True)
+    return len(parados)
+
+
 # ---------- Mensagem recebida ----------
 
 
@@ -362,6 +504,8 @@ def responder(
         _guardar(db, conversa, whatsappModo=MENU)
         return _saida(telefone, texto_do_menu(nome), [BOTAO_LUCIA, BOTAO_EQUIPE], conversa, db)
 
+    if modo is None and (vindo := _vindo_do_site(db, conversa, telefone, texto, nome)) is not None:
+        return vindo
     if modo in (None, MENU):
         if escolha == EQUIPE:
             motivo = memoria.get("perguntaPendente") or "O cliente escolheu falar com a equipe no menu do WhatsApp."

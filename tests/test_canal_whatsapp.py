@@ -2,7 +2,7 @@
 menu (respostas rápidas ou equipe); a equipe abre o chamado na hora e as mensagens seguintes entram nele; toda
 resposta da Lúcia traz o botão da equipe; uma conversa por telefone e nada respondido duas vezes."""
 
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import pytest
 from sqlalchemy import select
@@ -263,3 +263,137 @@ def test_texto_longo_e_cortado_no_limite_do_whatsapp():
     longo = "\n".join(f"linha {i} " + "x" * 80 for i in range(100))
     cortado = canal.texto_para_whatsapp(longo, [])
     assert len(cortado) <= canal.TAMANHO_MAXIMO and cortado.endswith("…")
+
+
+# ---------- Atendimento humano num lugar só (decisão 115) ----------
+
+
+@pytest.fixture
+def entregas(monkeypatch):
+    """O que a API mandou para o webhook de envio do n8n (sem rede)."""
+    enviadas = []
+
+    class Resposta:
+        status_code = 200
+
+    def post(url, json, headers, timeout):
+        enviadas.append({"url": url, "corpo": json, "segredo": headers.get("X-Canal-Segredo")})
+        return Resposta()
+
+    monkeypatch.setattr(settings, "N8N_ENVIO_URL", "https://n8n.exemplo/webhook/envio")
+    monkeypatch.setattr(canal.httpx, "post", post)
+    return enviadas
+
+
+def _atendimento_id(protocolo) -> int:
+    with SessionLocal() as db:
+        return db.scalar(select(m.Atendimento.id).where(m.Atendimento.protocolo == protocolo))
+
+
+def _equipe_responde(client, admin, protocolo, texto="Oi, Ana! Vou verificar o seu pedido."):
+    resposta = client.post(f"/api/atendimentos/{_atendimento_id(protocolo)}/mensagens", json={"conteudo": texto}, headers=admin)
+    assert resposta.status_code == 201, resposta.text
+
+
+def _envelhecer(protocolo, autor_tipo, horas):
+    """Recua no tempo as mensagens de um autor do chamado (e a conversa do WhatsApp ligada a ele)."""
+    with SessionLocal() as db:
+        atendimento = db.scalar(select(m.Atendimento).where(m.Atendimento.protocolo == protocolo))
+        for mensagem in atendimento.mensagens:
+            if mensagem.autor_tipo == autor_tipo:
+                mensagem.enviado_em = mensagem.enviado_em - timedelta(hours=horas)
+        for conversa in db.scalars(select(m.ConversaAssistente).where(m.ConversaAssistente.atendimento_id == atendimento.id)):
+            conversa.atualizada_em = conversa.atualizada_em - timedelta(hours=horas)
+        db.commit()
+
+
+def test_cliente_que_vem_do_site_cai_no_mesmo_chamado(client):
+    from src.use_cases import atendimentos
+
+    with SessionLocal() as db:
+        tipo = db.scalar(select(m.TipoSolicitacao).where(m.TipoSolicitacao.titulo == "Dúvida sobre produto"))
+        aberto = atendimentos.abrir_pelo_whatsapp(
+            db, None, marca="LORENZI", tipo_solicitacao_id=tipo.id, descricao="Resumo do site: cliente quer saber do cinto."
+        )
+        db.commit()
+        protocolo = aberto.protocolo
+    resposta = diga(client, f"Olá! Vim do assistente do site. Protocolo {protocolo}.", nome="Ana Souza")
+    assert resposta["protocolo"] == protocolo and protocolo in resposta["texto"] and "Ana" in resposta["texto"]
+    atendimento = chamado(protocolo)
+    assert atendimento.contato == f"+{TELEFONE}" and atendimento.contato_nome == "Ana Souza"
+    assert atendimento.mensagens[-1].conteudo.startswith("Olá! Vim do assistente do site")
+    assert diga(client, "é sobre o cinto preto")["protocolo"] == protocolo
+    with SessionLocal() as db:
+        assert db.query(m.Atendimento).filter(m.Atendimento.canal == "WHATSAPP").count() == 1
+
+
+def test_resposta_da_equipe_no_painel_vai_para_o_whatsapp(client, admin, entregas):
+    diga(client, "oi")
+    protocolo = diga(client, botao="EQUIPE")["protocolo"]
+    _equipe_responde(client, admin, protocolo)
+    assert len(entregas) == 1
+    mensagem = entregas[0]["corpo"]["mensagem"]
+    assert entregas[0]["segredo"] == SEGREDO and mensagem["to"] == TELEFONE
+    corpo = mensagem["interactive"]["body"]["text"]
+    assert corpo.startswith("Oi, Ana! Vou verificar o seu pedido.") and protocolo in corpo
+
+
+def test_chamado_do_site_nao_vai_para_o_whatsapp(client, admin, entregas):
+    with SessionLocal() as db:
+        site = db.scalar(select(m.Atendimento).where(m.Atendimento.canal == "SITE", m.Atendimento.status != "CONCLUIDO").limit(1))
+    resposta = client.post(f"/api/atendimentos/{site.id}/mensagens", json={"conteudo": "Oi!"}, headers=admin)
+    assert resposta.status_code == 201 and entregas == []
+
+
+def test_fora_da_janela_de_24_horas_nao_envia_e_avisa_no_chamado(client, admin, entregas):
+    diga(client, "oi")
+    protocolo = diga(client, botao="EQUIPE")["protocolo"]
+    _envelhecer(protocolo, "CLIENTE", 25)
+    _equipe_responde(client, admin, protocolo)
+    assert entregas == []
+    assert "24 h" in chamado(protocolo).mensagens[-1].conteudo and chamado(protocolo).mensagens[-1].autor_tipo == "SISTEMA"
+
+
+def test_ciclo_fecha_com_4_horas_sem_resposta_do_cliente(client, admin, entregas):
+    diga(client, "oi")
+    protocolo = diga(client, botao="EQUIPE")["protocolo"]
+    _equipe_responde(client, admin, protocolo)
+    _envelhecer(protocolo, "CLIENTE", 6)  # a ordem se mantém: o cliente escreveu antes da equipe
+    _envelhecer(protocolo, "ATENDENTE", 5)
+    with SessionLocal() as db:
+        assert canal.encerrar_ciclos(db) == 1
+    atendimento = chamado(protocolo)
+    assert atendimento.status == "CONCLUIDO" and "4 horas" in atendimento.mensagens[-1].conteudo
+    aviso = entregas[-1]["corpo"]["mensagem"]
+    assert aviso["type"] == "text" and "encerramos este atendimento" in aviso["text"]["body"]
+    assert canal.OPCOES_DO_MENU in diga(client, "oi de novo")["texto"]
+
+
+def test_ciclo_nao_fecha_se_a_equipe_deve_a_resposta(client, entregas):
+    diga(client, "oi")
+    protocolo = diga(client, botao="EQUIPE")["protocolo"]
+    _envelhecer(protocolo, "CLIENTE", 5)
+    with SessionLocal() as db:
+        assert canal.encerrar_ciclos(db) == 0
+    assert chamado(protocolo).status != "CONCLUIDO"
+
+
+def test_cliente_que_volta_depois_de_4_horas_recomeca_pelo_menu(client, admin, entregas):
+    diga(client, "oi")
+    protocolo = diga(client, botao="EQUIPE")["protocolo"]
+    _equipe_responde(client, admin, protocolo)
+    _envelhecer(protocolo, "CLIENTE", 6)  # a ordem se mantém: o cliente escreveu antes da equipe
+    _envelhecer(protocolo, "ATENDENTE", 5)
+    resposta = diga(client, "voltei")
+    assert canal.OPCOES_DO_MENU in resposta["texto"] and resposta["protocolo"] is None
+    assert chamado(protocolo).status == "CONCLUIDO"
+
+
+def test_resposta_da_equipe_renova_o_ciclo(client, admin, entregas):
+    diga(client, "oi")
+    protocolo = diga(client, botao="EQUIPE")["protocolo"]
+    _envelhecer(protocolo, "CLIENTE", 5)  # a conversa ficou 5 h parada esperando a equipe
+    _equipe_responde(client, admin, protocolo)
+    seguinte = diga(client, "obrigada, aguardo")
+    assert seguinte["protocolo"] == protocolo and protocolo in seguinte["texto"]
+    assert chamado(protocolo).mensagens[-1].conteudo == "obrigada, aguardo"
