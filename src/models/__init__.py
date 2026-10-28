@@ -31,6 +31,7 @@ from src.models.mensagem import Mensagem
 from src.models.mensagem_assistente import MensagemAssistente
 from src.models.movimentacao import Movimentacao
 from src.models.movimento_pontos import MovimentoPontos
+from src.models.oauth import OAuthCliente, OAuthCodigo, OAuthToken
 from src.models.pagamento import Pagamento
 from src.models.pedido import Pedido
 from src.models.produto import Produto
@@ -43,6 +44,9 @@ from src.models.usuario import Usuario
 from src.models.variacao import Variacao
 
 __all__ = [
+    "OAuthCliente",
+    "OAuthCodigo",
+    "OAuthToken",
     "AvisoEstoque",
     "Sacola",
     "Loja",
