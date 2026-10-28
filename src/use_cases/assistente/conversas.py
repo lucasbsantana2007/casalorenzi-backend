@@ -27,9 +27,11 @@ from src.repositories import assistente_repository, cadastro_repository, sessao
 from src.use_cases import analises, atendimentos
 from src.use_cases.assistente import (
     catalogo,
+    escalonamento,
     ferramentas_cliente,
     ferramentas_conta,
     ferramentas_gerenciais,
+    perfil_cliente,
     prompts,
     regras_cliente,
     regras_gerenciais,
@@ -46,6 +48,7 @@ ASSISTENTE_CLIENTE = Assistente(
     prompt_fixo=prompts.PROMPT_CLIENTE,
     direta=regras_cliente.direta,
     regras=regras_cliente.responder,
+    depois=escalonamento.aplicar,
 )
 ASSISTENTE_GERENCIAL = Assistente(
     tipo=regra.GERENCIAL,
@@ -67,6 +70,7 @@ CHAVES_MEMORIA = {
     "lojaEmFocoNome",
     "oferta",
     "eventos",
+    "falhasSeguidas",
 }
 
 
@@ -90,6 +94,10 @@ def _limpar_memoria(memoria: dict) -> dict:
 # ---------- Saída ----------
 
 
+NOTAS = {"AJUDOU": 1, "NAO_AJUDOU": -1}
+NOME_DA_NOTA = {valor: nome for nome, valor in NOTAS.items()}
+
+
 def mensagem_saida(mensagem: m.MensagemAssistente) -> dict:
     return {
         "id": mensagem.id,
@@ -98,6 +106,9 @@ def mensagem_saida(mensagem: m.MensagemAssistente) -> dict:
         "blocos": mensagem.blocos or [],
         "modo": mensagem.modo,
         "criadaEm": ms(mensagem.criada_em),
+        # Respostas (não a saudação) podem receber "ajudou / não ajudou" do cliente (decisão 104)
+        "avaliavel": mensagem.papel == regra.ASSISTENTE and mensagem.responde_a_id is not None,
+        "avaliacao": NOME_DA_NOTA.get(mensagem.avaliacao),
     }
 
 
@@ -125,7 +136,16 @@ def conversa_saida(db: Session, conversa: m.ConversaAssistente, com_mensagens: b
 # ---------- Abrir e conferir o dono ----------
 
 
-def _nova(db: Session, *, tipo: str, cliente_id=None, usuario_id=None, marca=None, chave_hash=None) -> m.ConversaAssistente:
+def _nova(
+    db: Session,
+    *,
+    tipo: str,
+    cliente_id=None,
+    usuario_id=None,
+    marca=None,
+    chave_hash=None,
+    saudacao: tuple[str, list[str]] | None = None,
+) -> m.ConversaAssistente:
     momento = agora()
     conversa = m.ConversaAssistente(
         id=uuid.uuid4().hex,
@@ -142,13 +162,15 @@ def _nova(db: Session, *, tipo: str, cliente_id=None, usuario_id=None, marca=Non
     )
     sessao.adicionar(db, conversa)
     sessao.gerar_ids(db)
+    texto, sugestoes = saudacao or (
+        prompts.BOAS_VINDAS[tipo],
+        regras_cliente.SUGESTOES if tipo == regra.CLIENTE else regras_gerenciais.SUGESTOES[:4],
+    )
     boas_vindas = m.MensagemAssistente(
         conversa_id=conversa.id,
         papel=regra.ASSISTENTE,
-        conteudo=prompts.BOAS_VINDAS[tipo],
-        blocos=[
-            {"tipo": "sugestoes", "itens": regras_cliente.SUGESTOES if tipo == regra.CLIENTE else regras_gerenciais.SUGESTOES[:4]}
-        ],
+        conteudo=texto,
+        blocos=[{"tipo": "sugestoes", "itens": sugestoes}],
         modo=regra.REGRAS,
         criada_em=momento,
     )
@@ -157,9 +179,20 @@ def _nova(db: Session, *, tipo: str, cliente_id=None, usuario_id=None, marca=Non
 
 
 def abrir_cliente(db: Session, *, cliente: m.Cliente | None, marca: str | None) -> tuple[m.ConversaAssistente, str]:
-    """Conversa nova no site. Devolve a chave (só agora: no banco fica o hash)."""
+    """Conversa nova no site. Devolve a chave (só agora: no banco fica o hash). Cliente logado: a saudação já
+    traz os pontos a vencer e atalhos do jeito dele (decisão 103)."""
     chave = secrets.token_urlsafe(24)
-    conversa = _nova(db, tipo=regra.CLIENTE, cliente_id=cliente.id if cliente else None, marca=marca, chave_hash=_hash(chave))
+    saudacao = None
+    if cliente is not None:
+        saudacao = perfil_cliente.saudacao(perfil_cliente.perfil(db, cliente), prompts.NOME_ASSISTENTE, regras_cliente.SUGESTOES)
+    conversa = _nova(
+        db,
+        tipo=regra.CLIENTE,
+        cliente_id=cliente.id if cliente else None,
+        marca=marca,
+        chave_hash=_hash(chave),
+        saudacao=saudacao,
+    )
     sessao.confirmar(db)
     return conversa, chave
 
@@ -208,6 +241,7 @@ def conversas_do_usuario(db: Session, usuario: m.Usuario) -> list[dict]:
 
 
 def _contexto_cliente(db: Session, conversa: m.ConversaAssistente, cliente: m.Cliente | None) -> Contexto:
+    atendimento = db.get(m.Atendimento, conversa.atendimento_id) if conversa.atendimento_id else None
     return Contexto(
         tipo=regra.CLIENTE,
         conversa_id=conversa.id,
@@ -215,6 +249,7 @@ def _contexto_cliente(db: Session, conversa: m.ConversaAssistente, cliente: m.Cl
         cliente_id=cliente.id if cliente else None,
         marca_site=conversa.marca,
         memoria=dict(conversa.contexto or {}),
+        atendimento_protocolo=atendimento.protocolo if atendimento else None,
     )
 
 
@@ -237,8 +272,14 @@ def _dinamico_cliente(db: Session, ctx: Contexto, cliente: m.Cliente | None):
             for loja in cadastro_repository.lojas(db, somente_ativas=True, tipo="LOJA")
         ]
         primeiro = cliente.nome.split()[0] if cliente and cliente.nome else None
+        perfil = perfil_cliente.linhas_do_contexto(perfil_cliente.perfil(db, cliente)) if cliente else []
         return prompts.contexto_cliente(
-            memoria=ctx.memoria, marca_site=ctx.marca_site, logado=cliente is not None, primeiro_nome=primeiro, lojas=lojas
+            memoria=ctx.memoria,
+            marca_site=ctx.marca_site,
+            logado=cliente is not None,
+            primeiro_nome=primeiro,
+            lojas=lojas,
+            perfil=perfil,
         )
 
     return montar
@@ -340,6 +381,7 @@ def enviar(
         conteudo=rodada.texto,
         blocos=cru(rodada.blocos),
         modo=rodada.modo,
+        auditoria=rodada.auditoria,
         responde_a_id=pergunta.id,
         request_id=request_id,
         criada_em=agora(),
@@ -412,6 +454,19 @@ def registrar_sacola(
         memoria["oferta"] = None
         conversa.contexto = _limpar_memoria(memoria)
         conversa.atualizada_em = momento
+    sessao.confirmar(db)
+
+
+def avaliar(db: Session, conversa: m.ConversaAssistente, mensagem_id: int, nota: str, comentario: str | None) -> None:
+    """O cliente marcou se a resposta ajudou (decisão 104). Pode mudar de ideia: a última nota vale. O comentário só
+    fica com "não ajudou" (é o que a equipe lê para melhorar a Lúcia)."""
+    mensagem = assistente_repository.mensagem(db, conversa.id, mensagem_id)
+    if mensagem is None or mensagem.papel != regra.ASSISTENTE or mensagem.responde_a_id is None:
+        raise NaoEncontrado("Resposta não encontrada nesta conversa.")
+    mensagem.avaliacao = NOTAS[nota]
+    comentario = (comentario or "").strip()[:500]
+    mensagem.avaliacao_comentario = comentario if nota == "NAO_AJUDOU" and comentario else None
+    mensagem.avaliada_em = agora()
     sessao.confirmar(db)
 
 
@@ -566,6 +621,44 @@ def apagar_vencidas(db: Session) -> int:
 # ---------- Uso e custo ----------
 
 
+def _qualidade(db: Session, desde: datetime) -> dict:
+    """Por assistente: a conferência dos números (decisão 101), as falhas e as ofertas da equipe (decisão 102) e as
+    avaliações dos clientes, com os últimos comentários de "não ajudou" (decisão 104)."""
+    saida: dict[str, dict] = {}
+    for tipo, auditoria, nota, comentario, avaliada_em, pergunta in assistente_repository.qualidade_desde(db, desde):
+        q = saida.setdefault(
+            tipo,
+            {
+                "verificacao": {"CONFERIDA": 0, "REESCRITA": 0, "SUBSTITUIDA": 0},
+                "comNumeros": 0,
+                "falhas": 0,
+                "ofereceuPessoa": 0,
+                "sinaisDoCliente": {"FRUSTRACAO": 0, "REPETICAO": 0},
+                "avaliacoes": {"ajudou": 0, "naoAjudou": 0},
+                "comentarios": [],
+            },
+        )
+        auditoria = auditoria or {}
+        if (situacao := auditoria.get("verificacao")) in q["verificacao"]:
+            q["verificacao"][situacao] += 1
+            q["comNumeros"] += 1 if auditoria.get("numeros") else 0
+        q["falhas"] += 1 if auditoria.get("falhou") else 0
+        q["ofereceuPessoa"] += 1 if auditoria.get("ofereceuPessoa") else 0
+        if (sinal := auditoria.get("sinalDoCliente")) in q["sinaisDoCliente"]:
+            q["sinaisDoCliente"][sinal] += 1
+        if nota == NOTAS["AJUDOU"]:
+            q["avaliacoes"]["ajudou"] += 1
+        elif nota == NOTAS["NAO_AJUDOU"]:
+            q["avaliacoes"]["naoAjudou"] += 1
+            if comentario:
+                q["comentarios"].append(
+                    {"pergunta": (pergunta or "")[:160], "comentario": comentario[:300], "em": ms(avaliada_em)}
+                )
+    for q in saida.values():
+        q["comentarios"] = q["comentarios"][-10:][::-1]  # os 10 mais recentes, do último para o primeiro
+    return saida
+
+
 def metricas(db: Session, dias: int = 30) -> dict:
     """Uso dos assistentes no período: conversas, respostas por modo, chamadas ao modelo, tokens, custo estimado
     e consultas (com a taxa de falha). Sem dado pessoal."""
@@ -616,6 +709,7 @@ def metricas(db: Session, dias: int = 30) -> dict:
         linha["duracaoMediaMs"] = max(linha["duracaoMediaMs"], int(duracao))
     peso = sum(q for _, q in duracoes)
     return {
+        "qualidade": _qualidade(db, desde),
         "dias": dias,
         "modoIA": "LLM" if settings.ANTHROPIC_API_KEY else "REGRAS",
         "modelo": settings.IA_MODELO,

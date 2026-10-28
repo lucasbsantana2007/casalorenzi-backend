@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import JSON, CheckConstraint, DateTime, ForeignKey, Index, String, Text
+from sqlalchemy import JSON, CheckConstraint, DateTime, ForeignKey, Index, SmallInteger, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.database.connection import Base
@@ -26,6 +26,7 @@ class MensagemAssistente(Base):
         CheckConstraint(valor_em("modo", MODOS_RESPOSTA), name="ck_mensagens_assistente_modo"),
         # Reenvio da mesma mensagem (rede instável, clique duplo) não gera outra resposta
         Index("uq_mensagens_assistente_id_cliente", "conversa_id", "id_cliente", unique=True),
+        CheckConstraint("avaliacao IN (1, -1)", name="ck_mensagens_assistente_avaliacao"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -41,5 +42,15 @@ class MensagemAssistente(Base):
     responde_a_id: Mapped[int | None] = mapped_column(ForeignKey("mensagens_assistente.id", ondelete="SET NULL"))
     request_id: Mapped[str | None] = mapped_column(String(32))
     criada_em: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    # Qualidade da resposta (decisões 101 e 102): a conferência dos números (CONFERIDA, REESCRITA pelo modelo ou
+    # SUBSTITUIDA pelo texto das ferramentas), os números sem fonte e o texto que o modelo tinha escrito; se a rodada
+    # falhou, o sinal do cliente (frustração, repetição) e se a Lúcia ofereceu a equipe depois de falhas seguidas.
+    # Nulo nas mensagens do usuário e do sistema e nas respostas sem nada a registrar (none_as_null: NULL de verdade,
+    # não o JSON null).
+    auditoria: Mapped[dict | None] = mapped_column(JSON(none_as_null=True))
+    # Avaliação do cliente (decisão 104): 1 = ajudou, -1 = não ajudou, com um comentário opcional
+    avaliacao: Mapped[int | None] = mapped_column(SmallInteger)
+    avaliacao_comentario: Mapped[str | None] = mapped_column(Text)
+    avaliada_em: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     conversa: Mapped[ConversaAssistente] = relationship(back_populates="mensagens")

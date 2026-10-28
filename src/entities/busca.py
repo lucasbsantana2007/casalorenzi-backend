@@ -99,6 +99,30 @@ TIPOS: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
     "meia": ((), ("meia",)),
     "lenco": ((), ("lenco",)),
 }
+# Tipos de peça com tamanho (acessório de tamanho único não entra)
+TIPOS_COM_TAMANHO = frozenset(
+    {
+        "camisa",
+        "camiseta",
+        "regata",
+        "polo",
+        "blusa",
+        "calca",
+        "bermuda",
+        "saia",
+        "vestido",
+        "macacao",
+        "jaqueta",
+        "blazer",
+        "moletom",
+        "trico",
+        "sueter",
+        "cardiga",
+        "top",
+        "cropped",
+        "body",
+    }
+)
 _PALAVRAS_TIPO = {
     **{p: "camisa" for p in ("camisa", "camisas", "camisaria", "overshirt", "chemise")},
     **{p: "camiseta" for p in ("camiseta", "camisetas", "tshirt", "t-shirt", "camisinha", "baby", "tee")},
@@ -132,7 +156,9 @@ _EXPRESSOES_TIPO = {"corta vento": "jaqueta", "corta-vento": "jaqueta", "tamanho
 # ---------- Tamanhos ----------
 
 TAMANHOS_LETRA = ("XP", "PP", "P", "M", "G", "GG", "XG", "XGG", "EG", "U")
-_SINONIMOS_TAMANHO = {"UNICO": "U", "ÚNICO": "U", "TU": "U", "XGG": "XGG", "EGG": "XGG"}
+# Grade internacional, como muitos clientes escrevem: XS = XP, S = P, M = M, L = G, XL = GG
+TAMANHOS_INTERNACIONAIS = {"XS": "XP", "S": "P", "L": "G", "XL": "GG"}
+_SINONIMOS_TAMANHO = {"UNICO": "U", "ÚNICO": "U", "TU": "U", "XGG": "XGG", "EGG": "XGG", **TAMANHOS_INTERNACIONAIS}
 TAMANHO_NUMERICO_MIN, TAMANHO_NUMERICO_MAX = 34, 56
 # Peças vendidas por número (36, 38, 40...): um número solto na frase é o tamanho
 TIPOS_GRADE_NUMERICA = frozenset({"calca", "bermuda", "saia"})
@@ -143,6 +169,9 @@ _MARCAS = {"vulto": "VULTO", "lorenzi": "LORENZI"}
 _GENEROS = {
     **{p: "Masculino" for p in ("masculino", "masculina", "masculinos", "masculinas", "homem", "homens", "masc")},
     **{p: "Feminino" for p in ("feminino", "feminina", "femininos", "femininas", "mulher", "mulheres", "fem")},
+    # "Presente pro meu pai", "para a minha esposa": quem vai usar a peça
+    **{p: "Masculino" for p in ("pai", "marido", "namorado", "filho", "irmao", "tio", "sogro", "padrinho", "noivo")},
+    **{p: "Feminino" for p in ("mae", "esposa", "namorada", "filha", "irma", "tia", "sogra", "madrinha", "noiva")},
 }
 PALAVRAS_VAZIAS = frozenset(
     """a o as os um uma uns umas de do da dos das no na nos nas em e ou com sem para pra pro por que
@@ -169,7 +198,7 @@ _PRECO_MAX = re.compile(
 _PRECO_MIN = re.compile(rf"\b(?:acima de|mais de|a partir de|pelo menos|minimo de|minimo|superior a|por mais de)\s+{_VALOR}")
 _PRECO_SOLTO = re.compile(rf"r\$\s*({_NUMERO})|\b({_NUMERO})\s*(?:reais|real|conto)\b|\b(\d+,\d{{2}})\b")
 _TAMANHO_EXPLICITO = re.compile(r"\b(?:tamanho|tam\.?|numero|num|n[ºo°]|numeracao|veste)\s*([a-z]{1,3}|\d{2})\b")
-_TAMANHO_DEPOIS_DE = re.compile(r"\b(?:no|na|o|em|do|da|de|um|uma)\s+(xp|pp|p|m|g|gg|xg|xgg|eg|u|\d{2})\b")
+_TAMANHO_DEPOIS_DE = re.compile(r"\b(?:no|na|o|em|do|da|de|um|uma)\s+(xp|pp|p|m|g|gg|xg|xgg|eg|u|xs|s|l|xl|\d{2})\b")
 
 
 @dataclass
@@ -255,7 +284,7 @@ def extrair_preco(texto: str) -> tuple[Decimal | None, Decimal | None, str]:
 
 
 def normalizar_tamanho(valor: str | None) -> str | None:
-    """'m' -> 'M'; 'único' -> 'U'; '40' -> '40'. Fora da grade conhecida: None."""
+    """'m' -> 'M'; 'único' -> 'U'; 'L' -> 'G' (grade internacional); '40' -> '40'. Fora da grade conhecida: None."""
     if valor is None:
         return None
     texto = str(valor).strip().upper().replace("TAMANHO", "").strip()
@@ -431,7 +460,7 @@ def descrever(pedido: PedidoBusca) -> str:
         partes.append(" ou ".join(ROTULO_TIPO.get(t, t) for t in pedido.tipos))
     if pedido.termos:
         partes.append(" ".join(pedido.termos))
-    texto = " ".join(partes) or "peças"
+    texto = " ".join(partes) or {"Masculino": "peças masculinas", "Feminino": "peças femininas"}.get(pedido.genero, "peças")
     if pedido.cor:
         texto += f" na cor {_COR_FEMININA.get(pedido.cor, rotulo_cor(pedido.cor))}"
     if pedido.tamanho:

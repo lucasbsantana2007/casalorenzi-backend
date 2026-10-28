@@ -32,6 +32,7 @@ Usuário ─► API (token: quem é, que papel, que marca)
             │        │                               │      estoque, Lupe+, vitrine)
             │        ◄──────── resultado (valores já formatados) ◄┘
             │        └─► texto final (no máximo 4 idas e voltas e 6 consultas por mensagem)
+            │                 └─► verificador: todo número do texto tem fonte? senão, refaz uma vez ou troca
             │
             └─► sem chave, ou modelo fora do ar: as mesmas ferramentas, escolhidas por regras
                                           ▼
@@ -40,7 +41,8 @@ Usuário ─► API (token: quem é, que papel, que marca)
 ```
 
 Por isso os números da tela (preço, estoque, faturamento, pontos) são sempre os do banco: mesmo que o modelo
-errasse ao escrever, os cards, tabelas e gráficos vêm do resultado da consulta.
+errasse ao escrever, os cards, tabelas e gráficos vêm do resultado da consulta. E os números do **texto** também são
+conferidos antes de sair (verificador, decisão 101, abaixo).
 
 ## Modos de resposta
 
@@ -56,6 +58,21 @@ As regras (`src/use_cases/assistente/regras_*.py`) entendem as perguntas mais co
 tamanho, faixa de preço, marca, loja ("loja do shopping", "em BH"), continuações ("M", "e na outra loja?",
 "a segunda", "sim"), períodos ("hoje", "nesta semana", "em setembro", "últimos 30 dias", "de 01/09 a 15/09").
 Assim a demonstração funciona mesmo sem chave, e uma queda do provedor não derruba o atendimento.
+
+## Qualidade das respostas (decisões 101 a 105)
+
+| O quê | Como funciona | Onde |
+| --- | --- | --- |
+| Verificador de números (101) | Todo número da resposta do modelo (R$, pontos, %, parcelas, prazos, datas, horários, códigos e qualquer número de 11 para cima) precisa ter fonte: as consultas da rodada, o contexto do sistema ou as respostas anteriores. O que o cliente disse vale só para tamanho, quantidade, data e código. Sem fonte, o modelo refaz uma vez (pode consultar o que faltou); se errar de novo, sai o texto pronto das consultas ou "não consegui confirmar". Sem chamada a mais quando a resposta está certa. | `verificacao.py`, `orquestrador._com_modelo` |
+| Duas falhas seguidas → pessoa (102) | Falha da Lúcia (não entendeu, não respondeu, número não confirmado) ou do cliente ("não foi isso", a mesma pergunta de novo). Na segunda seguida, a resposta ganha os botões de falar com a equipe; resposta sem falha zera a contagem. | `escalonamento.py` (passo final do assistente do site) |
+| Saudação personalizada (103) | Cliente logado: pontos que vencem em 30 dias, pedido em andamento e atalho do tipo de peça que ele mais compra no tamanho que costuma levar. Busca sem tamanho sugere esse tamanho. Só lê. | `perfil_cliente.py`, `conversas.abrir_cliente` |
+| "Ajudou?" (104) | 👍/👎 na última resposta, com o que faltou no 👎. O Uso da IA mostra a qualidade por assistente. | `POST /assistente/conversas/{id}/mensagens/{id}/avaliacao`, `conversas.metricas` |
+| Bateria como portão (105) | 38 casos difíceis com o que cada resposta precisa ter. Sem o Claude no pytest; com o Claude em `scripts/avaliar_lucia.py`. | `tests/bateria_lucia.py`, `docs/avaliacao_lucia.md` |
+
+A auditoria de cada resposta fica em `mensagens_assistente.auditoria` (JSON): `verificacao` (CONFERIDA, REESCRITA ou
+SUBSTITUIDA), `numeros`, `semFonte`, `textoModelo` (o que o modelo tinha escrito), `falhou`, `sinalDoCliente` e
+`ofereceuPessoa`. O teste com pessoas de fora tem roteiro em `docs/teste_com_pessoas.md` e relatório em
+`scripts/relatorio_lucia.py`.
 
 ## Onde está cada parte
 
@@ -275,7 +292,10 @@ pip install -r requirements-dev.txt      # inclui o SDK anthropic
 alembic upgrade head                     # cria as 6 tabelas
 uvicorn src.app:app --reload --port 8000
 python -m src.automacoes                 # gera os alertas (uma vez, ou num agendador)
-pytest                                   # 306 testes (92 dos assistentes), sem chamar a API do modelo
+pytest                                   # sem chamar a API do modelo (provedor falso)
+pytest tests/test_bateria_lucia.py       # a bateria da Lúcia sem o Claude (decisão 105)
+python scripts/avaliar_lucia.py          # a mesma bateria com o Claude de verdade: placar em docs/avaliacao_lucia.md
+python scripts/relatorio_lucia.py --desde "2026-10-28 14:00"   # relatório de uma sessão de teste com pessoas
 ```
 
 Para ligar o modelo: `ANTHROPIC_API_KEY=...` no `.env` do backend (e reiniciar). Sem ela tudo funciona pelas regras.
@@ -306,8 +326,9 @@ Rafael: Lojista; Diego: Operador; clientes como mariana.costa@gmail.com). A senh
 
 ## Limitações conhecidas
 
-- **Sem chave da API no ambiente desta entrega:** o caminho com o modelo foi testado com um provedor simulado (92
-  testes) e o SDK contra respostas HTTP simuladas; a primeira chamada real ainda precisa ser feita com a chave.
+- **Verificador de números:** lê algarismos ("1.200", "R$ 60,00", "12/11", "10h") e números por extenso com unidade
+  ("mil pontos"); um número escrito de outro jeito ("um milhão e meio") não é conferido, e o prompt pede algarismos.
+  Número sem unidade numa fonte (o "300" de um campo) vale para qualquer unidade na resposta.
 - **Dados até 03/10/2026** no banco local: "quanto faturamos hoje" responde R$ 0,00 e diz até quando vão os dados.
 - **Passivo do Lupe+ no banco local:** a consulta oficial dá 3.373.251 pontos em 01/10/2026; a documentação da
   união fala em 4.015.759. A carga local parece anterior à correção do passivo; o copiloto mostra o que está no banco.
@@ -322,5 +343,4 @@ Rafael: Lojista; Diego: Operador; clientes como mariana.costa@gmail.com). A senh
 ## Próximos passos (P2)
 
 WhatsApp (Cloud API) reaproveitando o mesmo orquestrador; previsão de demanda para as transferências; busca
-semântica (embeddings) se o catálogo crescer muito além das ~190 peças; envio dos avisos de pontos com consentimento;
-avaliação automática (conjunto de perguntas com respostas esperadas) antes de trocar de modelo.
+semântica (embeddings) se o catálogo crescer muito além das ~190 peças; envio dos avisos de pontos com consentimento.

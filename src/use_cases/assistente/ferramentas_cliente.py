@@ -8,6 +8,9 @@ página do produto) e o pagamento continua no checkout. Atendimento humano é um
 quando o cliente confirma.
 """
 
+import re
+from dataclasses import replace
+from datetime import date
 from decimal import Decimal
 from typing import Literal
 
@@ -17,6 +20,7 @@ from sqlalchemy.orm import Session
 from src.config import settings
 from src.entities import fidelidade as regra_pontos
 from src.entities.busca import (
+    TIPOS_COM_TAMANHO,
     PedidoBusca,
     descrever,
     familia_da_cor,
@@ -30,38 +34,15 @@ from src.schemas.produtos import imagem_url
 from src.use_cases import fidelidade
 from src.use_cases import frete as frete_config
 from src.use_cases import produtos as produtos_uc
-from src.use_cases.assistente import catalogo
+from src.use_cases.assistente import catalogo, perfil_cliente
 from src.use_cases.assistente.ferramentas import Contexto, Entrada, FalhaFerramenta, Ferramenta, Resultado
 from src.use_cases.assistente.formatacao import brl, data, numero
-from src.utils.datas import ms
+from src.utils.datas import hoje, ms
 from src.utils.texto import normalizar
 
 MAX_SACOLA = 5  # mesmo limite por peça da sacola do site (SacolaProvider)
 ROTULO_STATUS_PEDIDO = {"PROCESSANDO": "Em separação", "ENVIADO": "Enviado", "ENTREGUE": "Entregue", "CANCELADO": "Cancelado"}
 ROTULO_CATEGORIA = {"BRONZE": "Bronze", "PRATA": "Prata", "OURO": "Ouro", "VIP": "Vip"}
-TIPOS_COM_TAMANHO = frozenset(
-    {
-        "camisa",
-        "camiseta",
-        "regata",
-        "polo",
-        "blusa",
-        "calca",
-        "bermuda",
-        "saia",
-        "vestido",
-        "macacao",
-        "jaqueta",
-        "blazer",
-        "moletom",
-        "trico",
-        "sueter",
-        "cardiga",
-        "top",
-        "cropped",
-        "body",
-    }
-)
 
 Marca = Literal["LORENZI", "VULTO"]
 
@@ -86,7 +67,11 @@ class BuscarProdutos(Entrada):
         None, max_length=40, description="Tipo de peça: camisa, camiseta, calça, vestido, moletom, jaqueta..."
     )
     cor: str | None = Field(None, max_length=40, description="Cor pedida pelo cliente (ex.: azul, preto, off-white).")
-    tamanho: str | None = Field(None, max_length=10, description="Tamanho: XP, P, M, G, GG, U ou numérico (36 a 56).")
+    tamanho: str | None = Field(
+        None,
+        max_length=10,
+        description="Tamanho: XP, P, M, G, GG, U ou numérico (36 a 56). Aceita a grade internacional: XS=XP, S=P, L=G, XL=GG.",
+    )
     preco_min: float | None = Field(None, ge=0, le=100000)
     preco_max: float | None = Field(None, ge=0, le=100000)
     marca: Marca | None = None
@@ -117,27 +102,45 @@ def _pedido_da_entrada(entrada: BuscarProdutos) -> PedidoBusca:
     return pedido
 
 
-def texto_da_busca(resultado: catalogo.ResultadoBusca, cards: list[dict], loja_nome: str | None) -> str:
+def _sem_desconhecidas(resultado: catalogo.ResultadoBusca) -> PedidoBusca:
+    """O pedido sem as palavras que não aparecem em nenhuma peça (a busca não as usou; a descrição também não)."""
+    return replace(resultado.pedido, termos=[t for t in resultado.pedido.termos if t not in resultado.desconhecidos])
+
+
+def _frase_do_afrouxado(rotulo: str) -> str:
+    if rotulo.startswith("sem "):
+        return rotulo
+    if rotulo == catalogo.ROTULO_PRECO:
+        return "com preço fora da faixa"
+    return f"em {rotulo}"
+
+
+def texto_da_busca(
+    resultado: catalogo.ResultadoBusca, cards: list[dict], loja_nome: str | None, habitual: str | None = None
+) -> str:
     pedido = resultado.pedido
-    descricao = descrever(pedido)
+    descricao = descrever(_sem_desconhecidas(resultado))
     onde = f" na {loja_nome}" if loja_nome else ""
     if not cards:
         so_desconhecidas = not (pedido.tipos or pedido.cor or pedido.tamanho or pedido.preco_min or pedido.preco_max)
         if resultado.desconhecidos and so_desconhecidas and set(pedido.termos) <= set(resultado.desconhecidos):
             return f"Não encontrei “{' '.join(resultado.desconhecidos)}” no nosso catálogo. Quer que eu procure outra peça?"
-        texto = f"Não encontrei {descricao} disponível{onde} agora."
+        texto = f"Não encontrei {descricao}{onde} à venda agora."
         if resultado.esgotados:
             texto += f" {_lista(resultado.esgotados)} {'está esgotada' if len(resultado.esgotados) == 1 else 'estão esgotadas'} nessa opção."
         return texto + " Posso procurar outra cor, outro tamanho ou outra peça?"
     quantidade = f"{resultado.total} {'opção' if resultado.total == 1 else 'opções'}"
-    if resultado.afrouxado:
-        texto = f"Não encontrei exatamente {descricao}{onde}. Separei {quantidade} com {_lista(resultado.afrouxado)}."
+    if resultado.afrouxado == [catalogo.ROTULO_PRECO] and pedido.preco_max is not None:
+        menor = min(card["preco"] for card in cards)
+        texto = f"Não encontrei {descricao}{onde}. Separei as {quantidade} mais perto do seu orçamento, a partir de {brl(menor)}."
+    elif resultado.afrouxado:
+        texto = f"Não encontrei exatamente {descricao}{onde}. Separei {quantidade} {_frase_do_afrouxado(resultado.afrouxado[0])}."
     else:
         texto = f"Encontrei {quantidade} de {descricao}{onde}."
-    if resultado.desconhecidos:
-        texto += f" (não usei “{' '.join(resultado.desconhecidos)}”, que não aparece nas peças)"
     if pedido.tamanho is None and set(pedido.tipos) & TIPOS_COM_TAMANHO:
         texto += " Qual tamanho você procura?"
+        if habitual:
+            texto += f" Nas suas compras, você costuma levar {habitual}."
     elif len(cards) > 1:
         texto += " Quer ver alguma delas de perto?"
     return texto
@@ -154,7 +157,7 @@ def buscar_produtos(db: Session, ctx: Contexto, entrada: BuscarProdutos) -> Resu
     cards = [catalogo.card(a) for a in resultado.achados]
     memoria = {
         "busca": pedido.para_dict(),
-        "buscaDescricao": descrever(pedido),
+        "buscaDescricao": descrever(_sem_desconhecidas(resultado)),
         "produtosMostrados": [{"id": c["produtoId"], "nome": c["nome"]} for c in cards],
         # Busca nova: a peça em foco só continua se for a única encontrada
         "produtoEmFoco": {"id": cards[0]["produtoId"], "nome": cards[0]["nome"]} if len(cards) == 1 else None,
@@ -169,8 +172,13 @@ def buscar_produtos(db: Session, ctx: Contexto, entrada: BuscarProdutos) -> Resu
     if loja:
         memoria["lojaEmFoco"] = loja.id
         memoria["lojaEmFocoNome"] = loja.nome
+    # Sem tamanho na busca: o que o cliente logado costuma levar nesse tipo, como sugestão (decisão 103)
+    habitual = None
+    if cards and ctx.cliente_id and pedido.tamanho is None and set(pedido.tipos) & TIPOS_COM_TAMANHO:
+        habitual = perfil_cliente.tamanho_habitual(db, ctx.cliente_id, pedido.tipos)
     dados = {
-        "busca": descrever(pedido),
+        "busca": descrever(_sem_desconhecidas(resultado)),
+        "tamanhoQueCostumaLevar": habitual,
         "loja": loja.nome if loja else None,
         "encontrados": resultado.total,
         "pecas": [
@@ -183,7 +191,10 @@ def buscar_produtos(db: Session, ctx: Contexto, entrada: BuscarProdutos) -> Resu
     }
     blocos = [{"tipo": "produtos", "titulo": None, "itens": cards}] if cards else []
     return Resultado(
-        dados=dados, blocos=blocos, memoria=memoria, texto=texto_da_busca(resultado, cards, loja.nome if loja else None)
+        dados=dados,
+        blocos=blocos,
+        memoria=memoria,
+        texto=texto_da_busca(resultado, cards, loja.nome if loja else None, habitual),
     )
 
 
@@ -298,6 +309,28 @@ class InformacoesLojas(Entrada):
     marca: Marca | None = None
 
 
+_DIAS_DA_SEMANA = ("segunda", "terca", "quarta", "quinta", "sexta", "sabado", "domingo")
+NOME_DO_DIA = ("segunda-feira", "terça-feira", "quarta-feira", "quinta-feira", "sexta-feira", "sábado", "domingo")
+
+
+def _faixa(horas: str) -> str:
+    """'10:00–22:00' -> '10:00 às 22:00'."""
+    inicio, _, fim = horas.partition("–")
+    return f"{inicio.strip()} às {fim.strip()}" if fim else horas
+
+
+def horario_do_dia(horarios: list[str], dia: date) -> str | None:
+    """'10:00–22:00' do dia da semana, a partir das linhas do cadastro ('Segunda a sábado: 10:00–22:00',
+    'Domingo: 12:00–20:00'). None se o dia não estiver cadastrado."""
+    semana = dia.weekday()
+    for linha in horarios:
+        quando, _, horas = linha.partition(":")
+        dias = [_DIAS_DA_SEMANA.index(d) for d in re.findall(r"[a-z]+", normalizar(quando)) if d in _DIAS_DA_SEMANA]
+        if (len(dias) == 2 and dias[0] <= semana <= dias[1]) or dias == [semana]:
+            return horas.strip()
+    return None
+
+
 def loja_saida(loja) -> dict:
     return {
         "lojaId": loja.id,
@@ -316,16 +349,32 @@ def informacoes_lojas(db: Session, ctx: Contexto, entrada: InformacoesLojas) -> 
     else:
         lojas = cadastro_repository.lojas(db, somente_ativas=True, marca=entrada.marca, tipo="LOJA")
     itens = [loja_saida(loja) for loja in lojas]
+    # "Que horas fecha?" quase sempre é sobre hoje: o horário do dia vem pronto
+    dia = hoje()
+    hoje_texto = f"{NOME_DO_DIA[dia.weekday()]}, {data(dia)}"
+    for item in itens:
+        item["horarioDeHoje"] = horario_do_dia(item["horarios"], dia)
     if not itens:
         texto = "Não encontrei uma loja com esse nome ou nessa cidade. Nossas lojas ficam em São Paulo, Rio de Janeiro, Brasília, Curitiba e Belo Horizonte."
     elif len(itens) == 1:
         loja = itens[0]
         horarios = "; ".join(loja["horarios"]) or "horário não cadastrado"
         texto = f"{loja['nome']}: {loja['endereco'] or loja['cidade']}. Horário: {horarios}. Telefone: {loja['telefone'] or 'não cadastrado'}."
+        if loja["horarioDeHoje"]:
+            texto += f" Hoje ({NOME_DO_DIA[dia.weekday()]}), funciona das {_faixa(loja['horarioDeHoje'])}."
     else:
-        texto = f"Encontrei {len(itens)} lojas: {_lista([i['nome'] for i in itens])}. Os endereços e horários estão abaixo."
+        texto = f"Encontrei {len(itens)} lojas: {_lista([i['nome'] for i in itens])}."
+        de_hoje = [f"{i['nome']}, das {_faixa(i['horarioDeHoje'])}" for i in itens[:4] if i["horarioDeHoje"]]
+        if de_hoje:
+            texto += f" Hoje ({NOME_DO_DIA[dia.weekday()]}): {'; '.join(de_hoje)}."
+        texto += " Endereços, telefones e todos os horários estão abaixo."
     return Resultado(
-        dados={"lojas": [{k: i[k] for k in ("nome", "marca", "endereco", "cidade", "telefone", "horarios")} for i in itens]},
+        dados={
+            "hoje": hoje_texto,
+            "lojas": [
+                {k: i[k] for k in ("nome", "marca", "endereco", "cidade", "telefone", "horarios", "horarioDeHoje")} for i in itens
+            ],
+        },
         blocos=[{"tipo": "lojas", "itens": itens}] if itens else [],
         texto=texto,
     )

@@ -14,12 +14,15 @@ from datetime import datetime
 from sqlalchemy.orm import Session
 
 from src import models as m
+from src.entities.cliente import email_valido
 from src.entities.frete import uf_do_cep
 from src.entities.papeis import ADMINISTRADOR, loja_do_escopo, ve_pedido_da_loja
-from src.entities.pedido import STATUS_PEDIDO, pode_mudar, pontuar_loja
+from src.entities.pedido import PREFIXO_NUMERO, STATUS_PEDIDO, pode_mudar, pontuar_loja
 from src.entities.transferencia import pode_mudar as transferencia_pode_mudar
+from src.integrations import modelos_email
+from src.integrations.email import enviar as enviar_email
 from src.repositories import cadastro_repository, estoque_repository, pedido_repository, produto_repository, sessao
-from src.use_cases import fidelidade, log_acoes, transferencias
+from src.use_cases import avisos_cliente, fidelidade, log_acoes, transferencias
 from src.use_cases.estoque import aplicar_movimentacao
 from src.use_cases.pagamentos import estornar_aprovados
 from src.utils.datas import agora
@@ -243,6 +246,8 @@ def cancelar(db: Session, pedido: m.Pedido, momento: datetime, *, usuario_id: in
     fidelidade.devolver_resgate(db, pedido, momento)
     pedido.status = "CANCELADO"
     registrar_evento(db, pedido, "CANCELADO", usuario_id=usuario_id, observacao=observacao, quando=momento)
+    # As peças reservadas voltam a ficar livres no site: confere quem pediu "Avise-me"
+    avisos_cliente.marcar_liberadas(db, [item.variacao_id for item in pedido.itens])
 
 
 def atualizar(
@@ -278,4 +283,21 @@ def atualizar(
 
     sessao.confirmar(db)
     sessao.descartar_cache(db)  # volta com eventos, transferências e pagamentos atualizados
-    return obter(db, pedido_id, usuario)
+    atualizado = obter(db, pedido_id, usuario)
+    if status in ("ENVIADO", "ENTREGUE"):
+        avisar_andamento(atualizado)
+    return atualizado
+
+
+def avisar_andamento(pedido: m.Pedido) -> None:
+    """E-mail ao cliente quando o pedido sai para entrega ou é entregue (decisão 98). Só pedidos do site (CL-),
+    os mesmos que já recebem o "pedido confirmado"; vendas de loja e pedidos migrados não recebem."""
+    cliente = pedido.cliente
+    if not pedido.numero.startswith(PREFIXO_NUMERO) or cliente is None or cliente.excluido_em is not None:
+        return
+    if not email_valido(cliente.email):
+        return
+    if pedido.status == "ENVIADO":
+        enviar_email(modelos_email.pedido_enviado(cliente.email, cliente.nome, pedido.numero, pedido.codigo_rastreio or ""))
+    elif pedido.status == "ENTREGUE":
+        enviar_email(modelos_email.pedido_entregue(cliente.email, cliente.nome, pedido.numero))

@@ -2,9 +2,9 @@
 
 from datetime import datetime
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, or_, select
 from sqlalchemy.exc import OperationalError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, aliased
 
 from src import models as m
 from src.utils.erros import Conflito
@@ -121,6 +121,31 @@ def respostas_desde(db: Session, desde: datetime) -> list:
         .join(m.ConversaAssistente, m.ConversaAssistente.id == m.MensagemAssistente.conversa_id)
         .where(m.MensagemAssistente.papel == "ASSISTENTE", m.MensagemAssistente.criada_em >= desde)
         .group_by(m.ConversaAssistente.tipo, m.MensagemAssistente.modo)
+    )
+    return list(db.execute(consulta))
+
+
+def qualidade_desde(db: Session, desde: datetime) -> list:
+    """(tipo da conversa, auditoria, avaliação, comentário, avaliada em, pergunta) das respostas com auditoria ou
+    avaliação do cliente."""
+    pergunta = aliased(m.MensagemAssistente)
+    consulta = (
+        select(
+            m.ConversaAssistente.tipo,
+            m.MensagemAssistente.auditoria,
+            m.MensagemAssistente.avaliacao,
+            m.MensagemAssistente.avaliacao_comentario,
+            m.MensagemAssistente.avaliada_em,
+            pergunta.conteudo,
+        )
+        .join(m.ConversaAssistente, m.ConversaAssistente.id == m.MensagemAssistente.conversa_id)
+        .outerjoin(pergunta, pergunta.id == m.MensagemAssistente.responde_a_id)
+        .where(
+            m.MensagemAssistente.papel == "ASSISTENTE",
+            m.MensagemAssistente.criada_em >= desde,
+            or_(m.MensagemAssistente.auditoria.isnot(None), m.MensagemAssistente.avaliacao.isnot(None)),
+        )
+        .order_by(m.MensagemAssistente.id)
     )
     return list(db.execute(consulta))
 

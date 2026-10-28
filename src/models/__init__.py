@@ -8,6 +8,7 @@
 from src.models.alerta import Alerta
 from src.models.anexo import Anexo
 from src.models.atendimento import Atendimento
+from src.models.aviso_estoque import AvisoEstoque
 from src.models.aviso_pontos import AvisoPontos
 from src.models.categoria import Categoria
 from src.models.chamada_ferramenta import ChamadaFerramenta
@@ -33,6 +34,7 @@ from src.models.movimento_pontos import MovimentoPontos
 from src.models.pagamento import Pagamento
 from src.models.pedido import Pedido
 from src.models.produto import Produto
+from src.models.sacola import Sacola
 from src.models.tipo_solicitacao import TipoSolicitacao
 from src.models.token_senha import TokenSenha
 from src.models.transferencia import Transferencia
@@ -40,6 +42,8 @@ from src.models.usuario import Usuario
 from src.models.variacao import Variacao
 
 __all__ = [
+    "AvisoEstoque",
+    "Sacola",
     "Loja",
     "Categoria",
     "Fornecedor",

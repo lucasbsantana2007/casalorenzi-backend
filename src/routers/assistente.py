@@ -50,6 +50,12 @@ class EncaminharEntrada(Entrada):
     canal: Literal["SITE", "WHATSAPP"] = "SITE"
 
 
+class AvaliacaoEntrada(Entrada):
+    nota: Literal["AJUDOU", "NAO_AJUDOU"]
+    # Só com "não ajudou": o que faltou na resposta
+    comentario: str | None = Field(None, max_length=500)
+
+
 def _ip(request: Request) -> str:
     return request.client.host if request.client else "desconhecido"
 
@@ -136,6 +142,20 @@ def evento(
         raise DadosInvalidos("Informe a peça.")
     removida = dados.tipo == "SACOLA_REMOVIDA"
     conversas.registrar_sacola(db, conversa, dados.mensagem_id, dados.variacao_id, removida=removida)
+
+
+@router.post("/conversas/{conversa_id}/mensagens/{mensagem_id}/avaliacao", status_code=204, response_class=Response)
+def avaliar(
+    conversa_id: str,
+    mensagem_id: int,
+    dados: AvaliacaoEntrada,
+    db: Session = Depends(get_db),
+    sessao: Sessao | None = Depends(sessao_opcional),
+    chave: str | None = Header(default=None, alias="X-Conversa-Chave"),
+):
+    """O cliente marca se a resposta ajudou (👍/👎, com comentário opcional no 👎). Marcar de novo troca a nota."""
+    conversa = conversas.conversa_do_site(db, conversa_id, chave, _cliente(sessao))
+    conversas.avaliar(db, conversa, mensagem_id, dados.nota, dados.comentario)
 
 
 @router.post("/conversas/{conversa_id}/atendimento", status_code=201)
