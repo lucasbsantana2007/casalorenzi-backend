@@ -20,6 +20,7 @@ from sqlalchemy.orm import Session
 from src.config import settings
 from src.entities import fidelidade as regra_pontos
 from src.entities.busca import (
+    TIPOS_COM_TAMANHO,
     PedidoBusca,
     descrever,
     familia_da_cor,
@@ -42,29 +43,6 @@ from src.utils.texto import normalizar
 MAX_SACOLA = 5  # mesmo limite por peça da sacola do site (SacolaProvider)
 ROTULO_STATUS_PEDIDO = {"PROCESSANDO": "Em separação", "ENVIADO": "Enviado", "ENTREGUE": "Entregue", "CANCELADO": "Cancelado"}
 ROTULO_CATEGORIA = {"BRONZE": "Bronze", "PRATA": "Prata", "OURO": "Ouro", "VIP": "Vip"}
-TIPOS_COM_TAMANHO = frozenset(
-    {
-        "camisa",
-        "camiseta",
-        "regata",
-        "polo",
-        "blusa",
-        "calca",
-        "bermuda",
-        "saia",
-        "vestido",
-        "macacao",
-        "jaqueta",
-        "blazer",
-        "moletom",
-        "trico",
-        "sueter",
-        "cardiga",
-        "top",
-        "cropped",
-        "body",
-    }
-)
 
 Marca = Literal["LORENZI", "VULTO"]
 

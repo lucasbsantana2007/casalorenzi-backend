@@ -99,6 +99,30 @@ TIPOS: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
     "meia": ((), ("meia",)),
     "lenco": ((), ("lenco",)),
 }
+# Tipos de peça com tamanho (acessório de tamanho único não entra)
+TIPOS_COM_TAMANHO = frozenset(
+    {
+        "camisa",
+        "camiseta",
+        "regata",
+        "polo",
+        "blusa",
+        "calca",
+        "bermuda",
+        "saia",
+        "vestido",
+        "macacao",
+        "jaqueta",
+        "blazer",
+        "moletom",
+        "trico",
+        "sueter",
+        "cardiga",
+        "top",
+        "cropped",
+        "body",
+    }
+)
 _PALAVRAS_TIPO = {
     **{p: "camisa" for p in ("camisa", "camisas", "camisaria", "overshirt", "chemise")},
     **{p: "camiseta" for p in ("camiseta", "camisetas", "tshirt", "t-shirt", "camisinha", "baby", "tee")},
