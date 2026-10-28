@@ -36,7 +36,7 @@ from src.use_cases import produtos as produtos_uc
 from src.use_cases.assistente import catalogo
 from src.use_cases.assistente.ferramentas import Contexto, Entrada, FalhaFerramenta, Ferramenta, Resultado
 from src.use_cases.assistente.formatacao import brl, data, numero
-from src.utils.datas import ms
+from src.utils.datas import hoje, ms
 from src.utils.texto import normalizar
 
 MAX_SACOLA = 5  # mesmo limite por peça da sacola do site (SacolaProvider)
@@ -315,6 +315,28 @@ class InformacoesLojas(Entrada):
     marca: Marca | None = None
 
 
+_DIAS_DA_SEMANA = ("segunda", "terca", "quarta", "quinta", "sexta", "sabado", "domingo")
+NOME_DO_DIA = ("segunda-feira", "terça-feira", "quarta-feira", "quinta-feira", "sexta-feira", "sábado", "domingo")
+
+
+def _faixa(horas: str) -> str:
+    """'10:00–22:00' -> '10:00 às 22:00'."""
+    inicio, _, fim = horas.partition("–")
+    return f"{inicio.strip()} às {fim.strip()}" if fim else horas
+
+
+def horario_do_dia(horarios: list[str], dia: date) -> str | None:
+    """'10:00–22:00' do dia da semana, a partir das linhas do cadastro ('Segunda a sábado: 10:00–22:00',
+    'Domingo: 12:00–20:00'). None se o dia não estiver cadastrado."""
+    semana = dia.weekday()
+    for linha in horarios:
+        quando, _, horas = linha.partition(":")
+        dias = [_DIAS_DA_SEMANA.index(d) for d in re.findall(r"[a-z]+", normalizar(quando)) if d in _DIAS_DA_SEMANA]
+        if (len(dias) == 2 and dias[0] <= semana <= dias[1]) or dias == [semana]:
+            return horas.strip()
+    return None
+
+
 def loja_saida(loja) -> dict:
     return {
         "lojaId": loja.id,
@@ -333,16 +355,32 @@ def informacoes_lojas(db: Session, ctx: Contexto, entrada: InformacoesLojas) -> 
     else:
         lojas = cadastro_repository.lojas(db, somente_ativas=True, marca=entrada.marca, tipo="LOJA")
     itens = [loja_saida(loja) for loja in lojas]
+    # "Que horas fecha?" quase sempre é sobre hoje: o horário do dia vem pronto
+    dia = hoje()
+    hoje_texto = f"{NOME_DO_DIA[dia.weekday()]}, {data(dia)}"
+    for item in itens:
+        item["horarioDeHoje"] = horario_do_dia(item["horarios"], dia)
     if not itens:
         texto = "Não encontrei uma loja com esse nome ou nessa cidade. Nossas lojas ficam em São Paulo, Rio de Janeiro, Brasília, Curitiba e Belo Horizonte."
     elif len(itens) == 1:
         loja = itens[0]
         horarios = "; ".join(loja["horarios"]) or "horário não cadastrado"
         texto = f"{loja['nome']}: {loja['endereco'] or loja['cidade']}. Horário: {horarios}. Telefone: {loja['telefone'] or 'não cadastrado'}."
+        if loja["horarioDeHoje"]:
+            texto += f" Hoje ({NOME_DO_DIA[dia.weekday()]}), funciona das {_faixa(loja['horarioDeHoje'])}."
     else:
-        texto = f"Encontrei {len(itens)} lojas: {_lista([i['nome'] for i in itens])}. Os endereços e horários estão abaixo."
+        texto = f"Encontrei {len(itens)} lojas: {_lista([i['nome'] for i in itens])}."
+        de_hoje = [f"{i['nome']}, das {_faixa(i['horarioDeHoje'])}" for i in itens[:4] if i["horarioDeHoje"]]
+        if de_hoje:
+            texto += f" Hoje ({NOME_DO_DIA[dia.weekday()]}): {'; '.join(de_hoje)}."
+        texto += " Endereços, telefones e todos os horários estão abaixo."
     return Resultado(
-        dados={"lojas": [{k: i[k] for k in ("nome", "marca", "endereco", "cidade", "telefone", "horarios")} for i in itens]},
+        dados={
+            "hoje": hoje_texto,
+            "lojas": [
+                {k: i[k] for k in ("nome", "marca", "endereco", "cidade", "telefone", "horarios", "horarioDeHoje")} for i in itens
+            ],
+        },
         blocos=[{"tipo": "lojas", "itens": itens}] if itens else [],
         texto=texto,
     )
