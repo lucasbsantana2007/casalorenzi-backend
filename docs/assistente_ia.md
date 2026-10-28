@@ -10,9 +10,9 @@ Dois assistentes integrados à plataforma existente, mais automações operacion
    definição da métrica e a data dos dados.
 3. **Automações**: alertas de estoque baixo, estoque parado, sugestões de transferência e pontos a vencer,
    idempotentes, com log de execução; mais a limpeza das conversas pela política de retenção.
-4. **Copiloto no Claude** (decisões 106 e 109): a cúpula de informação da liderança. As ferramentas do copiloto
-   no Claude Code, no Claude Desktop ou no n8n, por um servidor MCP com token pessoal, só para Administradores e
-   só leitura. Detalhes em [mcp.md](mcp.md).
+4. **Copiloto no Claude** (decisões 106, 109 e 110): a cúpula de informação da direção. As ferramentas do
+   copiloto no Claude Code, no Claude Desktop ou no n8n, por um servidor MCP com token pessoal, só para o
+   Administrador do grupo (hoje, a Helena) e só leitura. Detalhes em [mcp.md](mcp.md).
 
 Custos e escolha do modelo: [custos_ia.md](custos_ia.md). Roteiro para a banca: [roteiro_demonstracao.md](roteiro_demonstracao.md).
 
@@ -116,7 +116,7 @@ SUBSTITUIDA), `numeros`, `semFonte`, `textoModelo` (o que o modelo tinha escrito
 | `src/components/assistente/ChatWidget.jsx` | Botão flutuante (vitrine Casa Lorenzi, vitrine Vulto e área do cliente; some no checkout) |
 | `src/components/assistente/PainelChat.jsx`, `BlocosChat.jsx` | Janela do chat (carregada só ao abrir) e os blocos: peças, disponibilidade, lojas, pontos, pedidos, sacola, atendimento |
 | `src/hooks/useAssistente.js` | Conversa no navegador (id + chave), nova conversa ao trocar de conta, reenvio sem duplicar, conversa vencida |
-| `src/pages/admin/InteligenciaPage.jsx` | Página `/inteligencia`: Assistente, Alertas e, para Administrador, Conectar ao Claude e Uso e custo da IA |
+| `src/pages/admin/InteligenciaPage.jsx` | Página `/inteligencia`: Assistente, Alertas, Uso e custo da IA (Administrador) e Conectar ao Claude (Administrador do grupo) |
 | `src/components/copiloto/*` | Indicadores, tabelas, gráficos (recharts, já usado no Financeiro), fonte, alertas e uso |
 | `src/services/assistenteService.js`, `copilotoService.js` | Chamadas à API (a chave do modelo nunca passa pelo navegador) |
 

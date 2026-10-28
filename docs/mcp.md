@@ -1,8 +1,9 @@
-# Copiloto no Claude: o servidor MCP (decisões 106 e 109)
+# Copiloto no Claude: o servidor MCP (decisões 106, 109 e 110)
 
 O copiloto gerencial também atende fora do painel, como a **cúpula de informação da liderança**: no **Claude
-Code**, no **Claude Desktop** ou num agente do **n8n**, pelo protocolo MCP (Model Context Protocol). Só o papel
-**Administrador** usa (decisão 109); Lojista e Operador usam o copiloto no painel. Quem pergunta usa as mesmas consultas, as mesmas regras e as
+Code**, no **Claude Desktop** ou num agente do **n8n**, pelo protocolo MCP (Model Context Protocol). Só o
+**Administrador do grupo** usa, o que vê as duas marcas; hoje, a Helena (decisão 110). Os outros perfis usam o
+copiloto no painel. Quem pergunta usa as mesmas consultas, as mesmas regras e as
 mesmas permissões do painel. Muda só o lugar da conversa.
 
 | O quê | Como |
@@ -11,7 +12,7 @@ mesmas permissões do painel. Muda só o lugar da conversa.
 | Login | Token pessoal (`Authorization: Bearer clmcp_...`), criado em **Inteligência > Conectar ao Claude** |
 | O que dá para consultar | As 11 ferramentas do copiloto e `ver_contexto` (data de hoje, até quando há vendas, lojas com os ids, categorias, permissões e definições das métricas) |
 | O que não sai | Nada do cliente: pedidos, pontos, devoluções e conta ficam só na Lúcia, no site |
-| Permissão | Só Administrador. A do dono do token **no momento da chamada**: papel, marca (quem é da Vulto vê só a Vulto) e conta ativa |
+| Permissão | Só o Administrador do grupo, conferido **a cada chamada**: papel, marca (as duas) e conta ativa |
 | Escrita | Nenhuma. As consultas rodam em transação READ ONLY, como no copiloto |
 
 ## Como conectar
@@ -51,7 +52,7 @@ estoque parado da loja dele".
 
 - Valem **90 dias** (`MCP_TOKEN_VALIDADE_DIAS`). Cada pessoa tem no máximo **5 ativos** (`MCP_TOKENS_POR_USUARIO`).
 - **Revogar** na mesma tela corta o acesso na hora: a próxima chamada recebe 401.
-- Quem é desativado ou deixa de ser Administrador perde o MCP na hora, sem precisar revogar.
+- Quem é desativado ou deixa de ser Administrador do grupo perde o MCP na hora, sem precisar revogar.
 - A tela mostra o último uso e quantas consultas cada token fez.
 - Quem tiver o token consulta o que o dono consulta. Não mande por e-mail nem cole em lugar público.
 

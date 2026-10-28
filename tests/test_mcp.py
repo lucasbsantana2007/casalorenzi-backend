@@ -25,6 +25,15 @@ def paula(client):
     return _entrar(client, "paula.ferraz@vulto.com.br")  # Administradora só da Vulto
 
 
+@pytest.fixture
+def outro_do_grupo(client):
+    """Um segundo Administrador do grupo (no seed, só a Helena é): o Otávio passa a ver as duas marcas."""
+    with SessionLocal() as db:
+        db.execute(text("UPDATE usuarios SET marca = 'GRUPO' WHERE email = 'otavio.vasconcelos@casalorenzi.com.br'"))
+        db.commit()
+    return _entrar(client, "otavio.vasconcelos@casalorenzi.com.br")
+
+
 def criar_token(client, headers, nome="Claude Code do notebook") -> str:
     resposta = client.post("/api/mcp/tokens", json={"nome": nome}, headers=headers)
     assert resposta.status_code == 201, resposta.text
@@ -106,11 +115,11 @@ def test_limite_de_tokens_ativos_e_revogacao(client, admin):
     assert client.post("/api/mcp/tokens", json={"nome": "Sexto"}, headers=admin).status_code == 201
 
 
-def test_nome_em_branco_e_token_de_outra_pessoa(client, admin, paula):
+def test_nome_em_branco_e_token_de_outra_pessoa(client, admin, outro_do_grupo):
     assert client.post("/api/mcp/tokens", json={"nome": "   "}, headers=admin).status_code == 422
     meu = client.post("/api/mcp/tokens", json={"nome": "Meu"}, headers=admin).json()
-    assert client.delete(f"/api/mcp/tokens/{meu['id']}", headers=paula).status_code == 404
-    assert client.get("/api/mcp/tokens", headers=paula).json() == []
+    assert client.delete(f"/api/mcp/tokens/{meu['id']}", headers=outro_do_grupo).status_code == 404
+    assert client.get("/api/mcp/tokens", headers=outro_do_grupo).json() == []
     assert legado(client, meu["token"], "tools/list").status_code == 200
 
 
@@ -119,12 +128,12 @@ def test_cliente_nao_cria_token(client, mariana):
     assert client.get("/api/mcp/tokens").status_code == 401
 
 
-def test_token_vencido_ou_de_conta_desativada_para_de_valer(client, admin, paula):
+def test_token_vencido_ou_de_conta_desativada_para_de_valer(client, admin, outro_do_grupo):
     vencido = criar_token(client, admin)
-    desativado = criar_token(client, paula)
+    desativado = criar_token(client, outro_do_grupo)
     with SessionLocal() as db:
         db.execute(text("UPDATE tokens_mcp SET expira_em = now() - interval '1 minute' WHERE prefixo = :p"), {"p": vencido[:12]})
-        db.execute(text("UPDATE usuarios SET ativo = false WHERE email = 'paula.ferraz@vulto.com.br'"))
+        db.execute(text("UPDATE usuarios SET ativo = false WHERE email = 'otavio.vasconcelos@casalorenzi.com.br'"))
         db.commit()
     for token in (vencido, desativado):
         resposta = legado(client, token, "tools/list")
@@ -351,28 +360,28 @@ def test_faturamento_igual_ao_do_copiloto(client, admin):
     assert dados["faturamento"] == f"R$ {centavos}"
 
 
-def test_so_a_lideranca_usa_o_mcp(client, lojista, operador):
-    """Decisão 109: o MCP é a cúpula de informação da liderança (Administradores). Lojista e Operador não criam
-    nem veem tokens; quem deixa de ser Administrador perde o MCP na hora."""
-    for perfil in (lojista, operador):
-        assert client.post("/api/mcp/tokens", json={"nome": "x"}, headers=perfil).status_code == 403
-        assert client.get("/api/mcp/tokens", headers=perfil).status_code == 403
+def test_so_o_administrador_do_grupo_usa_o_mcp(client, admin, lojista, operador, paula):
+    """Decisão 110: o MCP é do Administrador do grupo (hoje, a Helena). Administrador de uma marca (Paula, Otávio),
+    Lojista e Operador não criam nem veem tokens; quem deixa de ver as duas marcas perde o MCP na hora."""
     otavio = _entrar(client, "otavio.vasconcelos@casalorenzi.com.br")
-    token = criar_token(client, otavio)
+    for perfil in (paula, otavio, lojista, operador):
+        recusado = client.post("/api/mcp/tokens", json={"nome": "x"}, headers=perfil)
+        assert recusado.status_code == 403 and "Administrador do grupo" in recusado.json()["detail"]
+        assert client.get("/api/mcp/tokens", headers=perfil).status_code == 403
+    token = criar_token(client, admin)
     assert legado(client, token, "tools/list").status_code == 200
     with SessionLocal() as db:
-        db.execute(text("UPDATE usuarios SET papel = 'OPERADOR' WHERE email = 'otavio.vasconcelos@casalorenzi.com.br'"))
+        db.execute(text("UPDATE usuarios SET marca = 'LORENZI' WHERE email = 'helena@casalorenzi.com.br'"))
         db.commit()
     assert legado(client, token, "tools/list").status_code == 401
 
 
-def test_marca_vem_do_dono_do_token(client, paula):
-    token = criar_token(client, paula)
+def test_o_administrador_do_grupo_ve_as_duas_marcas(client, admin):
+    token = criar_token(client, admin)
     contexto = chamar(client, token, "ver_contexto")["structuredContent"]
-    assert contexto["marcasQuePodeVer"] == ["Vulto"]
-    assert all(loja["marca"] == "Vulto" for loja in contexto["lojas"])  # nenhuma loja da Casa Lorenzi
-    outra = chamar(client, token, "consultar_faturamento", {"marca": "LORENZI"})
-    assert outra["isError"] is True and "SEM_PERMISSAO" in outra["content"][0]["text"]
+    assert contexto["marcasQuePodeVer"] == ["Casa Lorenzi", "Vulto"]
+    so_vulto = chamar(client, token, "consultar_faturamento", {"marca": "VULTO"})
+    assert so_vulto["isError"] is False and "Vulto" in " ".join(so_vulto["structuredContent"]["filtros"])
 
 
 def test_parametro_a_mais_e_recusado_e_auditado(client, admin):
