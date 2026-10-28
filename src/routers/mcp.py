@@ -12,6 +12,7 @@ não termina em /mcp. As duas coisas valem para qualquer cliente; nenhuma muda o
 """
 
 import json
+import logging
 from urllib.parse import urlsplit
 
 from fastapi import APIRouter, Depends, Request
@@ -29,6 +30,7 @@ from src.use_cases import tokens_mcp
 from src.use_cases.assistente import servidor_mcp
 from src.use_cases.assistente.servidor_mcp import ERRO_JSON, Resposta
 
+log = logging.getLogger(__name__)
 router = APIRouter(tags=["MCP (copiloto em apps de IA)"])
 acesso = exigir_modulo("inteligencia")
 
@@ -93,14 +95,35 @@ def _sem_token() -> Resposta:
     return resposta
 
 
+def _sem_numero_especial(valor: str):
+    """NaN e Infinity não são JSON (o Python aceita, o Postgres recusa na auditoria)."""
+    raise ValueError(f"{valor} não é um valor JSON")
+
+
+def _ler(corpo: bytes):
+    return json.loads(corpo, parse_constant=_sem_numero_especial)
+
+
 def _atender(mensagem, cabecalhos: dict, texto_token: str | None) -> Resposta:
     with SessionLocal() as db:
-        token = tokens_mcp.autenticar(db, texto_token)
-        if token is None:
-            return _sem_token()
-        resposta = servidor_mcp.processar(db, mensagem, cabecalhos, token, cabecalhos.get("user-agent"))
-        db.commit()
-        return resposta
+        try:
+            token = tokens_mcp.autenticar(db, texto_token)
+            if token is None:
+                return _sem_token()
+            resposta = servidor_mcp.processar(db, mensagem, cabecalhos, token, cabecalhos.get("user-agent"))
+            db.commit()
+            return resposta
+        except Exception:
+            # Banco fora do ar ou falha não prevista: resposta JSON-RPC legível (o 500 padrão sai com Content-Length)
+            db.rollback()
+            log.exception("Falha no servidor MCP")
+            id_ = mensagem.get("id") if isinstance(mensagem, dict) else None
+            return servidor_mcp.erro_jsonrpc(
+                500,
+                servidor_mcp.ERRO_INTERNO,
+                "Falha interna: tente de novo em instantes.",
+                id_ if servidor_mcp.id_valido(id_) else None,
+            )
 
 
 @router.post("/conector-mcp", include_in_schema=False)
@@ -116,8 +139,8 @@ async def mcp(request: Request):
     if len(corpo) > TAMANHO_MAXIMO:
         return _json(servidor_mcp.erro_jsonrpc(413, servidor_mcp.PEDIDO_INVALIDO, "Mensagem grande demais."))
     try:
-        mensagem = json.loads(corpo)
-    except (json.JSONDecodeError, UnicodeDecodeError):
+        mensagem = _ler(corpo)
+    except (ValueError, RecursionError):  # JSON quebrado, NaN/Infinity, aninhado demais
         return _json(servidor_mcp.erro_jsonrpc(400, ERRO_JSON, "Corpo não é um JSON válido."))
     cabecalhos = {chave.lower(): valor for chave, valor in request.headers.items()}
     return _json(await run_in_threadpool(_atender, mensagem, cabecalhos, texto_token))

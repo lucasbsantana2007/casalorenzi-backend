@@ -209,6 +209,42 @@ def test_mensagens_mal_formadas(client, admin):
     assert grande.status_code == 413
 
 
+def test_json_que_o_python_aceita_mas_nao_e_json(client, admin):
+    """NaN, Infinity e aninhamento sem fim: 400 de JSON inválido, sem chegar ao banco (antes davam 500)."""
+    token = criar_token(client, admin)
+    cabecalhos = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+    corpos = [
+        b'{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"ver_contexto","arguments":{"x":NaN}}}',
+        b'{"jsonrpc":"2.0","id":1,"method":"ping","params":{"x":-Infinity}}',
+        b"[" * 20000 + b"]" * 20000,
+    ]
+    for corpo in corpos:
+        resposta = client.post(URL, content=corpo, headers=cabecalhos)
+        assert resposta.status_code == 400 and resposta.json()["error"]["code"] == -32700
+    assert chamadas_mcp() == []
+
+
+def test_argumentos_ausentes_ou_com_caractere_nulo_vao_para_a_auditoria(client, admin):
+    token = criar_token(client, admin)
+    sem_argumentos = legado(client, token, "tools/call", {"name": "ver_contexto"})
+    assert sem_argumentos.json()["result"]["isError"] is False
+    nulo = chamar(client, token, "consultar_faturamento", {"periodo": "mes\u0000atual"})
+    assert nulo["isError"] is True and "PARAMETROS_INVALIDOS" in nulo["content"][0]["text"]
+    assert [c.argumentos for c in chamadas_mcp()] == [{}, {"periodo": "mes\u0000atual"}]
+
+
+def test_falha_inesperada_vira_erro_json_rpc(client, admin, monkeypatch):
+    token = criar_token(client, admin)
+
+    def quebra(*_, **__):
+        raise RuntimeError("banco caiu")
+
+    monkeypatch.setattr("src.use_cases.assistente.servidor_mcp.processar", quebra)
+    resposta = legado(client, token, "tools/list", id_=7)
+    assert resposta.status_code == 500 and resposta.json()["error"]["code"] == -32603 and resposta.json()["id"] == 7
+    assert "banco caiu" not in resposta.text
+
+
 def test_get_e_delete_respondem_405(client, admin):
     token = criar_token(client, admin)
     for metodo in ("GET", "DELETE"):

@@ -61,7 +61,7 @@ META = "io.modelcontextprotocol/"
 CAPACIDADES = {"tools": {"listChanged": False}}
 
 # Códigos JSON-RPC (os -320xx são os definidos pela especificação do MCP)
-ERRO_JSON, PEDIDO_INVALIDO, METODO_INEXISTENTE, PARAMETROS_INVALIDOS = -32700, -32600, -32601, -32602
+ERRO_JSON, PEDIDO_INVALIDO, METODO_INEXISTENTE, PARAMETROS_INVALIDOS, ERRO_INTERNO = -32700, -32600, -32601, -32602, -32603
 CABECALHO_DIVERGENTE, VERSAO_NAO_SUPORTADA = -32020, -32022
 # Token ou origem recusados (código da aplicação, fora da faixa reservada ao JSON-RPC e ao MCP)
 SEM_AUTORIZACAO = -31001
@@ -179,7 +179,7 @@ def _decodificar(valor: str | None) -> str | None:
     return valor
 
 
-def _id_valido(id_) -> bool:
+def id_valido(id_) -> bool:
     return (isinstance(id_, str) or isinstance(id_, int)) and not isinstance(id_, bool)
 
 
@@ -200,10 +200,10 @@ def processar(
             else erro_jsonrpc(400, PEDIDO_INVALIDO, "Mensagem JSON-RPC 2.0 inválida.")
         )
     id_ = mensagem["id"]
-    if not _id_valido(id_) or not isinstance(metodo, str):
+    if not id_valido(id_) or not isinstance(metodo, str):
         if not isinstance(metodo, str) and ("result" in mensagem or "error" in mensagem):
             return Resposta(202)  # resposta do cliente a algo que nunca pedimos: ignorada
-        return erro_jsonrpc(400, PEDIDO_INVALIDO, "Requisição sem id válido ou sem método.", id_ if _id_valido(id_) else None)
+        return erro_jsonrpc(400, PEDIDO_INVALIDO, "Requisição sem id válido ou sem método.", id_ if id_valido(id_) else None)
     parametros = mensagem.get("params")
     if parametros is None:
         parametros = {}
