@@ -67,6 +67,7 @@ def criar(db: Session, usuario: m.Usuario, nome: str) -> tuple[m.TokenMcp, str]:
     if not nome:
         raise DadosInvalidos("Dê um nome ao token (ex.: Claude Code do notebook).")
     momento = agora()
+    repo.travar_usuario(db, usuario.id)  # dois pedidos ao mesmo tempo não passam juntos do limite
     if repo.ativos_do_usuario(db, usuario.id, momento) >= settings.MCP_TOKENS_POR_USUARIO:
         raise Conflito(
             f"Você já tem {settings.MCP_TOKENS_POR_USUARIO} tokens ativos. Revogue um que não usa mais antes de criar outro."
@@ -112,7 +113,11 @@ def autenticar(db: Session, texto: str | None) -> m.TokenMcp | None:
 
 
 def registrar_chamada(db: Session, token: m.TokenMcp, execucao: Execucao, cliente: str | None) -> None:
-    argumentos = execucao.argumentos if isinstance(execucao.argumentos, dict) else {"valor": str(execucao.argumentos)[:200]}
+    argumentos = execucao.argumentos
+    if argumentos is None:
+        argumentos = {}
+    elif not isinstance(argumentos, dict):
+        argumentos = {"valor": str(argumentos)[:200]}
     serializado = json.dumps(argumentos, ensure_ascii=False, default=str)
     if len(serializado) > 2000:  # o app pode mandar qualquer coisa: a auditoria guarda só o começo
         argumentos = {"truncado": serializado[:2000]}

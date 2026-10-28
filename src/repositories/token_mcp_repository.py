@@ -23,6 +23,10 @@ def do_usuario(db: Session, usuario_id: int) -> list[m.TokenMcp]:
     )
 
 
+def travar_usuario(db: Session, usuario_id: int) -> None:
+    db.execute(select(m.Usuario.id).where(m.Usuario.id == usuario_id).with_for_update())
+
+
 def ativos_do_usuario(db: Session, usuario_id: int, momento: datetime) -> int:
     return db.scalar(
         select(func.count())
