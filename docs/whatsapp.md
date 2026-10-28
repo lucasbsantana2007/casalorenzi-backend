@@ -51,9 +51,9 @@ Como a conversa funciona:
 | # | Nó | Configuração |
 | --- | --- | --- |
 | 1 | **WhatsApp Trigger** | Credencial do app da Meta; evento *messages* |
-| 2 | **IF** | Só segue se `{{ $json.messages }}` existir (a Meta também manda avisos de entrega e leitura, que não são mensagens) |
-| 3 | **HTTP Request** | `POST https://casalorenzi-api.onrender.com/api/canais/whatsapp/mensagens`; cabeçalho `X-Canal-Segredo`; corpo JSON abaixo; tempo máximo de 60 s |
-| 4 | **IF** | Só segue se `{{ $json.responder }}` for verdadeiro |
+| 2 | **IF** | `{{ Array.isArray($json.messages) && $json.messages.length > 0 }}` com o operador **Boolean > is true** e **Convert types where required** ligado. A Meta também manda avisos de entrega e leitura (`statuses`), que param aqui |
+| 3 | **HTTP Request** | `POST https://casalorenzi-api.onrender.com/api/canais/whatsapp/mensagens`; credencial Header Auth (`X-Canal-Segredo`); **Send Body** ligado, JSON com os campos abaixo, cada valor em modo Expression; tempo máximo de 60 s; em *Settings*, **Retry On Fail** com 5 tentativas a cada 5 s (a API do plano grátis do Render dorme e responde 503 enquanto acorda) |
+| 4 | **IF** | `{{ $json.responder }}` com **Boolean > is true** |
 | 5 | **WhatsApp** (*Send message*) | *Phone number ID* do número; destinatário `{{ $('WhatsApp Trigger').item.json.messages[0].from }}`; texto `{{ $json.texto }}` |
 
 Corpo do nó 3:
@@ -67,8 +67,20 @@ Corpo do nó 3:
 }
 ```
 
-Confira no primeiro teste o caminho dos campos na saída do WhatsApp Trigger: a Meta manda `messages` e
-`contacts` dentro de `value`, e o nó pode entregar o objeto inteiro ou só o `value`.
+Conferido em 28/10/2026: o WhatsApp Trigger entrega `messages` e `contacts` no primeiro nível do item (os caminhos
+acima funcionam). Depois de qualquer mudança no fluxo, clique em **Publish**: enquanto houver a bolinha amarela, as
+mensagens rodam a versão anterior.
+
+## Problemas encontrados na montagem
+
+| Sintoma | Causa | O que fazer |
+| --- | --- | --- |
+| IF com "Wrong type: '[object Object]' is a string but was expecting an array" | Comparar a lista direto no IF | Usar a expressão booleana acima, operador Boolean e Convert types ligado |
+| HTTP Request com "Service unavailable" | A API estava dormindo (Render grátis) | Retry On Fail no nó; para a banca, plano Starter do Render |
+| HTTP Request com "Field required" | Send Body desligado | Ligar Send Body com os 4 campos |
+| Execução verde, mas a resposta não chega | A Meta recusa a entrega; o motivo vem no aviso seguinte (`statuses[0].errors`) | Abrir a execução do aviso e ler o código do erro |
+| Erro 131031 "Business Account locked" | A Meta bloqueou a conta do WhatsApp Business (conta do Facebook recém-criada) | Pedir revisão em Business Support Home ou criar o app com uma conta do Facebook antiga |
+| Resposta não chega no número com o 9 | O WhatsApp identifica muitos números antigos de MG sem o nono dígito (`from` = 553184139032) | Cadastrar em **To**, na Meta, as duas versões do número |
 
 ## Limitações
 
