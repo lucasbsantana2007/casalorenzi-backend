@@ -62,7 +62,7 @@ Como a conversa funciona:
 - **O número não fica salvo na conversa.** Ela é achada pelo HMAC do telefone, calculado com o segredo do canal.
 - **O assistente é o mesmo do site**: as mesmas ferramentas, o verificador de números e a regra de duas falhas →
   pessoa. O modelo sabe que está no WhatsApp: responde só em texto, sem botões, com no máximo 5 peças.
-- **Os cards viram texto.** Peças saem com preço e link do site; disponibilidade sai por loja; lojas saem com
+- **Os cards viram texto**, sem repetir peça ou loja que a Lúcia já escreveu. Peças saem com preço e link do site; disponibilidade sai por loja; lojas saem com
   endereço, horário de hoje e telefone. Quando a peça está escolhida, sai o link para comprar.
 - **Sem login.** O WhatsApp não identifica a conta do site, então pedidos, pontos e dados da conta ficam no site
   (`/login`).
