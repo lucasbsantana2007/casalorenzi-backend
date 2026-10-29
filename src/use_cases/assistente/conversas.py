@@ -169,7 +169,7 @@ def _nova(
     sessao.gerar_ids(db)
     texto, sugestoes = saudacao or (
         prompts.BOAS_VINDAS[tipo],
-        regras_cliente.SUGESTOES if tipo == regra.CLIENTE else regras_gerenciais.SUGESTOES[:4],
+        regras_cliente.SUGESTOES if tipo == regra.CLIENTE else regras_gerenciais.sugestoes_para(None, True)[:4],
     )
     boas_vindas = m.MensagemAssistente(
         conversa_id=conversa.id,
@@ -222,7 +222,9 @@ def conversa_do_site(db: Session, conversa_id: str, chave: str | None, cliente: 
 
 
 def abrir_gerencial(db: Session, usuario: m.Usuario) -> m.ConversaAssistente:
-    conversa = _nova(db, tipo=regra.GERENCIAL, usuario_id=usuario.id)
+    # Boas-vindas com as perguntas que este perfil pode fazer (decisão 123)
+    sugestoes = regras_gerenciais.sugestoes_para(usuario.papel, usuario.marca == "GRUPO")[:4]
+    conversa = _nova(db, tipo=regra.GERENCIAL, usuario_id=usuario.id, saudacao=(prompts.BOAS_VINDAS[regra.GERENCIAL], sugestoes))
     sessao.confirmar(db)
     return conversa
 
