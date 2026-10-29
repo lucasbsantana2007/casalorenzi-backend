@@ -76,6 +76,11 @@ CHAVES_MEMORIA = {
     "whatsappModo",
     "perguntaPendente",
     "whatsappUltimoId",
+    # Depois da resposta (decisão 125): para onde mandar a checagem, quando a Lúcia ou a equipe respondeu e quando a
+    # checagem saiu (só enquanto espera o cliente)
+    "whatsappTelefone",
+    "whatsappRespondidoEm",
+    "whatsappChecagemEm",
 }
 
 

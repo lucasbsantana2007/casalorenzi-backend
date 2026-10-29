@@ -448,3 +448,86 @@ def test_resposta_da_equipe_renova_o_ciclo(client, admin, entregas):
     seguinte = diga(client, "obrigada, aguardo")
     assert seguinte["protocolo"] == protocolo and seguinte["responder"] is False
     assert chamado(protocolo).mensagens[-1].conteudo == "obrigada, aguardo"
+
+
+# ---------- Depois da resposta: a checagem e o fim (decisão 125) ----------
+
+
+def _recuar_espera(conversa_id, minutos):
+    """Recua no tempo a resposta (da Lúcia ou da equipe) e a checagem, como se o cliente estivesse calado."""
+    with SessionLocal() as db:
+        conversa = db.get(m.ConversaAssistente, conversa_id)
+        contexto = dict(conversa.contexto)
+        for chave in ("whatsappRespondidoEm", "whatsappChecagemEm"):
+            if contexto.get(chave):
+                contexto[chave] = (datetime.fromisoformat(contexto[chave]) - timedelta(minutes=minutos)).isoformat()
+        conversa.contexto = contexto
+        db.commit()
+
+
+def _rotina(client):
+    resposta = client.post(f"{URL.rsplit('/', 1)[0]}/rotina", headers={"X-Canal-Segredo": SEGREDO})
+    assert resposta.status_code == 200, resposta.text
+    return resposta.json()
+
+
+def test_quinze_minutos_depois_da_lucia_vem_a_checagem(client, entregas):
+    com_a_lucia(client)
+    resposta = diga(client, "qual o horário da loja de Curitiba?")
+    assert _rotina(client) == {"checagens": 0, "finalizadas": 0}  # ainda não deu 15 min
+    _recuar_espera(resposta["conversaId"], 16)
+    assert _rotina(client)["checagens"] == 1
+    checagem = entregas[-1]["corpo"]["mensagem"]
+    assert checagem["to"] == TELEFONE and checagem["interactive"]["body"]["text"] == canal.CHECAGEM
+    assert [b["reply"]["id"] for b in checagem["interactive"]["action"]["buttons"]] == ["FINALIZAR"]
+    assert _rotina(client)["checagens"] == 0  # uma vez só
+
+
+def test_cliente_que_responde_nao_recebe_a_checagem(client, entregas):
+    com_a_lucia(client)
+    resposta = diga(client, "tem camisa?")
+    _recuar_espera(resposta["conversaId"], 10)
+    diga(client, "obrigada")  # cortesia: a Lúcia responde e a espera recomeça do zero
+    _recuar_espera(resposta["conversaId"], 10)
+    assert _rotina(client)["checagens"] == 0 and entregas == []
+
+
+def test_sem_resposta_por_mais_3h45_finaliza_e_avisa(client, entregas):
+    com_a_lucia(client)
+    resposta = diga(client, "tem camisa?")
+    _recuar_espera(resposta["conversaId"], 16)
+    _rotina(client)
+    _recuar_espera(resposta["conversaId"], 3 * 60 + 46)
+    assert _rotina(client)["finalizadas"] == 1
+    assert entregas[-1]["corpo"]["mensagem"]["text"]["body"] == canal.SEM_RESPOSTA
+    with SessionLocal() as db:
+        assert db.get(m.ConversaAssistente, resposta["conversaId"]).status == regra.ENCERRADA
+    nova = diga(client, "oi")
+    assert nova["conversaId"] != resposta["conversaId"] and canal.OPCOES_DO_MENU in nova["texto"]
+
+
+def test_depois_da_equipe_tambem_e_o_chamado_fecha(client, admin, entregas):
+    diga(client, "oi")
+    aberto = diga(client, botao="EQUIPE")
+    _equipe_responde(client, admin, aberto["protocolo"])
+    _recuar_espera(aberto["conversaId"], 16)
+    assert _rotina(client)["checagens"] == 1
+    _recuar_espera(aberto["conversaId"], 3 * 60 + 46)
+    assert _rotina(client)["finalizadas"] == 1
+    assert chamado(aberto["protocolo"]).status == "CONCLUIDO"
+    assert aberto["protocolo"] in entregas[-1]["corpo"]["mensagem"]["text"]["body"]
+
+
+def test_botao_finalizar_encerra_na_hora(client, admin, entregas):
+    diga(client, "oi")
+    aberto = diga(client, botao="EQUIPE")
+    _equipe_responde(client, admin, aberto["protocolo"])
+    fim = diga(client, botao="FINALIZAR")
+    assert fim["texto"] == canal.FINALIZADO and botoes(fim) == []
+    assert chamado(aberto["protocolo"]).status == "CONCLUIDO"
+    assert "Finalizado pelo cliente" in chamado(aberto["protocolo"]).mensagens[-1].conteudo
+    assert _rotina(client) == {"checagens": 0, "finalizadas": 0}
+
+
+def test_rotina_exige_o_segredo(client):
+    assert client.post(f"{URL.rsplit('/', 1)[0]}/rotina").status_code == 401

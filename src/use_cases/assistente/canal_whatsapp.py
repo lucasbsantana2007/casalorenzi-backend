@@ -24,7 +24,7 @@ import hmac
 import logging
 import re
 import time
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 import httpx
 from sqlalchemy import select
@@ -269,12 +269,13 @@ _NUMEROS_DO_MENU = {LUCIA: {"1", "um"}, EQUIPE: {"2", "dois"}}
 _ESCOLHE_LUCIA = {"respostas rapidas", "resposta rapida", "lucia"}
 _ESCOLHE_EQUIPE = {"equipe", "falar com a equipe", "atendente", "atendimento humano", "pessoa", "humano"}
 _PEDE_MENU = {"menu", "opcoes", "inicio"}
+_PEDE_FIM = {"finalizar", "finalizar atendimento", "encerrar", "encerrar atendimento"}
 
 
 def _escolha(texto: str, botao: str | None, no_menu: bool = True) -> str | None:
     """LUCIA, EQUIPE ou MENU quando o cliente escolheu (botão ou resposta curta); senão None (é uma pergunta).
     no_menu=False: 1 e 2 não valem como opção."""
-    if botao in (LUCIA, EQUIPE, MENU):
+    if botao in (LUCIA, EQUIPE, MENU, FINALIZAR):
         return botao
     curto = " ".join(re.findall(r"[a-z0-9]+", normalizar(texto)))
     if curto in _ESCOLHE_LUCIA or (no_menu and curto in _NUMEROS_DO_MENU[LUCIA]):
@@ -283,6 +284,8 @@ def _escolha(texto: str, botao: str | None, no_menu: bool = True) -> str | None:
         return EQUIPE
     if curto in _PEDE_MENU:
         return MENU
+    if curto in _PEDE_FIM:
+        return FINALIZAR
     return None
 
 
@@ -436,7 +439,10 @@ def entregar_resposta_da_equipe(db: Session, atendimento: m.Atendimento, conteud
     sessao.confirmar(db)
     # Mensagem comum, como numa conversa (decisão 121): sem assinatura, protocolo nem botão
     entregue = _entregar(mensagem_da_meta(telefone, conteudo.strip()[:TAMANHO_MAXIMO]))
-    if not entregue:
+    if entregue:
+        for conversa in db.scalars(select(m.ConversaAssistente).where(m.ConversaAssistente.atendimento_id == atendimento.id)):
+            _esperar_o_cliente(db, conversa, telefone)
+    else:
         atendimentos.registrar_evento(
             db, atendimento, "Não consegui entregar esta resposta no WhatsApp do cliente. Tente de novo em instantes."
         )
@@ -477,6 +483,113 @@ def encerrar_ciclos(db: Session) -> int:
     for atendimento in parados:
         _encerrar(db, atendimento, avisar=True)
     return len(parados)
+
+
+# ---------- Depois da resposta: a checagem e o fim (decisão 125) ----------
+# Respondeu (a Lúcia ou a equipe) e o cliente ficou 15 min calado: "Precisa de mais alguma coisa?", com o botão
+# Finalizar atendimento. Mais 3 h 45 sem resposta (4 h no total): o atendimento é finalizado e o cliente, avisado.
+# Para mandar a mensagem sem o cliente ter escrito, a rotina roda de tempos em tempos (o n8n chama a cada 5 min).
+# O telefone fica na memória da conversa só enquanto espera, cifrado com o segredo do canal (o número não fica
+# aberto no banco), para a rotina saber para onde mandar; some quando o cliente fala ou o atendimento termina.
+
+FINALIZAR = "FINALIZAR"
+BOTAO_FINALIZAR = {"id": FINALIZAR, "title": "Finalizar atendimento"}
+CHECAGEM = "Precisa de mais alguma coisa? Se estiver tudo certo, é só tocar em “Finalizar atendimento”."
+FINALIZADO = "Atendimento finalizado. Obrigada pelo contato! Quando precisar, é só mandar uma mensagem por aqui."
+SEM_RESPOSTA = (
+    "Como não tivemos mais notícias, encerramos o atendimento por aqui. Obrigada pelo contato! Se precisar de algo, "
+    "é só mandar uma mensagem."
+)
+ESPERA_DA_CHECAGEM = timedelta(minutes=15)
+_SEM_ESPERA = {"whatsappTelefone": None, "whatsappRespondidoEm": None, "whatsappChecagemEm": None}
+
+
+def _marcar(db: Session, conversa: m.ConversaAssistente, **valores) -> None:
+    """Como _guardar, sem mexer em atualizada_em (a checagem não conta como conversa)."""
+    contexto = dict(conversa.contexto or {})
+    for chave, valor in valores.items():
+        if valor is None:
+            contexto.pop(chave, None)
+        else:
+            contexto[chave] = valor
+    conversa.contexto = contexto
+    sessao.confirmar(db)
+
+
+def _fluxo(conversa_id: str, tamanho: int) -> bytes:
+    chave = hashlib.sha256(settings.CANAL_WHATSAPP_SEGREDO.encode()).digest()
+    return hashlib.blake2b(conversa_id.encode(), key=chave, digest_size=tamanho).digest()
+
+
+def _cifrar(telefone: str, conversa_id: str) -> str:
+    """O número cifrado com o segredo do canal e o id da conversa (cada conversa, uma cifra)."""
+    dados = telefone.encode()
+    return bytes(a ^ b for a, b in zip(dados, _fluxo(conversa_id, len(dados)), strict=True)).hex()
+
+
+def _decifrar(cifrado: str, conversa_id: str) -> str | None:
+    try:
+        dados = bytes.fromhex(cifrado)
+        return telefone_valido(bytes(a ^ b for a, b in zip(dados, _fluxo(conversa_id, len(dados)), strict=True)).decode())
+    except (ValueError, UnicodeDecodeError):
+        return None
+
+
+def _esperar_o_cliente(db: Session, conversa: m.ConversaAssistente, telefone: str) -> None:
+    _marcar(
+        db,
+        conversa,
+        whatsappTelefone=_cifrar(telefone, conversa.id),
+        whatsappRespondidoEm=agora().isoformat(),
+        whatsappChecagemEm=None,
+    )
+
+
+def _finalizar(db: Session, conversa: m.ConversaAssistente, nota: str) -> m.Atendimento | None:
+    """Encerra a conversa e o chamado dela, se estiver aberto. Devolve o chamado encerrado."""
+    atendimento = db.get(m.Atendimento, conversa.atendimento_id) if conversa.atendimento_id else None
+    if atendimento is not None and atendimento.status in EM_ABERTO:
+        atendimento.status = "CONCLUIDO"
+        atendimento.atualizado_em = agora()
+        atendimentos.registrar_evento(db, atendimento, nota)
+    else:
+        atendimento = None
+    conversa.status = regra.ENCERRADA
+    _marcar(db, conversa, **_SEM_ESPERA)
+    return atendimento
+
+
+def rotina(db: Session) -> dict:
+    """Manda a checagem a quem ficou 15 min sem responder e finaliza quem ficou mais 3 h 45 sem responder. Depois,
+    fecha os chamados parados que ficaram de fora (decisão 117). Devolve quantas checagens e finalizações fez."""
+    momento = agora()
+    total = timedelta(hours=settings.WHATSAPP_CICLO_HORAS)
+    checagens = finalizadas = 0
+    conversas_ativas = db.scalars(
+        select(m.ConversaAssistente).where(
+            m.ConversaAssistente.tipo == regra.CLIENTE,
+            m.ConversaAssistente.chave_hash.is_not(None),
+            m.ConversaAssistente.status != regra.ENCERRADA,
+            m.ConversaAssistente.atualizada_em >= momento - total - timedelta(hours=1),
+        )
+    ).all()
+    for conversa in conversas_ativas:
+        memoria = conversa.contexto or {}
+        cifrado, respondido = memoria.get("whatsappTelefone"), memoria.get("whatsappRespondidoEm")
+        telefone = _decifrar(cifrado, conversa.id) if cifrado else None
+        if not telefone or not respondido:
+            continue
+        checagem = memoria.get("whatsappChecagemEm")
+        if checagem and momento - datetime.fromisoformat(checagem) >= total - ESPERA_DA_CHECAGEM:
+            atendimento = _finalizar(db, conversa, NOTA_ENCERRADO.format(horas=settings.WHATSAPP_CICLO_HORAS))
+            aviso = ENCERRAMENTO.format(protocolo=atendimento.protocolo) if atendimento else SEM_RESPOSTA
+            _entregar(mensagem_da_meta(telefone, aviso))
+            finalizadas += 1
+        elif not checagem and momento - datetime.fromisoformat(respondido) >= ESPERA_DA_CHECAGEM:
+            if _entregar(mensagem_da_meta(telefone, CHECAGEM, [BOTAO_FINALIZAR])):
+                _marcar(db, conversa, whatsappChecagemEm=momento.isoformat())
+                checagens += 1
+    return {"checagens": checagens, "finalizadas": finalizadas + encerrar_ciclos(db)}
 
 
 # ---------- Mensagem recebida ----------
@@ -522,8 +635,12 @@ def responder(
         return {"responder": False, "texto": "", "mensagem": None, "conversaId": conversa.id, "protocolo": None}
     modo = memoria.get("whatsappModo")
     escolha = _escolha(texto, botao, no_menu=modo in (None, MENU))
-    if id_cliente:
-        _guardar(db, conversa, whatsappUltimoId=id_cliente)
+    # O cliente falou: para de contar a espera da checagem (decisão 125)
+    _guardar(db, conversa, **({"whatsappUltimoId": id_cliente} if id_cliente else {}), **_SEM_ESPERA)
+
+    if escolha == FINALIZAR:
+        _finalizar(db, conversa, "Finalizado pelo cliente no WhatsApp.")
+        return _saida(telefone, FINALIZADO, None, None, db)
 
     if escolha == MENU:
         _guardar(db, conversa, whatsappModo=MENU)
@@ -599,6 +716,7 @@ def _resposta_da_lucia(db: Session, telefone: str, texto: str, id_cliente: str |
         texto_final = texto_para_whatsapp(
             f"{corpo}\n\n{OFERTA_DA_EQUIPE}", [b for b in blocos if b.get("tipo") != "acao_atendimento"]
         )
+        _esperar_o_cliente(db, conversa, telefone)
         return _saida(telefone, texto_final, [BOTAO_EQUIPE], conversa, db)
     if oferta is not None:
         # O cliente pediu uma pessoa (ou chegou irritado): abre o chamado na hora
@@ -611,4 +729,5 @@ def _resposta_da_lucia(db: Session, telefone: str, texto: str, id_cliente: str |
             )
             saida["mensagem"] = mensagem_da_meta(telefone, saida["texto"])
         return saida
+    _esperar_o_cliente(db, conversa, telefone)
     return _saida(telefone, texto_para_whatsapp(resposta.conteudo or "", blocos), None, conversa, db)

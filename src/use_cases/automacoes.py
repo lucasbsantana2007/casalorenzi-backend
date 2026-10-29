@@ -281,9 +281,15 @@ def _limpeza(db: Session) -> Placar:
 def _encerrar_whatsapp(db: Session) -> Placar:
     from src.use_cases.assistente import canal_whatsapp
 
-    fechados = canal_whatsapp.encerrar_ciclos(db)
+    feito = canal_whatsapp.rotina(db)
     horas = settings.WHATSAPP_CICLO_HORAS
-    return Placar(resolvidos=fechados, detalhe=[f"{fechados} chamado(s) do WhatsApp encerrado(s) após {horas} h sem resposta"])
+    return Placar(
+        resolvidos=feito["finalizadas"],
+        detalhe=[
+            f"{feito['checagens']} checagem(ns) enviada(s)",
+            f"{feito['finalizadas']} atendimento(s) do WhatsApp finalizado(s) após {horas} h sem resposta",
+        ],
+    )
 
 
 AUTOMACOES: dict[str, Callable[[Session], Placar]] = {

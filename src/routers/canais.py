@@ -26,7 +26,7 @@ class MensagemDoWhatsApp(Entrada):
     id_mensagem: str | None = Field(None, max_length=256)
     # O nome do perfil do WhatsApp, para o chamado de atendimento
     nome: str | None = Field(None, max_length=120)
-    # Botão tocado (o id do button_reply da Meta): LUCIA, EQUIPE ou MENU (decisão 116)
+    # Botão tocado (o id do button_reply da Meta): LUCIA, EQUIPE, MENU (decisão 116) ou FINALIZAR (decisão 125)
     botao: str | None = Field(None, max_length=40)
 
 
@@ -47,3 +47,10 @@ def mensagem_do_whatsapp(dados: MensagemDoWhatsApp, db: Session = Depends(get_db
     return canal_whatsapp.responder(
         db, telefone=telefone, texto=dados.texto, id_mensagem=dados.id_mensagem, nome=dados.nome, botao=dados.botao
     )
+
+
+@router.post("/whatsapp/rotina", dependencies=[Depends(_canal_liberado)])
+def rotina_do_whatsapp(db: Session = Depends(get_db)):
+    """Chamada pelo n8n a cada 5 minutos (decisão 125): manda "Precisa de mais alguma coisa?" a quem ficou 15 min sem
+    responder e finaliza quem ficou 4 h. Devolve { checagens, finalizadas }."""
+    return canal_whatsapp.rotina(db)
