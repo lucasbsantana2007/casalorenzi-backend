@@ -16,6 +16,11 @@ if not URL_TESTE:
 os.environ["DATABASE_URL"] = URL_TESTE  # precisa vir antes de importar o app
 os.environ["RESEND_API_KEY"] = ""  # testes nunca mandam e-mail de verdade (sem chave, vai para o log)
 os.environ["ANTHROPIC_API_KEY"] = ""  # testes nunca chamam o modelo de verdade (usam tests/ia_falsa.py)
+# Os e-mails automáticos começam desligados e sem modo teste, seja qual for o .env (cada teste liga o que precisa)
+for _chave in ("AVISO_PONTOS_ENVIAR", "AVISO_ESTOQUE_ENVIAR", "LEMBRETE_SACOLA_ENVIAR"):
+    os.environ[_chave] = "false"
+for _chave in ("AVISO_PONTOS_TESTE_PARA", "AVISOS_TESTE_PARA"):
+    os.environ[_chave] = ""
 
 from alembic.config import Config  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402

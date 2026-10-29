@@ -27,7 +27,7 @@ from src import models as m
 from src.config import settings
 from src.database.connection import SessionLocal
 from src.entities import fidelidade as regra
-from src.entities.cliente import email_valido, normalizar_email
+from src.entities.cliente import email_valido, normalizar_email, recebe_email_real
 from src.integrations import email as envio
 from src.integrations import modelos_email
 from src.repositories import fidelidade_repository
@@ -65,6 +65,10 @@ class Resultado:
 
 def _modo() -> str:
     return "TESTE" if settings.AVISO_PONTOS_TESTE_PARA else "REAL"
+
+
+def _teto() -> int:
+    return regra.AVISOS_TESTE_POR_DIA if settings.AVISO_PONTOS_TESTE_PARA else settings.AVISO_PONTOS_LIMITE_DIA
 
 
 def _emails_compartilhados(db: Session) -> set[str]:
@@ -105,7 +109,7 @@ def pendentes(db: Session, modo: str, referencia: date | None = None) -> list[Pe
     clientes = db.scalars(select(m.Cliente).where(m.Cliente.id.in_(janelas), m.Cliente.excluido_em.is_(None)))
     saida = []
     for cliente in clientes:
-        if not email_valido(cliente.email):
+        if not email_valido(cliente.email) or (modo == "REAL" and not recebe_email_real(cliente)):
             continue
         vencimentos, saldo = janelas[cliente.id]
         novos = [(dia, pontos) for dia, pontos in vencimentos if (cliente.id, dia) not in avisados]
@@ -175,9 +179,8 @@ def enviar_pendentes(db: Session, enviar: Callable[[envio.Email], None] | None =
     enviar = enviar or _enviar_de_verdade
     modo = _modo()
     teste_para = settings.AVISO_PONTOS_TESTE_PARA or None
-    teto = regra.AVISOS_TESTE_POR_DIA if teste_para else settings.AVISO_PONTOS_LIMITE_DIA
     lista = pendentes(db, modo)
-    vagas = max(teto - _enviados_hoje(db, modo), 0)
+    vagas = max(_teto() - _enviados_hoje(db, modo), 0)
     resultado = Resultado(ligado=True, modo=modo, pendentes=len(lista), adiados=max(len(lista) - vagas, 0))
     for indice, pendente in enumerate(lista[:vagas]):
         email = montar_email(pendente, teste_para)
@@ -200,3 +203,17 @@ def enviar_pendentes(db: Session, enviar: Callable[[envio.Email], None] | None =
         + (f", {resultado.adiados} para os próximos dias (limite diário)" if resultado.adiados else "")
     )
     return resultado
+
+
+def situacao(db: Session) -> dict:
+    """Para a aba Automações do painel (decisão 127): ligado ou não, o modo, o teto do dia, quantos clientes já
+    receberam hoje e quantos esperam aviso agora. Só lê: não manda nada."""
+    modo = _modo()
+    return {
+        "ligado": settings.AVISO_PONTOS_ENVIAR,
+        "modo": modo,
+        "testePara": settings.AVISO_PONTOS_TESTE_PARA or None,
+        "limiteDia": _teto(),
+        "enviadosHoje": _enviados_hoje(db, modo),
+        "naFila": len(pendentes(db, modo)),
+    }

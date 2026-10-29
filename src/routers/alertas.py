@@ -1,6 +1,7 @@
 """Alertas operacionais (criados pelas automações) e as automações. Cada tipo de alerta pede o módulo do
-assunto (src/entities/assistente.py, MODULO_DO_ALERTA) e respeita a marca do token. Rodar automação e ver o
-log das execuções: só Administrador."""
+assunto (src/entities/assistente.py, MODULO_DO_ALERTA) e respeita a marca do token. Rodar automação, ver o
+log das execuções e os e-mails automáticos aos clientes (aba Automações, decisão 127): só Administrador.
+Os alertas saíram da tela, mas continuam sendo criados: o Assistente IA e o MCP os consultam."""
 
 from typing import Literal
 
@@ -15,7 +16,7 @@ from src.entities.papeis import pode_acessar
 from src.middlewares.autenticacao import escopo_marca, exigir_modulo
 from src.repositories import alerta_repository, sessao
 from src.schemas.comum import Entrada, loja_saida, usuario_resumo
-from src.use_cases import automacoes
+from src.use_cases import automacoes, emails_clientes
 from src.utils.datas import agora, ms
 from src.utils.erros import DadosInvalidos, NaoEncontrado
 
@@ -125,10 +126,18 @@ def executar(nome: str, usuario: m.Usuario = Depends(admin)):
             "atualizados": e.atualizados,
             "resolvidos": e.resolvidos,
             "detalhe": e.detalhe,
+            "iniciadaEm": ms(e.iniciada_em),
             "terminadaEm": ms(e.terminada_em),
         }
         for e in execucoes
     ]
+
+
+@router.get("/automacoes/emails")
+def emails_aos_clientes(db: Session = Depends(get_db), _: m.Usuario = Depends(admin)):
+    """Aba Automações (decisão 127): os e-mails automáticos aos clientes (ligado, modo, fila e envios de hoje), as
+    rotinas internas que rodam junto e os últimos e-mails que saíram. Só lê."""
+    return emails_clientes.painel(db)
 
 
 @router.get("/automacoes/execucoes")

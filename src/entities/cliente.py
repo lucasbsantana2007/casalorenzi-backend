@@ -78,3 +78,12 @@ def problemas_do_cadastro(cpf: str | None, email: str | None, telefone: str | No
     if problema := problema_do_telefone(telefone):
         problemas.append(problema)
     return problemas
+
+
+def recebe_email_real(cliente) -> bool:
+    """E-mails automáticos no modo real (decisão 128): só para quem criou a conta no site (com senha, cadastro pelo
+    e-commerce). A base migrada (sem conta) e as contas de demonstração do seed nunca recebem: não pediram e os
+    endereços podem ser de outras pessoas."""
+    from src.entities.pedido import CANAL_ECOMMERCE
+
+    return cliente is not None and bool(cliente.senha_hash) and cliente.canal_cadastro == CANAL_ECOMMERCE

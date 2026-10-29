@@ -10,7 +10,7 @@
 
 Lembrete de sacola abandonada (decisão 100)
 - O site guarda uma cópia da sacola de quem está logado (tabela sacolas).
-- Sacola parada há SACOLA_LEMBRETE_HORAS horas (e não mais que SACOLA_LEMBRETE_MAX_DIAS dias) recebe um lembrete,
+- Sacola parada há SACOLA_LEMBRETE_HORAS hora (decisão 129), e não mais que SACOLA_LEMBRETE_MAX_DIAS dias, recebe um lembrete,
   só se o cliente aceita e-mails de marketing, não comprou depois e ainda há peças disponíveis. No máximo um
   lembrete por mudança da sacola e um a cada SACOLA_LEMBRETE_INTERVALO_DIAS dias.
 
@@ -36,7 +36,7 @@ from src import models as m
 from src.config import settings
 from src.database.connection import SessionLocal
 from src.entities import fidelidade as regra_pontos
-from src.entities.cliente import email_valido
+from src.entities.cliente import email_valido, recebe_email_real
 from src.integrations import email as envio
 from src.integrations import modelos_email
 from src.use_cases.assistente.catalogo import caminho_do_produto
@@ -51,7 +51,8 @@ AVISOS_ESTOQUE_POR_CLIENTE = 30
 # Sacola: o que o site aceita (o mesmo limite do navegador)
 SACOLA_MAX_ITENS = 30
 SACOLA_MAX_POR_ITEM = 5
-SACOLA_LEMBRETE_HORAS = 24
+# Decisão 128: 1 hora parada já é sacola abandonada (antes, 24 horas)
+SACOLA_LEMBRETE_HORAS = 1
 SACOLA_LEMBRETE_MAX_DIAS = 7
 SACOLA_LEMBRETE_INTERVALO_DIAS = 7
 
@@ -126,7 +127,10 @@ def _pecas(db: Session, quantidades: dict[int, int]) -> list[modelos_email.PecaE
 
 
 def _cliente_recebe(cliente: m.Cliente | None) -> bool:
-    return cliente is not None and cliente.excluido_em is None and email_valido(cliente.email)
+    """No modo real, só quem criou a conta no site (decisão 128); no modo teste tudo vai para o e-mail do time."""
+    if cliente is None or cliente.excluido_em is not None or not email_valido(cliente.email):
+        return False
+    return _modo() == "TESTE" or recebe_email_real(cliente)
 
 
 # ---------- "Avise-me quando chegar" ----------
@@ -196,6 +200,21 @@ def _conferir_em_segundo_plano(variacao_ids: list[int]) -> None:
         log.exception("Falha ao conferir os avisos de estoque")
 
 
+def _pedidos_com_peca_de_volta(db: Session, variacao_ids: list[int] | None = None) -> dict[int, list[int]]:
+    """Pedidos de aviso ainda não atendidos cuja peça está disponível no site, por cliente (os mais antigos primeiro).
+    variacao_ids: só essas peças."""
+    consulta = select(m.AvisoEstoque.cliente_id, m.AvisoEstoque.variacao_id).where(m.AvisoEstoque.avisado_em.is_(None))
+    if variacao_ids is not None:
+        consulta = consulta.where(m.AvisoEstoque.variacao_id.in_(variacao_ids))
+    pedidos = db.execute(consulta.order_by(m.AvisoEstoque.criado_em)).all()
+    disponiveis = disponiveis_no_site(db, (v for _, v in pedidos))
+    por_cliente: dict[int, list[int]] = defaultdict(list)
+    for cliente_id, variacao_id in pedidos:
+        if variacao_id in disponiveis:
+            por_cliente[cliente_id].append(variacao_id)
+    return por_cliente
+
+
 def _avisados_hoje(db: Session, modo: str) -> int:
     consulta = select(func.count(func.distinct(m.AvisoEstoque.cliente_id))).where(
         m.AvisoEstoque.modo == modo, m.AvisoEstoque.avisado_em >= inicio_do_dia(hoje())
@@ -211,15 +230,7 @@ def enviar_avisos_estoque(
         return Resultado(ligado=False, detalhe=["envio desligado (AVISO_ESTOQUE_ENVIAR)"])
     enviar = enviar or _enviar_de_verdade
     modo = _modo()
-    consulta = select(m.AvisoEstoque.cliente_id, m.AvisoEstoque.variacao_id).where(m.AvisoEstoque.avisado_em.is_(None))
-    if variacao_ids is not None:
-        consulta = consulta.where(m.AvisoEstoque.variacao_id.in_(variacao_ids))
-    pedidos = db.execute(consulta.order_by(m.AvisoEstoque.criado_em)).all()
-    disponiveis = disponiveis_no_site(db, (v for _, v in pedidos))
-    por_cliente: dict[int, list[int]] = defaultdict(list)
-    for cliente_id, variacao_id in pedidos:
-        if variacao_id in disponiveis:
-            por_cliente[cliente_id].append(variacao_id)
+    por_cliente = _pedidos_com_peca_de_volta(db, variacao_ids)
     vagas = max(_teto(settings.AVISO_ESTOQUE_LIMITE_DIA) - _avisados_hoje(db, modo), 0)
     resultado = Resultado(ligado=True, modo=modo, adiados=max(len(por_cliente) - vagas, 0))
     for indice, (cliente_id, variacoes) in enumerate(list(por_cliente.items())[:vagas]):
@@ -374,23 +385,29 @@ def enviar_lembretes_sacola(db: Session, enviar: Callable[[envio.Email], None] |
     return resultado
 
 
+def _pecas_do_lembrete(db: Session, sacola: m.Sacola | None, cliente: m.Cliente | None) -> dict[int, int]:
+    """As peças (variação: quantidade) que entram no lembrete. Vazio quando a sacola não recebe lembrete agora: já
+    lembrada, cliente sem e-mail válido ou sem consentimento, compra depois da sacola ou nenhuma peça disponível."""
+    if sacola is None or not _pode_lembrar(sacola) or not _cliente_recebe(cliente) or not cliente.aceita_marketing:
+        return {}
+    # Comprou depois de mexer na sacola: não é sacola abandonada
+    comprou = db.scalar(select(func.count()).where(m.Pedido.cliente_id == cliente.id, m.Pedido.criado_em >= sacola.atualizada_em))
+    quantidades = {i["variacaoId"]: i["quantidade"] for i in sacola.itens}
+    disponiveis = disponiveis_no_site(db, quantidades)
+    if comprou or not disponiveis:
+        return {}
+    return {v: q for v, q in quantidades.items() if v in disponiveis}
+
+
 def _lembrar(cliente_id: int, modo: str, enviar, resultado: Resultado) -> int:
     with SessionLocal() as db:
         sacola = db.get(m.Sacola, cliente_id, with_for_update={"skip_locked": True})
         cliente = db.get(m.Cliente, cliente_id)
-        if sacola is None or not _pode_lembrar(sacola) or not _cliente_recebe(cliente) or not cliente.aceita_marketing:
+        escolhidas = _pecas_do_lembrete(db, sacola, cliente)
+        if not escolhidas:
             db.rollback()
             return 0
-        # Comprou depois de mexer na sacola: não é sacola abandonada
-        comprou = db.scalar(
-            select(func.count()).where(m.Pedido.cliente_id == cliente_id, m.Pedido.criado_em >= sacola.atualizada_em)
-        )
-        quantidades = {i["variacaoId"]: i["quantidade"] for i in sacola.itens}
-        disponiveis = disponiveis_no_site(db, quantidades)
-        if comprou or not disponiveis:
-            db.rollback()
-            return 0
-        pecas = _pecas(db, {v: q for v, q in quantidades.items() if v in disponiveis})
+        pecas = _pecas(db, escolhidas)
         loja = "/vulto" if all(p.caminho.startswith("/vulto/") for p in pecas) else "/"
         email = _para_o_teste(modelos_email.lembrete_sacola(cliente.email, cliente.nome, pecas, loja))
         try:
@@ -403,6 +420,43 @@ def _lembrar(cliente_id: int, modo: str, enviar, resultado: Resultado) -> int:
         sacola.lembrete_em, sacola.lembrete_modo = agora(), modo
         db.commit()
         return 1
+
+
+# ---------- Situação para o painel (decisão 127) ----------
+
+
+def situacao_avisos_estoque(db: Session) -> dict:
+    """Avise-me na aba Automações: ligado ou não, o modo, o teto do dia, quantos clientes já receberam hoje e
+    quantos têm peça de volta esperando o e-mail. Só lê: não manda nada."""
+    modo = _modo()
+    por_cliente = _pedidos_com_peca_de_volta(db)
+    clientes = db.scalars(select(m.Cliente).where(m.Cliente.id.in_(por_cliente))) if por_cliente else []
+    return {
+        "ligado": settings.AVISO_ESTOQUE_ENVIAR,
+        "modo": modo,
+        "testePara": settings.AVISOS_TESTE_PARA or None,
+        "limiteDia": _teto(settings.AVISO_ESTOQUE_LIMITE_DIA),
+        "enviadosHoje": _avisados_hoje(db, modo),
+        "naFila": sum(1 for cliente in clientes if _cliente_recebe(cliente)),
+    }
+
+
+def situacao_lembretes(db: Session) -> dict:
+    """Lembrete de sacola na aba Automações, com as mesmas regras do envio para contar quem está na fila."""
+    modo = _modo()
+    na_fila = sum(
+        1
+        for cliente_id in _sacolas_paradas(db)
+        if _pecas_do_lembrete(db, db.get(m.Sacola, cliente_id), db.get(m.Cliente, cliente_id))
+    )
+    return {
+        "ligado": settings.LEMBRETE_SACOLA_ENVIAR,
+        "modo": modo,
+        "testePara": settings.AVISOS_TESTE_PARA or None,
+        "limiteDia": _teto(settings.LEMBRETE_SACOLA_LIMITE_DIA),
+        "enviadosHoje": _lembretes_hoje(db, modo),
+        "naFila": na_fila,
+    }
 
 
 # ---------- Conta excluída ----------

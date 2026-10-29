@@ -264,7 +264,13 @@ Garantias: trava por automação no Postgres (`pg_try_advisory_xact_lock`, vale 
 alerta descartado pela equipe não volta por 7 dias; log de cada execução com o erro resumido.
 
 Como rodar: `python -m src.automacoes` (todas, para um agendador), `python -m src.automacoes estoque_baixo`, ou o
-botão "Atualizar alertas agora" (Administrador) na aba Alertas. No banco local, todas juntas levam cerca de 1,4 s.
+botão "Enviar e-mails agora" (Administrador) na aba Automações. No banco local, todas juntas levam cerca de 1,4 s.
+
+Aba Automações (decisão 127): a tela mostra os e-mails automáticos aos clientes (`aviso_pontos`, `lembrete_sacola`,
+`aviso_estoque`): se cada um está ligado, o modo, a fila (contada com as mesmas regras do envio), quantos clientes
+receberam hoje e os últimos e-mails que saíram (`GET /api/automacoes/emails`, só leitura). O botão roda todas as
+automações. As demais aparecem recolhidas em "Rotinas internas": não mandam e-mail, e os alertas que criam saíram da
+tela, mas continuam sendo a fonte da consulta `consultar_alertas` do Assistente IA e do MCP.
 
 ## Variáveis de ambiente (backend)
 

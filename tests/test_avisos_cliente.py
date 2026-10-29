@@ -65,6 +65,8 @@ def caixa(monkeypatch):
             funcao(*args)
 
     monkeypatch.setattr(avisos_cliente, "_fila", Imediata())
+    # Modo real: só quem criou a conta no site recebe (decisão 128)
+    sql("UPDATE clientes SET canal_cadastro = 'E-commerce' WHERE id = :c", c=MARIANA)
     return enviados
 
 
@@ -243,10 +245,10 @@ def test_lembrete_so_para_quem_aceita_e_uma_vez(client, mariana, caixa):
     assert len(caixa) == 1
 
 
-def test_sem_lembrete_antes_de_24h_ou_depois_da_compra(client, mariana, caixa):
+def test_sem_lembrete_antes_de_1h_ou_depois_da_compra(client, mariana, caixa):
     _, variacao = _produto_com_estoque(client)
     sql("UPDATE clientes SET aceita_marketing = true WHERE id = :c", c=MARIANA)
-    _sacola_parada(client, mariana, variacao["id"], horas=3)
+    _sacola_parada(client, mariana, variacao["id"], horas=0.5)  # meia hora: ainda não é sacola abandonada
     automacoes.executar("lembrete_sacola")
     assert caixa == []
 

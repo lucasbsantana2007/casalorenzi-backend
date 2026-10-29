@@ -894,7 +894,7 @@ def consultar_alertas(db: Session, ctx: Contexto, entrada: ConsultarAlertas) -> 
         if linhas
         else []
     )
-    blocos.append({"tipo": "link", "rotulo": "Ver todos os alertas", "destino": "/inteligencia?aba=alertas"})
+    # Sem link para uma lista: os alertas saíram do painel (decisão 127) e ficam só nas respostas do Assistente IA
     texto = (
         f"Há {len(alertas)} alertas abertos."
         if alertas
