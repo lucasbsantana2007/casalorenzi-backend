@@ -1,4 +1,4 @@
-# A Lúcia no WhatsApp (decisões 108, 116, 117 e 121)
+# A Lúcia no WhatsApp (decisões 108, 116, 117, 121 e 125)
 
 O n8n recebe e entrega as mensagens; quem responde é a API, com o mesmo assistente do site.
 
@@ -20,7 +20,7 @@ Corpo (JSON):
 | `idMensagem` | O id da mensagem na Meta (`wamid...`) |
 | `nome` | O nome do perfil do WhatsApp (vai para o chamado de atendimento) |
 
-| `botao` | O id do botão tocado (`interactive.button_reply.id` da Meta): `LUCIA`, `EQUIPE` ou `MENU` |
+| `botao` | O id do botão tocado (`interactive.button_reply.id` da Meta): `LUCIA`, `EQUIPE`, `MENU` ou `FINALIZAR` |
 
 Resposta: `{ "responder": true, "texto": "...", "mensagem": {...}, "conversaId": "...", "protocolo": null }`.
 `mensagem` é o corpo pronto para `POST /{phone-number-id}/messages` da Graph API: texto ou botões, já com o
@@ -52,14 +52,19 @@ só entrou no chamado e quem responde é a equipe.
   cliente pelo n8n como mensagem comum, sem assinatura, protocolo nem botão (decisão 121).
   Passadas 24 h da última mensagem do cliente, a Meta não aceita mensagem livre: a resposta não sai e o chamado
   registra o aviso.
-- **Ciclo de 4 horas** (`WHATSAPP_CICLO_HORAS`): se o cliente fica 4 h sem responder depois da equipe, a
-  automação `encerrar_whatsapp` encerra o chamado e avisa o cliente. Se ele voltar antes de a automação rodar,
-  o chamado é encerrado na hora e a conversa recomeça pelo cumprimento e pelo menu. Se a última mensagem é do
-  cliente, o ciclo não fecha: quem deve resposta é a equipe. Conversa com a Lúcia parada 4 h também recomeça.
+- **Checagem e fim (decisão 125):** depois de uma resposta da Lúcia ou da equipe, se o cliente fica **15 minutos**
+  sem falar, chega "Precisa de mais alguma coisa?" com o botão **Finalizar atendimento**. Tocar nele (ou escrever
+  "finalizar") encerra na hora. Sem resposta por mais **3 h 45** (4 h no total, `WHATSAPP_CICLO_HORAS`), o
+  atendimento é finalizado: a conversa e o chamado, se houver, e o cliente recebe o aviso. A próxima mensagem
+  recomeça pelo cumprimento e pelo menu. Se a última mensagem é do cliente, nada disso corre: quem deve resposta é
+  a equipe. Quem dispara a checagem e o fim é a rotina `POST /api/canais/whatsapp/rotina`, que o n8n chama a cada
+  5 minutos (terceiro fluxo, abaixo); sem ela, a conversa parada 4 h recomeça quando o cliente volta.
 
 Como a conversa funciona:
 - **Uma conversa por telefone**, enquanto estiver ativa. Depois de 24 h sem mensagem, começa outra, como no site.
-- **O número não fica salvo na conversa.** Ela é achada pelo HMAC do telefone, calculado com o segredo do canal.
+- **O número não fica aberto na conversa.** Ela é achada pelo HMAC do telefone, calculado com o segredo do canal.
+  Enquanto espera o cliente (checagem), o número fica cifrado com o segredo do canal e some quando ele fala ou o
+  atendimento termina.
 - **O assistente é o mesmo do site**: as mesmas ferramentas, o verificador de números e a regra de duas falhas →
   pessoa. O modelo sabe que está no WhatsApp: responde só em texto, sem botões, com no máximo 5 peças.
 - **Os cards viram texto**, sem repetir peça ou loja que a Lúcia já escreveu. Peças saem com preço e link do site; disponibilidade sai por loja; lojas saem com
@@ -101,6 +106,7 @@ Corpo do nó 3:
   "nome": "{{ $json.contacts[0].profile.name }}",
   "botao": "{{ $json.messages[0].interactive ? $json.messages[0].interactive.button_reply.id : '' }}"
 }
+```
 
 O nó **WhatsApp > Send message** não manda botões; por isso o envio é o HTTP Request do passo 5, que publica a
 `mensagem` que a API montou.
@@ -115,7 +121,16 @@ A API chama este fluxo quando a equipe responde no painel ou quando o ciclo fech
 | 2 | **HTTP Request** | Igual ao passo 5 do primeiro fluxo (Graph API, credencial `Authorization: Bearer ...`), com o JSON `{{ JSON.stringify($json.body.mensagem) }}` |
 
 Depois de publicar, copie a **Production URL** do Webhook e ponha no Render em `N8N_ENVIO_URL`.
-```
+
+### Terceiro fluxo: o relógio da checagem (decisão 125)
+
+| # | Nó | Configuração |
+| --- | --- | --- |
+| 1 | **Schedule Trigger** | *Trigger Interval* Minutes; *Minutes Between Triggers* 5 |
+| 2 | **HTTP Request** | `POST https://casalorenzi-api.onrender.com/api/canais/whatsapp/rotina`; credencial Header Auth do segredo do canal (`X-Canal-Segredo`); em *Settings*, **Retry On Fail** com 5 tentativas a cada 5 s |
+
+A resposta é `{ "checagens": n, "finalizadas": n }`. As mensagens saem pelo fluxo de envio. A chamada a cada 5
+minutos também mantém acordada a API do plano grátis do Render.
 
 Conferido em 28/10/2026: o WhatsApp Trigger entrega `messages` e `contacts` no primeiro nível do item (os caminhos
 acima funcionam). Depois de qualquer mudança no fluxo, clique em **Publish**: enquanto houver a bolinha amarela, as
