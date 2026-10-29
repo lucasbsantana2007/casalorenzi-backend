@@ -40,7 +40,9 @@ só entrou no chamado e quem responde é a equipe.
    só abre se o cliente aceitar. Pedido de pessoa ou cliente irritado abrem na hora.
 4. **Equipe:** o chamado abre com a **conversa inteira com a Lúcia** (até 60 mensagens), o telefone e o nome do
    perfil, e o cliente recebe uma confirmação com o protocolo. As mensagens seguintes entram no mesmo chamado
-   **sem resposta automática**: quem responde é a equipe.
+   **sem resposta automática**: quem responde é a equipe. Se a equipe já está atrasada (mais de 30 min, decisão
+   122), o cliente recebe uma vez "Sua mensagem está com a nossa equipe..." (decisão 126). Uma mensagem com o
+   protocolo do site entra no chamado desse protocolo em qualquer momento; chamado concluído solta a conversa.
 5. **"menu"** mostra as opções de novo. Chamado encerrado: a próxima mensagem recomeça pelo menu.
 
 ### Um lugar só para o atendimento humano (decisão 117)
