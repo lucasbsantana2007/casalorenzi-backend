@@ -81,6 +81,8 @@ CHAVES_MEMORIA = {
     "whatsappTelefone",
     "whatsappRespondidoEm",
     "whatsappChecagemEm",
+    # Equipe atrasada (decisão 126): o começo da espera em que o cliente já foi avisado
+    "whatsappAvisoDeEspera",
 }
 
 

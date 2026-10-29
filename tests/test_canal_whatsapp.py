@@ -578,3 +578,15 @@ def test_depois_do_chamado_concluido_pedir_a_equipe_abre_outro(client):
     assert canal.OPCOES_DO_MENU in menu["texto"] and menu["protocolo"] is None
     novo = diga(client, botao="EQUIPE")
     assert novo["protocolo"] and novo["protocolo"] != antigo and "Passei a sua conversa" in novo["texto"]
+
+
+def test_equipe_atrasada_avisa_uma_vez_por_espera(client, admin, entregas):
+    diga(client, "oi")
+    protocolo = diga(client, botao="EQUIPE")["protocolo"]
+    assert diga(client, "alguém aí?")["responder"] is False  # ainda no prazo: silêncio
+    _envelhecer(protocolo, "CLIENTE", 1)  # o cliente espera há 1 h
+    aviso = diga(client, "oi?")
+    assert aviso["texto"] == canal.AVISO_DE_ESPERA and chamado(protocolo).mensagens[-1].conteudo == "oi?"
+    assert diga(client, "???")["responder"] is False  # na mesma espera, um aviso só
+    _equipe_responde(client, admin, protocolo)  # a equipe respondeu: a espera recomeça
+    assert diga(client, "obrigada")["responder"] is False

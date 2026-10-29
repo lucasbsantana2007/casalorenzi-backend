@@ -33,9 +33,9 @@ from sqlalchemy.orm import Session
 from src import models as m
 from src.config import settings
 from src.entities import assistente as regra
-from src.entities.atendimento import EM_ABERTO
+from src.entities.atendimento import EM_ABERTO, atrasado
 from src.middlewares import limite
-from src.repositories import assistente_repository, sessao
+from src.repositories import assistente_repository, atendimento_repository, sessao
 from src.use_cases import atendimentos
 from src.use_cases.assistente import catalogo, conversas, regras_cliente
 from src.utils.datas import agora
@@ -260,6 +260,8 @@ def texto_do_menu(nome: str | None, momento=None) -> str:
     )
 
 
+# Cliente que escreve com a equipe atrasada (decisão 122): um aviso por espera, e não a cada mensagem (decisão 126)
+AVISO_DE_ESPERA = "Sua mensagem está com a nossa equipe. Assim que alguém estiver disponível, responde por aqui."
 # Cliente que toca de novo em "Falar com a equipe" (num botão antigo) com o chamado já aberto
 JA_COM_A_EQUIPE = "A sua conversa já está com a nossa equipe (protocolo {protocolo}). Alguém responde por aqui."
 DICA_DA_EQUIPE = "Para falar com alguém da equipe, responda “equipe”."
@@ -682,8 +684,14 @@ def responder(
             return _saida(telefone, texto_do_menu(nome), [BOTAO_LUCIA, BOTAO_EQUIPE], conversa, db)
         if botao == EQUIPE:  # tocou de novo num botão antigo da equipe
             return _saida(telefone, JA_COM_A_EQUIPE.format(protocolo=atendimento.protocolo), None, conversa, db)
-        # A mensagem entra no chamado e quem responde é a equipe, sem "Recebi!" a cada mensagem (decisão 121)
+        # A mensagem entra no chamado e quem responde é a equipe, sem "Recebi!" a cada mensagem (decisão 121). Se a
+        # equipe já está atrasada, o cliente recebe um aviso, uma vez só por espera (decisão 126)
+        espera = atendimento_repository.espera_da_equipe(db, [atendimento.id]).get(atendimento.id)
         atendimentos.mensagem_do_whatsapp(db, atendimento, texto)
+        avisado = memoria.get("whatsappAvisoDeEspera")
+        if atrasado(espera, agora(), settings.ATENDIMENTO_ATRASO_MINUTOS) and avisado != espera.isoformat():
+            _guardar(db, conversa, whatsappAvisoDeEspera=espera.isoformat())
+            return _saida(telefone, AVISO_DE_ESPERA, None, conversa, db)
         return _silencio(conversa, atendimento)
 
     elif escolha == EQUIPE:  # modo LUCIA: botão ou pedido ("equipe", "atendente") chama a equipe a qualquer momento
