@@ -128,7 +128,8 @@ ALERTA_PONTOS_DIAS = int(os.getenv("ALERTA_PONTOS_DIAS", "30"))
 # Aviso por e-mail de pontos a vencer (decisão 82, automação aviso_pontos). Desligado por padrão: com a chave
 # do Resend, o e-mail sai de verdade, e a base migrada tem e-mails que podem ser de pessoas reais.
 AVISO_PONTOS_ENVIAR = os.getenv("AVISO_PONTOS_ENVIAR", "false").lower() == "true"
-# Modo teste: todos os avisos vão para este e-mail do time (no máximo 5 por dia), com o destinatário no assunto
+# Modo teste: todos os avisos vão para este e-mail do time (no máximo 5 por dia), com o destinatário no assunto.
+# Vazio: modo real, só para quem criou a conta no site (decisão 128); a base migrada nunca recebe
 AVISO_PONTOS_TESTE_PARA = os.getenv("AVISO_PONTOS_TESTE_PARA", "").strip()
 # Teto por dia: o plano grátis do Resend manda 100 e-mails por dia, e os outros e-mails da plataforma usam a mesma cota
 AVISO_PONTOS_LIMITE_DIA = int(os.getenv("AVISO_PONTOS_LIMITE_DIA", "80"))
