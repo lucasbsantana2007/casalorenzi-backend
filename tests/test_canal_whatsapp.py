@@ -531,3 +531,62 @@ def test_botao_finalizar_encerra_na_hora(client, admin, entregas):
 
 def test_rotina_exige_o_segredo(client):
     assert client.post(f"{URL.rsplit('/', 1)[0]}/rotina").status_code == 401
+
+
+# ---------- Protocolo do site e chamado concluído ----------
+
+
+def _chamado_do_site(descricao="Resumo do site: cliente quer falar com humano.") -> str:
+    from src.use_cases import atendimentos
+
+    with SessionLocal() as db:
+        tipo = db.scalar(select(m.TipoSolicitacao).where(m.TipoSolicitacao.titulo == "Dúvida sobre produto"))
+        aberto = atendimentos.abrir_pelo_whatsapp(db, None, marca="LORENZI", tipo_solicitacao_id=tipo.id, descricao=descricao)
+        db.commit()
+        return aberto.protocolo
+
+
+def _concluir(protocolo):
+    with SessionLocal() as db:
+        db.query(m.Atendimento).filter(m.Atendimento.protocolo == protocolo).update({"status": "CONCLUIDO"})
+        db.commit()
+
+
+def test_protocolo_do_site_vale_mesmo_com_outro_chamado_aberto(client):
+    diga(client, "oi")
+    antigo = diga(client, botao="EQUIPE")["protocolo"]
+    novo = _chamado_do_site()
+    resposta = diga(client, f"Olá! Vim do assistente do site. Protocolo {novo}.")
+    assert resposta["protocolo"] == novo and novo in resposta["texto"]
+    assert diga(client, "é sobre a troca")["protocolo"] == novo
+    assert chamado(novo).mensagens[-1].conteudo == "é sobre a troca"
+    assert chamado(antigo).mensagens[-1].conteudo != "é sobre a troca"
+
+
+def test_protocolo_do_proprio_chamado_so_entra_nele(client):
+    diga(client, "oi")
+    protocolo = diga(client, botao="EQUIPE")["protocolo"]
+    resposta = diga(client, f"Meu protocolo é {protocolo}")
+    assert resposta["responder"] is False and chamado(protocolo).mensagens[-1].conteudo == f"Meu protocolo é {protocolo}"
+
+
+def test_depois_do_chamado_concluido_pedir_a_equipe_abre_outro(client):
+    diga(client, "oi")
+    antigo = diga(client, botao="EQUIPE")["protocolo"]
+    _concluir(antigo)
+    menu = diga(client, "quero falar com humano")
+    assert canal.OPCOES_DO_MENU in menu["texto"] and menu["protocolo"] is None
+    novo = diga(client, botao="EQUIPE")
+    assert novo["protocolo"] and novo["protocolo"] != antigo and "Passei a sua conversa" in novo["texto"]
+
+
+def test_equipe_atrasada_avisa_uma_vez_por_espera(client, admin, entregas):
+    diga(client, "oi")
+    protocolo = diga(client, botao="EQUIPE")["protocolo"]
+    assert diga(client, "alguém aí?")["responder"] is False  # ainda no prazo: silêncio
+    _envelhecer(protocolo, "CLIENTE", 1)  # o cliente espera há 1 h
+    aviso = diga(client, "oi?")
+    assert aviso["texto"] == canal.AVISO_DE_ESPERA and chamado(protocolo).mensagens[-1].conteudo == "oi?"
+    assert diga(client, "???")["responder"] is False  # na mesma espera, um aviso só
+    _equipe_responde(client, admin, protocolo)  # a equipe respondeu: a espera recomeça
+    assert diga(client, "obrigada")["responder"] is False

@@ -40,7 +40,9 @@ só entrou no chamado e quem responde é a equipe.
    só abre se o cliente aceitar. Pedido de pessoa ou cliente irritado abrem na hora.
 4. **Equipe:** o chamado abre com a **conversa inteira com a Lúcia** (até 60 mensagens), o telefone e o nome do
    perfil, e o cliente recebe uma confirmação com o protocolo. As mensagens seguintes entram no mesmo chamado
-   **sem resposta automática**: quem responde é a equipe.
+   **sem resposta automática**: quem responde é a equipe. Se a equipe já está atrasada (mais de 30 min, decisão
+   122), o cliente recebe uma vez "Sua mensagem está com a nossa equipe..." (decisão 126). Uma mensagem com o
+   protocolo do site entra no chamado desse protocolo em qualquer momento; chamado concluído solta a conversa.
 5. **"menu"** mostra as opções de novo. Chamado encerrado: a próxima mensagem recomeça pelo menu.
 
 ### Um lugar só para o atendimento humano (decisão 117)
@@ -86,11 +88,24 @@ Como a conversa funciona:
 2. **Meta for Developers:** app do tipo Business com o produto WhatsApp. Anote o *Phone number ID* do número de
    teste e cadastre os telefones que vão testar (até 5). Para a banca, use um token permanente de usuário do sistema
    (o temporário vence em 24 h).
-3. **n8n:** um fluxo com cinco nós:
+3. **n8n:** um fluxo com duas entradas no mesmo endereço (`/webhook/whatsapp-meta`). Desde 29/10/2026 o fluxo
+   **não usa o nó WhatsApp Trigger**: ele grava e apaga sozinho o endereço no app da Meta (ao testar, despublicar ou
+   duplicar o fluxo), e a Meta parava de entregar. O endereço agora é cadastrado à mão na Meta (passo 4).
+
+Verificação da Meta (GET), uma linha separada:
 
 | # | Nó | Configuração |
 | --- | --- | --- |
-| 1 | **WhatsApp Trigger** | Credencial do app da Meta; evento *messages* |
+| a | **Webhook** | *HTTP Method* GET; *Path* `whatsapp-meta`; *Respond* Using 'Respond to Webhook' Node |
+| b | **IF** | `{{ $json.query['hub.verify_token'] }}` **String > is equal to** o token de verificação (um texto qualquer, o mesmo cadastrado na Meta; não é o token da API) |
+| c | **Respond to Webhook** (true) | *Respond With* Text; *Response Body* `{{ $json.query['hub.challenge'] }}` |
+| d | **Respond to Webhook** (false) | *Respond With* No Data; *Response Code* 403 |
+
+Mensagens (POST):
+
+| # | Nó | Configuração |
+| --- | --- | --- |
+| 1 | **Webhook** + **Code** | Webhook com *HTTP Method* POST, *Path* `whatsapp-meta`, *Respond* Immediately; depois um Code (JavaScript, *Run Once for All Items*) que entrega cada mudança como um item, no formato do antigo Trigger: `return $input.all().flatMap(i => (i.json.body.entry \|\| []).flatMap(e => (e.changes \|\| []).map(c => ({ json: c.value }))));` |
 | 2 | **IF** | `{{ Array.isArray($json.messages) && $json.messages.length > 0 }}` com o operador **Boolean > is true** e **Convert types where required** ligado. A Meta também manda avisos de entrega e leitura (`statuses`), que param aqui |
 | 3 | **HTTP Request** | `POST https://casalorenzi-api.onrender.com/api/canais/whatsapp/mensagens`; credencial Header Auth (`X-Canal-Segredo`); **Send Body** ligado, JSON com os campos abaixo, cada valor em modo Expression; tempo máximo de 60 s; em *Settings*, **Retry On Fail** com 5 tentativas a cada 5 s (a API do plano grátis do Render dorme e responde 503 enquanto acorda) |
 | 4 | **IF** | `{{ $json.responder }}` com **Boolean > is true** |
@@ -132,9 +147,13 @@ Depois de publicar, copie a **Production URL** do Webhook e ponha no Render em `
 A resposta é `{ "checagens": n, "finalizadas": n }`. As mensagens saem pelo fluxo de envio. A chamada a cada 5
 minutos também mantém acordada a API do plano grátis do Render.
 
-Conferido em 28/10/2026: o WhatsApp Trigger entrega `messages` e `contacts` no primeiro nível do item (os caminhos
-acima funcionam). Depois de qualquer mudança no fluxo, clique em **Publish**: enquanto houver a bolinha amarela, as
-mensagens rodam a versão anterior.
+4. **Meta, Casos de uso > Personalizar > Configuração > Webhook:** *URL de callback*
+   `https://lorenzivulto.app.n8n.cloud/webhook/whatsapp-meta` (a de produção, não a `webhook-test`), *Verificar
+   token* igual ao do nó IF da verificação, **Verificar e salvar** e o campo **messages** assinado. Conta nova: ligar
+   a conta do WhatsApp ao app com `POST /{waba-id}/subscribed_apps` (Graph API Explorer, com o token permanente).
+
+Depois de qualquer mudança no fluxo, clique em **Publish**: enquanto houver a bolinha amarela, as mensagens rodam a
+versão anterior. **Não** coloque o nó WhatsApp Trigger em nenhum fluxo que use este app da Meta.
 
 ## Problemas encontrados na montagem
 
@@ -146,6 +165,7 @@ mensagens rodam a versão anterior.
 | Execução verde, mas a resposta não chega | A Meta recusa a entrega; o motivo vem no aviso seguinte (`statuses[0].errors`) | Abrir a execução do aviso e ler o código do erro |
 | Erro 131031 "Business Account locked" | A Meta bloqueou a conta do WhatsApp Business (conta do Facebook recém-criada) | Pedir revisão em Business Support Home ou criar o app com uma conta do Facebook antiga |
 | Resposta da equipe no painel com "Não consegui entregar esta resposta no WhatsApp" e nenhuma execução no fluxo de envio | O Webhook do fluxo de envio estava com a credencial `Authorization: Bearer` (a da Meta) em vez da `X-Canal-Segredo`; o n8n recusa antes de executar | No nó Webhook, escolher a credencial do segredo do canal e publicar de novo |
+| Nenhuma execução no n8n e a *URL de callback* vazia na Meta | O nó WhatsApp Trigger apagou o endereço (teste com Execute workflow, fluxo despublicado ou duplicado) | Montagem atual: Webhook comum e endereço cadastrado à mão (passos 3 e 4) |
 | Resposta não chega no número com o 9 | O WhatsApp identifica muitos números antigos de MG sem o nono dígito (`from` = 553184139032) | Cadastrar em **To**, na Meta, as duas versões do número |
 
 ## Limitações

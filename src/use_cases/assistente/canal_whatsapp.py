@@ -33,9 +33,9 @@ from sqlalchemy.orm import Session
 from src import models as m
 from src.config import settings
 from src.entities import assistente as regra
-from src.entities.atendimento import EM_ABERTO
+from src.entities.atendimento import EM_ABERTO, atrasado
 from src.middlewares import limite
-from src.repositories import assistente_repository, sessao
+from src.repositories import assistente_repository, atendimento_repository, sessao
 from src.use_cases import atendimentos
 from src.use_cases.assistente import catalogo, conversas, regras_cliente
 from src.utils.datas import agora
@@ -199,10 +199,11 @@ def texto_para_whatsapp(texto: str, blocos: list[dict]) -> str:
 
 
 def _passar_para_a_equipe(db: Session, conversa: m.ConversaAssistente, telefone: str, nome: str | None, motivo: str) -> str:
-    """Abre o chamado (canal WHATSAPP) com a conversa inteira e o telefone. Se a conversa já tem chamado, só lembra o
-    protocolo."""
+    """Abre o chamado (canal WHATSAPP) com a conversa inteira e o telefone. Se a conversa já tem chamado em aberto, só
+    lembra o protocolo; concluído, abre outro."""
     assistente_repository.travar(db, conversa.id)
-    if conversa.atendimento_id and (existente := db.get(m.Atendimento, conversa.atendimento_id)) is not None:
+    existente = db.get(m.Atendimento, conversa.atendimento_id) if conversa.atendimento_id else None
+    if existente is not None and existente.status in EM_ABERTO:
         return (
             f"A sua conversa já está com a nossa equipe (protocolo {existente.protocolo}). "
             "Alguém vai continuar com você por aqui, pelo WhatsApp."
@@ -259,6 +260,8 @@ def texto_do_menu(nome: str | None, momento=None) -> str:
     )
 
 
+# Cliente que escreve com a equipe atrasada (decisão 122): um aviso por espera, e não a cada mensagem (decisão 126)
+AVISO_DE_ESPERA = "Sua mensagem está com a nossa equipe. Assim que alguém estiver disponível, responde por aqui."
 # Cliente que toca de novo em "Falar com a equipe" (num botão antigo) com o chamado já aberto
 JA_COM_A_EQUIPE = "A sua conversa já está com a nossa equipe (protocolo {protocolo}). Alguém responde por aqui."
 DICA_DA_EQUIPE = "Para falar com alguém da equipe, responda “equipe”."
@@ -365,14 +368,17 @@ NOTA_ENCERRADO = "Encerrado automaticamente: o cliente ficou {horas} horas sem r
 
 def _vindo_do_site(db: Session, conversa: m.ConversaAssistente, telefone: str, texto: str, nome: str | None) -> dict | None:
     """Cliente que tocou em "Continuar no WhatsApp" no site: a mensagem traz o protocolo. Liga a conversa ao chamado
-    que já existe (com o resumo do site), em vez de abrir outro. Protocolo de outro canal, encerrado ou inexistente:
-    None (segue o menu)."""
+    que já existe (com o resumo do site), em vez de abrir outro, em qualquer momento da conversa. Protocolo de outro
+    canal, encerrado ou inexistente: None (segue o fluxo normal)."""
     achado = PROTOCOLO.search(texto)
     if not achado:
         return None
     atendimento = db.scalar(select(m.Atendimento).where(m.Atendimento.protocolo == achado.group(0)))
     if atendimento is None or atendimento.canal != CANAL or atendimento.status == "CONCLUIDO":
         return None
+    if conversa.atendimento_id == atendimento.id:  # o chamado que já está com a equipe: só entra nele
+        atendimentos.mensagem_do_whatsapp(db, atendimento, texto)
+        return _silencio(conversa, atendimento)
     if not (atendimento.contato or "").startswith("+"):
         atendimento.contato = f"+{telefone}"
     if (nome or "").strip() and atendimento.contato_nome in (None, "Visitante do site"):
@@ -646,7 +652,7 @@ def responder(
         _guardar(db, conversa, whatsappModo=MENU)
         return _saida(telefone, texto_do_menu(nome), [BOTAO_LUCIA, BOTAO_EQUIPE], conversa, db)
 
-    if modo is None and (vindo := _vindo_do_site(db, conversa, telefone, texto, nome)) is not None:
+    if (vindo := _vindo_do_site(db, conversa, telefone, texto, nome)) is not None:
         return vindo
     if modo in (None, MENU):
         if escolha == EQUIPE:
@@ -671,13 +677,21 @@ def responder(
             return _saida(telefone, LUCIA_PRONTA, None, conversa, db)
         atendimento = db.get(m.Atendimento, conversa.atendimento_id) if conversa.atendimento_id else None
         if atendimento is None or atendimento.status == "CONCLUIDO":
-            # O chamado foi encerrado: começa de novo, com o menu
+            # O chamado foi encerrado: a conversa se solta dele e começa de novo, com o menu
+            conversa.atendimento_id = None
+            conversa.status = regra.ATIVA
             _guardar(db, conversa, whatsappModo=MENU, perguntaPendente=None if _so_saudacao(texto) else texto[:800])
             return _saida(telefone, texto_do_menu(nome), [BOTAO_LUCIA, BOTAO_EQUIPE], conversa, db)
         if botao == EQUIPE:  # tocou de novo num botão antigo da equipe
             return _saida(telefone, JA_COM_A_EQUIPE.format(protocolo=atendimento.protocolo), None, conversa, db)
-        # A mensagem entra no chamado e quem responde é a equipe, sem "Recebi!" a cada mensagem (decisão 121)
+        # A mensagem entra no chamado e quem responde é a equipe, sem "Recebi!" a cada mensagem (decisão 121). Se a
+        # equipe já está atrasada, o cliente recebe um aviso, uma vez só por espera (decisão 126)
+        espera = atendimento_repository.espera_da_equipe(db, [atendimento.id]).get(atendimento.id)
         atendimentos.mensagem_do_whatsapp(db, atendimento, texto)
+        avisado = memoria.get("whatsappAvisoDeEspera")
+        if atrasado(espera, agora(), settings.ATENDIMENTO_ATRASO_MINUTOS) and avisado != espera.isoformat():
+            _guardar(db, conversa, whatsappAvisoDeEspera=espera.isoformat())
+            return _saida(telefone, AVISO_DE_ESPERA, None, conversa, db)
         return _silencio(conversa, atendimento)
 
     elif escolha == EQUIPE:  # modo LUCIA: botão ou pedido ("equipe", "atendente") chama a equipe a qualquer momento
