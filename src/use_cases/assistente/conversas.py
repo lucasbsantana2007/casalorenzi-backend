@@ -524,7 +524,11 @@ def registrar_acao(db: Session, conversa: m.ConversaAssistente, mensagem_id: int
     sessao.confirmar(db)
 
 
-def _resumo_para_atendimento(db: Session, conversa: m.ConversaAssistente, motivo: str | None, canal: str = "SITE") -> str:
+def _resumo_para_atendimento(
+    db: Session, conversa: m.ConversaAssistente, motivo: str | None, canal: str = "SITE", completa: bool = False
+) -> str:
+    """O resumo que abre o chamado. completa=True (WhatsApp, decisão 121): a conversa inteira com a Lúcia, para o
+    atendente acompanhar tudo; senão, as últimas 8 mensagens."""
     memoria = conversa.contexto or {}
     quem = f"{prompts.NOME_ASSISTENTE}, a assistente virtual do site"
     if canal == "WHATSAPP":
@@ -539,14 +543,15 @@ def _resumo_para_atendimento(db: Session, conversa: m.ConversaAssistente, motivo
         linhas.append(f"Peça em foco: {foco['nome']}{f' ({escolha})' if escolha else ''}")
     if busca := memoria.get("buscaDescricao"):
         linhas.append(f"Última busca: {busca}")
-    linhas.append("Últimas mensagens:")
-    for msg in assistente_repository.mensagens(db, conversa.id, limite=8):
+    limite, tamanho, total = (60, 1500, 20000) if completa else (8, 300, 3000)
+    linhas.append("Conversa com a assistente:" if completa else "Últimas mensagens:")
+    for msg in assistente_repository.mensagens(db, conversa.id, limite=limite):
         if msg.papel == regra.SISTEMA or not msg.conteudo:
             continue
-        autor = "Cliente" if msg.papel == regra.USUARIO else "Assistente"
-        linhas.append(f"- {autor}: {msg.conteudo.strip()[:300]}")
+        autor = "Cliente" if msg.papel == regra.USUARIO else prompts.NOME_ASSISTENTE if completa else "Assistente"
+        linhas.append(f"- {autor}: {msg.conteudo.strip()[:tamanho]}")
     linhas.append(f"(Registro do assistente: conversa {conversa.id})")
-    return "\n".join(linhas)[:3000]
+    return "\n".join(linhas)[:total]
 
 
 def _tipo_para_atendimento(db: Session) -> m.TipoSolicitacao:
