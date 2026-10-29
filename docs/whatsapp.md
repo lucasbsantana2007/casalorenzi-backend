@@ -1,4 +1,4 @@
-# A Lúcia no WhatsApp (decisões 108, 116 e 117)
+# A Lúcia no WhatsApp (decisões 108, 116, 117 e 121)
 
 O n8n recebe e entrega as mensagens; quem responde é a API, com o mesmo assistente do site.
 
@@ -24,18 +24,24 @@ Corpo (JSON):
 
 Resposta: `{ "responder": true, "texto": "...", "mensagem": {...}, "conversaId": "...", "protocolo": null }`.
 `mensagem` é o corpo pronto para `POST /{phone-number-id}/messages` da Graph API: texto ou botões, já com o
-destinatário. Com `responder: false` (a Meta entregou a mesma mensagem de novo), o n8n não envia nada.
+destinatário. Com `responder: false`, o n8n não envia nada: a Meta entregou a mesma mensagem de novo, ou a mensagem
+só entrou no chamado e quem responde é a equipe.
 
 ### O menu (decisão 116)
 
 1. **Primeira mensagem:** cumprimento pelo horário com o primeiro nome do perfil ("Boa tarde, Ana! Aqui é a
    Lúcia...") e dois botões: **Respostas rápidas** e **Falar com a equipe**. Responder 1 ou 2 também vale. Se a
    primeira mensagem era uma pergunta, ela fica guardada e é respondida quando o cliente escolher a Lúcia.
-2. **Respostas rápidas:** a Lúcia responde como no site, e toda resposta traz o botão **Falar com a equipe**
-   (ou, se o texto passar de 1.024 caracteres, a dica "responda 2").
-3. **Equipe:** o chamado abre na hora, com o resumo e o telefone. As mensagens seguintes entram no mesmo
-   chamado, e o cliente recebe a confirmação com o protocolo e o botão **Respostas rápidas** para voltar.
-4. **"menu"** mostra as opções de novo. Chamado encerrado: a próxima mensagem recomeça pelo menu.
+2. **Respostas rápidas:** a Lúcia responde como no site, em texto, sem botões (decisão 121). No meio da conversa,
+   1 e 2 não são opções do menu (podem ser a resposta a uma pergunta); para chamar uma pessoa, o cliente pede
+   ("atendente", "equipe", "quero falar com uma pessoa").
+3. **Só quando a Lúcia não resolve:** depois de duas falhas seguidas (decisão 102), a resposta oferece a equipe com
+   o botão **Falar com a equipe** (ou, se o texto passar de 1.024 caracteres, a dica "responda equipe"). O chamado
+   só abre se o cliente aceitar. Pedido de pessoa ou cliente irritado abrem na hora.
+4. **Equipe:** o chamado abre com a **conversa inteira com a Lúcia** (até 60 mensagens), o telefone e o nome do
+   perfil, e o cliente recebe uma confirmação com o protocolo. As mensagens seguintes entram no mesmo chamado
+   **sem resposta automática**: quem responde é a equipe.
+5. **"menu"** mostra as opções de novo. Chamado encerrado: a próxima mensagem recomeça pelo menu.
 
 ### Um lugar só para o atendimento humano (decisão 117)
 
@@ -43,7 +49,7 @@ destinatário. Com `responder: false` (a Meta entregou a mesma mensagem de novo)
   site abre esse número com o protocolo escrito; a mensagem chega com o protocolo e entra no chamado que já
   existe ("Recebi o seu protocolo..."), sem abrir outro.
 - **Uma caixa:** a equipe responde no painel, em Atendimento. Em chamado do WhatsApp, a resposta vai para o
-  cliente pelo n8n, assinada "Equipe Casa Lorenzi e Vulto · protocolo ...", com o botão Respostas rápidas.
+  cliente pelo n8n como mensagem comum, sem assinatura, protocolo nem botão (decisão 121).
   Passadas 24 h da última mensagem do cliente, a Meta não aceita mensagem livre: a resposta não sai e o chamado
   registra o aviso.
 - **Ciclo de 4 horas** (`WHATSAPP_CICLO_HORAS`): se o cliente fica 4 h sem responder depois da equipe, a
