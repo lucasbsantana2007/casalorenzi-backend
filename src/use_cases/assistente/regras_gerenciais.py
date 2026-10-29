@@ -40,7 +40,6 @@ SUGESTOES_POR_MODULO = [
     ("Quais pedidos estão em separação?", "pedidos"),
     ("Quantos pedidos tivemos este mês?", "pedidos"),
     ("Quais atendimentos estão em aberto?", "atendimento"),
-    ("Quantos pontos Lupe+ a cliente Mariana Costa tem?", "atendimento"),
     ("Quais atendimentos estão sem responsável?", "atendimento"),
 ]
 
@@ -205,6 +204,13 @@ _NOME_DEPOIS_DE_CLIENTE = re.compile(
 )
 
 
+DADO_DE_CLIENTE = (
+    "Os dados de um cliente específico, como os pontos Lupe+, não passam pelo Assistente IA. Consulte em Atendimento > "
+    "Lupe+, com a busca por nome, e-mail ou CPF. Aqui eu trago os números do programa: saldo total, categorias e "
+    "pontos a vencer."
+)
+
+
 def _cliente_citado(texto: str) -> str | None:
     """O e-mail, o CPF ou o nome (com maiúscula, depois de "cliente") citados na pergunta."""
     if achado := _EMAIL.search(texto):
@@ -263,10 +269,9 @@ def responder(texto: str, ctx: Contexto, executar) -> Rodada:
         r"\bestoque baixo|\bacabando|\bruptura|\bzerad|\bsem estoque|\brepor\b|\breposicao|\bem falta|\bfaltando|\bminimo", n
     ):
         return _consultar(executar, "consultar_estoque_baixo", {**escopo, "categoria": _categoria(n)})
-    # Pontos de um cliente (decisão 119): "quantos pontos a cliente Mariana Costa tem?", "pontos do ana@email.com"
-    if re.search(r"\bpontos\b|\blupe\b", n):
-        if quem := _cliente_citado(texto):
-            return _consultar(executar, "consultar_pontos_cliente", {"busca": quem})
+    # Pontos de um cliente (decisão 124): dado do cliente não vai para a IA; fica em Atendimento > Lupe+
+    if re.search(r"\bpontos\b|\blupe\b", n) and _cliente_citado(texto):
+        return Rodada(DADO_DE_CLIENTE, [{"tipo": "link", "rotulo": "Abrir Atendimento > Lupe+", "destino": "/atendimento"}])
     if re.search(
         r"(\blupe\b|vulto\+|vulto mais|\bpontos\b|\bfidelidade\b|\bpassivo\b|\bcategorias? de clientes?\b|\bclientes?\b.*\bcategorias?\b)",
         n,

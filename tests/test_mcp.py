@@ -11,7 +11,7 @@ from sqlalchemy import select, text
 from src import models as m
 from src.database.connection import SessionLocal
 from src.entities import assistente as regra
-from src.use_cases.assistente import ferramentas_cliente, ferramentas_gerenciais, servidor_mcp
+from src.use_cases.assistente import ferramentas_cliente, ferramentas_gerenciais
 from src.utils.datas import agora
 from tests.conftest import _entrar
 
@@ -340,8 +340,8 @@ def test_so_ferramentas_da_equipe_e_so_leitura(client, admin):
     token = criar_token(client, admin)
     ferramentas = legado(client, token, "tools/list").json()["result"]["tools"]
     disponiveis = {f["name"] for f in ferramentas}
-    # Todas as do copiloto, menos as que ficam só no painel (dado de um cliente, decisão 120)
-    do_copiloto = {f.nome for f in ferramentas_gerenciais.FERRAMENTAS} - servidor_mcp.SO_NO_PAINEL
+    # Todas as do copiloto; nenhuma consulta um cliente específico (decisão 124)
+    do_copiloto = {f.nome for f in ferramentas_gerenciais.FERRAMENTAS}
     assert disponiveis == {"ver_contexto"} | do_copiloto and "consultar_pontos_cliente" not in disponiveis
     do_cliente = {f.nome for f in ferramentas_cliente.FERRAMENTAS}
     assert not disponiveis & do_cliente  # nada de pedidos, pontos ou devoluções de clientes

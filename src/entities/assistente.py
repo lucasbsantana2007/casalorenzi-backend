@@ -97,10 +97,6 @@ DEFINICOES = {
         "Pedidos de todos os canais criados no período, pelo status atual. Lojista e Operador veem só os da própria "
         "loja, como na tela Pedidos. Pedidos em separação aparecem de qualquer data. Sem dados do cliente."
     ),
-    "pontos_cliente": (
-        "Saldo de pontos Lupe+ válidos de um cliente (os vencidos ficam de fora), o valor em desconto (100 pontos = "
-        "R$ 5,00), a categoria e os próximos vencimentos, como na ficha do cliente no Atendimento."
-    ),
     "atendimentos": (
         "Solicitações de atendimento da marca, pelo status atual e pelo tipo. Sem nome, contato ou mensagens do cliente."
     ),

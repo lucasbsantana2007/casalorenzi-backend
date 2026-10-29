@@ -4,8 +4,8 @@ com acesso ao Assistente IA (decisão 115): cada um vê o que o seu papel e a su
 
 O que vale aqui é o mesmo do copiloto: só leitura, permissão por papel e marca de quem é dono do token, conferida
 a cada chamada, parâmetros validados pelo mesmo contrato (campo a mais é recusado) e valores já formatados. Fica de
-fora tudo que é do cliente (pedidos, pontos, devoluções): nenhum dado pessoal sai por aqui. O saldo do Lupe+ de um
-cliente (consultar_pontos_cliente) fica só no copiloto do painel (decisão 120). A diferença é quem
+fora tudo que é do cliente (pedidos, pontos, devoluções): nenhum dado pessoal sai por aqui, nem no copiloto do
+painel (decisão 124). A diferença é quem
 escreve a resposta final: o modelo do app da pessoa, e não o nosso; por isso o verificador de números não roda, e
 as instruções do servidor pedem para copiar os valores como vieram.
 
@@ -117,9 +117,7 @@ VER_CONTEXTO = Ferramenta(
     _SemParametros,
     _ver_contexto,
 )
-# Fica só no painel: consulta com dado pessoal de cliente não sai para apps de fora (decisão 120, volta à 106)
-SO_NO_PAINEL = {"consultar_pontos_cliente"}
-FERRAMENTAS = [VER_CONTEXTO, *(f for f in ferramentas_gerenciais.FERRAMENTAS if f.nome not in SO_NO_PAINEL)]
+FERRAMENTAS = [VER_CONTEXTO, *ferramentas_gerenciais.FERRAMENTAS]
 REGISTRO = registro_de(FERRAMENTAS)
 _ANOTACOES = {"readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": False}
 
