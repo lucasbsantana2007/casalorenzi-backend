@@ -292,6 +292,24 @@ def test_texto_longo_vira_mensagem_de_texto_com_a_dica_da_equipe():
     assert mensagem["type"] == "text" and mensagem["text"]["body"].endswith(canal.DICA_DA_EQUIPE)
 
 
+def test_peca_ja_escrita_pelo_modelo_nao_se_repete():
+    # Decisão 121: o modelo citou as duas camisas com o link; a lista não repete
+    bloco = {
+        "tipo": "produtos",
+        "itens": [
+            {"nome": "Camisa de Linho Toscana", "precoFormatado": "R$ 489,00", "link": "/produto/1"},
+            {"nome": "Camisa de Linho Positano", "precoFormatado": "R$ 369,00", "link": "/produto/2"},
+        ],
+    }
+    citadas = "Encontrei a **Camisa de Linho Toscana** e a Camisa de Linho Positano, ambas no M."
+    assert canal.texto_para_whatsapp(citadas, [bloco]).count("Toscana") == 1
+    assert "•" not in canal.texto_para_whatsapp(citadas, [bloco])
+    so_uma = canal.texto_para_whatsapp(f"Veja: {settings.URL_FRONTEND}/produto/1", [bloco])
+    assert "Toscana" not in so_uma and "• *Camisa de Linho Positano*" in so_uma
+    resumo = canal.texto_para_whatsapp("Encontrei duas camisas de linho azul no M:", [bloco])
+    assert resumo.count("•") == 2
+
+
 def test_texto_longo_e_cortado_no_limite_do_whatsapp():
     longo = "\n".join(f"linha {i} " + "x" * 80 for i in range(100))
     cortado = canal.texto_para_whatsapp(longo, [])

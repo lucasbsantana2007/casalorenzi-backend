@@ -299,7 +299,8 @@ def _dinamico_cliente(db: Session, ctx: Contexto, cliente: m.Cliente | None):
 # O que muda para o modelo quando o cliente fala pelo WhatsApp (decisão 108): só texto, sem botões, sem login
 NOTA_WHATSAPP = (
     "- Canal: WhatsApp. Aqui não há cards, botões, sacola nem login: responda em texto curto, com no máximo 5 peças, e "
-    "não diga para tocar em botões. O link de cada peça vai junto da resposta: para comprar, o cliente abre o link. "
+    "não diga para tocar em botões. A lista das peças (nome, preço e link) e das lojas vai logo depois do seu texto: "
+    "não repita nomes, preços, endereços nem links; apresente em uma frase e pergunte o próximo passo. "
     "Pedidos, pontos e dados da conta só no site, com login ({site}/login). Para falar com alguém da equipe, use "
     "solicitar_atendimento_humano: a equipe recebe o resumo e continua pelo WhatsApp."
 )

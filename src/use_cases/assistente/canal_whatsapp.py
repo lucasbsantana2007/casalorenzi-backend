@@ -115,9 +115,18 @@ def _markdown_do_whatsapp(texto: str) -> str:
     return re.sub(r"\[([^\]]+)\]\(([^)\s]+)\)", lambda m_: f"{m_.group(1)}: {_link(m_.group(2))}", texto)
 
 
-def _pecas(bloco: dict) -> list[str]:
+def _ja_escrito(texto: str, nome: str | None, link: str | None = None) -> bool:
+    """A peça ou a loja já está no texto do modelo (pelo nome ou pelo link): o card não repete (decisão 121)."""
+    if nome and normalizar(nome) in normalizar(texto):
+        return True
+    return bool(link) and re.search(re.escape(link) + r"(?!\d)", texto) is not None
+
+
+def _pecas(bloco: dict, texto: str = "") -> list[str]:
     linhas = []
     for item in bloco.get("itens", [])[:MAXIMO_DE_PECAS]:
+        if _ja_escrito(texto, item.get("nome"), _link(item.get("link"))):
+            continue
         partes = [f"• *{item.get('nome')}*", item.get("precoFormatado")]
         if item.get("situacao") == catalogo.ESGOTADO:
             partes.append("indisponível no site")
@@ -128,7 +137,10 @@ def _pecas(bloco: dict) -> list[str]:
     return linhas
 
 
-def _disponibilidade(bloco: dict) -> list[str]:
+def _disponibilidade(bloco: dict, texto: str = "") -> list[str]:
+    lojas = bloco.get("lojas", [])
+    if lojas and all(_ja_escrito(texto, loja.get("loja")) for loja in lojas):
+        return []  # o modelo já disse loja por loja
     rotulo = catalogo.ROTULO_SITUACAO
     linhas = [f"No site: {rotulo.get(bloco.get('site'), bloco.get('site'))}"]
     for loja in bloco.get("lojas", []):
@@ -136,9 +148,11 @@ def _disponibilidade(bloco: dict) -> list[str]:
     return linhas
 
 
-def _lojas(bloco: dict) -> list[str]:
+def _lojas(bloco: dict, texto: str = "") -> list[str]:
     linhas = []
     for loja in bloco.get("itens", [])[:6]:
+        if _ja_escrito(texto, loja.get("nome")):
+            continue
         partes = [f"*{loja.get('nome')}*", loja.get("endereco") or loja.get("cidade")]
         if hoje := loja.get("horarioDeHoje"):
             partes.append(f"hoje: {hoje}")
@@ -148,7 +162,7 @@ def _lojas(bloco: dict) -> list[str]:
     return linhas
 
 
-def _sacola(bloco: dict) -> list[str]:
+def _sacola(bloco: dict, texto: str = "") -> list[str]:
     item = bloco.get("item") or {}
     produto = {"id": item.get("produtoId"), "marca": item.get("marca")}
     if produto["id"] is None:
@@ -159,8 +173,10 @@ def _sacola(bloco: dict) -> list[str]:
 
 
 def texto_para_whatsapp(texto: str, blocos: list[dict]) -> str:
-    """A resposta do assistente em texto: o que o modelo escreveu e, depois, o essencial de cada card."""
-    partes = [_markdown_do_whatsapp((texto or "").strip())]
+    """A resposta do assistente em texto: o que o modelo escreveu e, depois, o essencial de cada card que ele ainda
+    não escreveu (peça ou loja já citada no texto não se repete)."""
+    escrito = _markdown_do_whatsapp((texto or "").strip())
+    partes = [escrito]
     for bloco in blocos or []:
         tipo = bloco.get("tipo")
         linhas = {
@@ -168,7 +184,7 @@ def texto_para_whatsapp(texto: str, blocos: list[dict]) -> str:
             "disponibilidade": _disponibilidade,
             "lojas": _lojas,
             "acao_sacola": _sacola,
-        }.get(tipo, lambda _: [])(bloco)
+        }.get(tipo, lambda *_: [])(bloco, escrito)
         if tipo == "link" and (link := _link(bloco.get("destino"))):
             linhas = [f"{bloco.get('rotulo') or 'Link'}: {link}"]
         if linhas:
