@@ -108,6 +108,9 @@ CANAL_WHATSAPP_MARCA = os.getenv("CANAL_WHATSAPP_MARCA", "LORENZI")
 # responder depois da equipe; conversa com a Lúcia parada esse tempo também recomeça pelo menu.
 N8N_ENVIO_URL = os.getenv("N8N_ENVIO_URL", "").strip()
 WHATSAPP_CICLO_HORAS = int(os.getenv("WHATSAPP_CICLO_HORAS", "4"))
+# Chamado aberto pela Lúcia (pedido de atendimento humano, no site ou no WhatsApp) fica atrasado quando o cliente
+# espera a resposta da equipe há mais que isso (decisão 122)
+ATENDIMENTO_ATRASO_MINUTOS = int(os.getenv("ATENDIMENTO_ATRASO_MINUTOS", "30"))
 
 # Banco só de leitura para o copiloto e as automações (opcional): um usuário do Postgres só com SELECT.
 # Vazio: usa DATABASE_URL, e cada consulta roda numa transação READ ONLY com tempo máximo.

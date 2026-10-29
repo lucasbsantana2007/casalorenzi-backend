@@ -1,11 +1,14 @@
 import base64
+from datetime import datetime
 from typing import Literal
 
 from src import models as m
+from src.config import settings
+from src.entities.atendimento import atrasado
 from src.schemas.clientes import cliente_saida
 from src.schemas.comum import AnexoEntrada, Entrada, loja_saida, usuario_resumo  # noqa: F401 (AnexoEntrada é reexportada)
 from src.schemas.pedidos import pedido_saida
-from src.utils.datas import ms
+from src.utils.datas import agora, ms
 
 StatusAtendimento = Literal["ABERTO", "EM_ANDAMENTO", "AGUARDANDO_CLIENTE", "CONCLUIDO"]
 
@@ -54,7 +57,8 @@ def _cliente_resumo(a: m.Atendimento) -> dict:
     return {"id": a.cliente.cpf, "nome": a.cliente.nome}
 
 
-def atendimento_saida(a: m.Atendimento, ultima: m.Mensagem | None) -> dict:
+def atendimento_saida(a: m.Atendimento, ultima: m.Mensagem | None, espera: datetime | None = None) -> dict:
+    """espera: desde quando o cliente espera a equipe num chamado aberto pela Lúcia (decisão 122)."""
     cliente_id = a.cliente.cpf if a.cliente else None
     return {
         "id": a.id,
@@ -81,6 +85,8 @@ def atendimento_saida(a: m.Atendimento, ultima: m.Mensagem | None) -> dict:
         "ultimaMensagem": (
             {"autorTipo": ultima.autor_tipo, "conteudo": ultima.conteudo, "enviadoEm": ms(ultima.enviado_em)} if ultima else None
         ),
+        "aguardandoEquipeDesde": ms(espera) if espera else None,
+        "atrasado": atrasado(espera, agora(), settings.ATENDIMENTO_ATRASO_MINUTOS),
     }
 
 
@@ -111,11 +117,13 @@ def mensagem_saida(msg: m.Mensagem) -> dict:
     }
 
 
-def atendimento_detalhado_saida(a: m.Atendimento, total_pedidos: int, total_atendimentos: int) -> dict:
+def atendimento_detalhado_saida(
+    a: m.Atendimento, total_pedidos: int, total_atendimentos: int, espera: datetime | None = None
+) -> dict:
     mensagens = a.mensagens
     cliente = cliente_saida(a.cliente) or _cliente_resumo(a)
     return {
-        **atendimento_saida(a, mensagens[-1] if mensagens else None),
+        **atendimento_saida(a, mensagens[-1] if mensagens else None, espera),
         "cliente": {**cliente, "totalPedidos": total_pedidos, "totalAtendimentos": total_atendimentos},
         "pedido": pedido_saida(a.pedido),
         "mensagens": [mensagem_saida(msg) for msg in mensagens],

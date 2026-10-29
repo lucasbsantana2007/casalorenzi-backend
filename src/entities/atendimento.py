@@ -5,6 +5,7 @@ e os da ferramenta à parte que a Vulto usava (WhatsApp, Instagram e e-mail). At
 externo pode não ter cliente identificado: aí fica o contato (telefone, e-mail ou @) que ele usou.
 """
 
+from datetime import datetime, timedelta
 from urllib.parse import quote
 
 STATUS_ATENDIMENTO = ("ABERTO", "EM_ANDAMENTO", "AGUARDANDO_CLIENTE", "CONCLUIDO")
@@ -27,6 +28,22 @@ def link_whatsapp(numero: str, protocolo_atendimento: str, assunto: str | None =
     if assunto and assunto.strip():
         texto += f"\nAssunto: {' '.join(assunto.split())[:200]}"
     return f"https://wa.me/{numero}?text={quote(texto)}"
+
+
+def aguardando_equipe_desde(mensagens: list[tuple[str, datetime]]) -> datetime | None:
+    """Desde quando o cliente espera a equipe: a primeira mensagem dele depois da última resposta da equipe.
+    mensagens: (autor_tipo, enviado_em) em ordem; as do SISTEMA não contam. None quando a última é da equipe."""
+    desde = None
+    for autor, quando in mensagens:
+        if autor == "ATENDENTE":
+            desde = None
+        elif autor == "CLIENTE" and desde is None:
+            desde = quando
+    return desde
+
+
+def atrasado(desde: datetime | None, agora: datetime, minutos: int) -> bool:
+    return desde is not None and agora - desde > timedelta(minutes=minutos)
 
 
 def status_apos_mensagem(status_atual: str, autor_tipo: str) -> str:
