@@ -310,7 +310,7 @@ DESCRICOES = {
     "pontos_a_vencer": "Pontos Lupe+ que vencem em breve (números agregados)",
     "aviso_pontos": "E-mail aos clientes 30 dias antes de os pontos vencerem (desligado por padrão)",
     "aviso_estoque": 'E-mail a quem pediu "Avise-me" quando a peça volta ao estoque (desligado por padrão)',
-    "lembrete_sacola": "Lembrete de sacola parada há 24 h, para quem aceita e-mails (desligado por padrão)",
+    "lembrete_sacola": "Lembrete de sacola parada há 1 h, para quem aceita e-mails (desligado por padrão)",
     "limpeza_conversas": "Apaga conversas dos assistentes além da retenção",
     "encerrar_whatsapp": "Encerra o chamado do WhatsApp quando o cliente fica 4 h sem responder à equipe",
 }
