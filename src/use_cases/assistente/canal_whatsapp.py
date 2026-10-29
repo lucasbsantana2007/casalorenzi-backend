@@ -199,10 +199,11 @@ def texto_para_whatsapp(texto: str, blocos: list[dict]) -> str:
 
 
 def _passar_para_a_equipe(db: Session, conversa: m.ConversaAssistente, telefone: str, nome: str | None, motivo: str) -> str:
-    """Abre o chamado (canal WHATSAPP) com a conversa inteira e o telefone. Se a conversa já tem chamado, só lembra o
-    protocolo."""
+    """Abre o chamado (canal WHATSAPP) com a conversa inteira e o telefone. Se a conversa já tem chamado em aberto, só
+    lembra o protocolo; concluído, abre outro."""
     assistente_repository.travar(db, conversa.id)
-    if conversa.atendimento_id and (existente := db.get(m.Atendimento, conversa.atendimento_id)) is not None:
+    existente = db.get(m.Atendimento, conversa.atendimento_id) if conversa.atendimento_id else None
+    if existente is not None and existente.status in EM_ABERTO:
         return (
             f"A sua conversa já está com a nossa equipe (protocolo {existente.protocolo}). "
             "Alguém vai continuar com você por aqui, pelo WhatsApp."
@@ -365,14 +366,17 @@ NOTA_ENCERRADO = "Encerrado automaticamente: o cliente ficou {horas} horas sem r
 
 def _vindo_do_site(db: Session, conversa: m.ConversaAssistente, telefone: str, texto: str, nome: str | None) -> dict | None:
     """Cliente que tocou em "Continuar no WhatsApp" no site: a mensagem traz o protocolo. Liga a conversa ao chamado
-    que já existe (com o resumo do site), em vez de abrir outro. Protocolo de outro canal, encerrado ou inexistente:
-    None (segue o menu)."""
+    que já existe (com o resumo do site), em vez de abrir outro, em qualquer momento da conversa. Protocolo de outro
+    canal, encerrado ou inexistente: None (segue o fluxo normal)."""
     achado = PROTOCOLO.search(texto)
     if not achado:
         return None
     atendimento = db.scalar(select(m.Atendimento).where(m.Atendimento.protocolo == achado.group(0)))
     if atendimento is None or atendimento.canal != CANAL or atendimento.status == "CONCLUIDO":
         return None
+    if conversa.atendimento_id == atendimento.id:  # o chamado que já está com a equipe: só entra nele
+        atendimentos.mensagem_do_whatsapp(db, atendimento, texto)
+        return _silencio(conversa, atendimento)
     if not (atendimento.contato or "").startswith("+"):
         atendimento.contato = f"+{telefone}"
     if (nome or "").strip() and atendimento.contato_nome in (None, "Visitante do site"):
@@ -646,7 +650,7 @@ def responder(
         _guardar(db, conversa, whatsappModo=MENU)
         return _saida(telefone, texto_do_menu(nome), [BOTAO_LUCIA, BOTAO_EQUIPE], conversa, db)
 
-    if modo is None and (vindo := _vindo_do_site(db, conversa, telefone, texto, nome)) is not None:
+    if (vindo := _vindo_do_site(db, conversa, telefone, texto, nome)) is not None:
         return vindo
     if modo in (None, MENU):
         if escolha == EQUIPE:
@@ -671,7 +675,9 @@ def responder(
             return _saida(telefone, LUCIA_PRONTA, None, conversa, db)
         atendimento = db.get(m.Atendimento, conversa.atendimento_id) if conversa.atendimento_id else None
         if atendimento is None or atendimento.status == "CONCLUIDO":
-            # O chamado foi encerrado: começa de novo, com o menu
+            # O chamado foi encerrado: a conversa se solta dele e começa de novo, com o menu
+            conversa.atendimento_id = None
+            conversa.status = regra.ATIVA
             _guardar(db, conversa, whatsappModo=MENU, perguntaPendente=None if _so_saudacao(texto) else texto[:800])
             return _saida(telefone, texto_do_menu(nome), [BOTAO_LUCIA, BOTAO_EQUIPE], conversa, db)
         if botao == EQUIPE:  # tocou de novo num botão antigo da equipe
