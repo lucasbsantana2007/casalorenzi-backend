@@ -283,7 +283,7 @@ def test_discover_moderno(client, admin):
 def test_chamada_moderna_e_nome_em_base64(client, admin):
     token = criar_token(client, admin)
     lista = moderno(client, token, "tools/list").json()["result"]
-    assert lista["resultType"] == "complete" and len(lista["tools"]) == 15
+    assert lista["resultType"] == "complete" and len(lista["tools"]) == 14
     nome = "ver_contexto"
     codificado = "=?base64?" + base64.b64encode(nome.encode()).decode() + "?="
     resposta = moderno(client, token, "tools/call", {"name": nome, "arguments": {}}, cabecalhos={"Mcp-Name": codificado})
@@ -323,7 +323,7 @@ def test_versao_de_2025_em_meta_e_atendida_como_2025(client, admin):
     """A lista de versões suportadas inclui as de 2025: quem tentar de novo com uma delas não fica sem resposta."""
     token = criar_token(client, admin)
     resposta = moderno(client, token, "tools/list", versao="2025-11-25")
-    assert resposta.status_code == 200 and len(resposta.json()["result"]["tools"]) == 15
+    assert resposta.status_code == 200 and len(resposta.json()["result"]["tools"]) == 14
     assert "resultType" not in resposta.json()["result"]
 
 
@@ -340,7 +340,9 @@ def test_so_ferramentas_da_equipe_e_so_leitura(client, admin):
     token = criar_token(client, admin)
     ferramentas = legado(client, token, "tools/list").json()["result"]["tools"]
     disponiveis = {f["name"] for f in ferramentas}
-    assert disponiveis == {"ver_contexto"} | {f.nome for f in ferramentas_gerenciais.FERRAMENTAS}
+    # Todas as do copiloto; nenhuma consulta um cliente específico (decisão 124)
+    do_copiloto = {f.nome for f in ferramentas_gerenciais.FERRAMENTAS}
+    assert disponiveis == {"ver_contexto"} | do_copiloto and "consultar_pontos_cliente" not in disponiveis
     do_cliente = {f.nome for f in ferramentas_cliente.FERRAMENTAS}
     assert not disponiveis & do_cliente  # nada de pedidos, pontos ou devoluções de clientes
     for f in ferramentas:

@@ -13,34 +13,11 @@ from src.entities.papeis import pode_acessar
 from src.middlewares import limite
 from src.middlewares.autenticacao import escopo_marca, exigir_modulo
 from src.schemas.comum import Entrada
-from src.use_cases.assistente import conversas
+from src.use_cases.assistente import conversas, regras_gerenciais
 from src.use_cases.assistente.ferramentas_gerenciais import FERRAMENTAS
 
 router = APIRouter(prefix="/copiloto", tags=["Copiloto gerencial"])
 acesso = exigir_modulo("inteligencia")
-
-# Pergunta de exemplo -> módulo que ela exige (só aparecem as que o perfil pode fazer)
-SUGESTOES = [
-    ("Quanto faturamos em setembro?", "financeiro"),
-    ("Qual marca vendeu mais no mês passado?", "financeiro"),
-    ("Quais foram os produtos mais vendidos nos últimos 30 dias?", "financeiro"),
-    ("Quantas vendas foram canceladas em setembro?", "financeiro"),
-    ("Qual loja teve o maior faturamento em setembro?", "financeiro"),
-    ("Quanto faturamos hoje?", "financeiro"),
-    ("Quais produtos estão com estoque baixo?", "estoque"),
-    ("Quais produtos estão parados há mais de 60 dias?", "estoque"),
-    ("Quais lojas concentram mais estoque?", "estoque"),
-    ("Quais produtos têm mais unidades disponíveis?", "estoque"),
-    ("Quais produtos têm avarias?", "estoque"),
-    ("Que transferências você sugere?", "transferencias"),
-    ("Quantos clientes têm pontos vencendo nos próximos 30 dias?", "fidelidade"),
-    ("Quantos clientes temos em cada categoria do Lupe+?", "fidelidade"),
-    ("Quais pedidos estão em separação?", "pedidos"),
-    ("Quantos pedidos tivemos este mês?", "pedidos"),
-    ("Quais atendimentos estão em aberto?", "atendimento"),
-    ("Quantos pontos Lupe+ a cliente Mariana Costa tem?", "atendimento"),
-    ("Quais atendimentos estão sem responsável?", "atendimento"),
-]
 
 
 class MensagemEntrada(Entrada):
@@ -53,7 +30,7 @@ def sugestoes(usuario: m.Usuario = Depends(acesso)):
     """Perguntas de exemplo que este perfil pode fazer e o que ele pode consultar."""
     ferramentas = [{"nome": f.nome, "liberada": pode_acessar(usuario.papel, f.modulo) if f.modulo else True} for f in FERRAMENTAS]
     return {
-        "sugestoes": [texto for texto, modulo in SUGESTOES if pode_acessar(usuario.papel, modulo)],
+        "sugestoes": regras_gerenciais.sugestoes_para(usuario.papel, usuario.marca == "GRUPO"),
         "permissoes": {
             "vendas": pode_acessar(usuario.papel, "financeiro"),
             "fidelidade": pode_acessar(usuario.papel, "fidelidade"),

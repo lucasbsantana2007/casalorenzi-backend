@@ -10,6 +10,7 @@ import re
 from datetime import date, timedelta
 
 from src.database.connection import SessionLeitura
+from src.entities.papeis import pode_acessar
 from src.entities.periodo import MESES
 from src.repositories import cadastro_repository
 from src.use_cases.assistente.ferramentas import Contexto
@@ -18,19 +19,43 @@ from src.use_cases.assistente.regras_cliente import so_cortesia
 from src.utils.datas import hoje
 from src.utils.texto import normalizar
 
-SUGESTOES = [
-    "Quanto faturamos em setembro?",
-    "Qual marca vendeu mais no mês passado?",
-    "Quais foram os produtos mais vendidos nos últimos 30 dias?",
-    "Quantas vendas foram canceladas em setembro?",
-    "Qual loja teve o maior faturamento em setembro?",
-    "Quais produtos estão com estoque baixo?",
-    "Quais produtos estão parados há mais de 60 dias?",
-    "Quais lojas concentram mais estoque?",
-    "Quais produtos têm avarias?",
-    "Que transferências você sugere?",
-    "Quantos clientes têm pontos vencendo nos próximos 30 dias?",
+# Pergunta de exemplo -> módulo que ela exige. Só aparecem as que o perfil pode fazer; comparar as marcas, só para
+# quem vê as duas (o Administrador do grupo): o administrador de uma marca não vê a outra (decisão 123)
+COMPARA_MARCAS = "Qual marca vendeu mais no mês passado?"
+SUGESTOES_POR_MODULO = [
+    ("Quanto faturamos em setembro?", "financeiro"),
+    (COMPARA_MARCAS, "financeiro"),
+    ("Quais foram os produtos mais vendidos nos últimos 30 dias?", "financeiro"),
+    ("Quantas vendas foram canceladas em setembro?", "financeiro"),
+    ("Qual loja teve o maior faturamento em setembro?", "financeiro"),
+    ("Quanto faturamos hoje?", "financeiro"),
+    ("Quais produtos estão com estoque baixo?", "estoque"),
+    ("Quais produtos estão parados há mais de 60 dias?", "estoque"),
+    ("Quais lojas concentram mais estoque?", "estoque"),
+    ("Quais produtos têm mais unidades disponíveis?", "estoque"),
+    ("Quais produtos têm avarias?", "estoque"),
+    ("Que transferências você sugere?", "transferencias"),
+    ("Quantos clientes têm pontos vencendo nos próximos 30 dias?", "fidelidade"),
+    ("Quantos clientes temos em cada categoria do Lupe+?", "fidelidade"),
+    ("Quais pedidos estão em separação?", "pedidos"),
+    ("Quantos pedidos tivemos este mês?", "pedidos"),
+    ("Quais atendimentos estão em aberto?", "atendimento"),
+    ("Quais atendimentos estão sem responsável?", "atendimento"),
 ]
+
+
+def sugestoes_para(papel: str | None, duas_marcas: bool) -> list[str]:
+    """As perguntas de exemplo que este perfil pode fazer (sem papel: todas)."""
+    return [
+        texto
+        for texto, modulo in SUGESTOES_POR_MODULO
+        if (papel is None or pode_acessar(papel, modulo)) and (duas_marcas or texto != COMPARA_MARCAS)
+    ]
+
+
+def _sugestoes(ctx: Contexto) -> list[str]:
+    return sugestoes_para(ctx.papel, ctx.marca_escopo is None)[:6]
+
 
 _DATA = r"(\d{1,2})/(\d{1,2})(?:/(\d{2,4}))?"
 
@@ -164,7 +189,7 @@ def direta(texto: str, ctx: Contexto, executar) -> Rodada | None:
     ):
         return Rodada(
             "Posso consultar vendas e faturamento, produtos mais vendidos, cancelamentos, pedidos, atendimentos, estoque baixo e parado, concentração de estoque, avarias, sugestões de transferência, alertas e os números do Lupe+. Escolha uma pergunta ou escreva a sua.",
-            [{"tipo": "sugestoes", "itens": SUGESTOES[:6]}],
+            [{"tipo": "sugestoes", "itens": _sugestoes(ctx)}],
         )
     # Só agradecimento: "perfeito, e por loja?" traz pergunta e vai para o modelo
     if so_cortesia(texto) is not None:
@@ -176,6 +201,13 @@ _EMAIL = re.compile(r"[^\s@]+@[^\s@]+\.[^\s@?!,;]+")
 _CPF = re.compile(r"\b\d{3}\.?\d{3}\.?\d{3}-?\d{2}\b")
 _NOME_DEPOIS_DE_CLIENTE = re.compile(
     r"\b(?:o|a|do|da)?\s*client[ea]s?\s+([A-ZÀ-Ý][\wÀ-ÿ'-]+(?:\s+(?:d[aeo]s?\s+)?[A-ZÀ-Ý][\wÀ-ÿ'-]+)*)"
+)
+
+
+DADO_DE_CLIENTE = (
+    "Os dados de um cliente específico, como os pontos Lupe+, não passam pelo Assistente IA. Consulte em Atendimento > "
+    "Lupe+, com a busca por nome, e-mail ou CPF. Aqui eu trago os números do programa: saldo total, categorias e "
+    "pontos a vencer."
 )
 
 
@@ -237,10 +269,9 @@ def responder(texto: str, ctx: Contexto, executar) -> Rodada:
         r"\bestoque baixo|\bacabando|\bruptura|\bzerad|\bsem estoque|\brepor\b|\breposicao|\bem falta|\bfaltando|\bminimo", n
     ):
         return _consultar(executar, "consultar_estoque_baixo", {**escopo, "categoria": _categoria(n)})
-    # Pontos de um cliente (decisão 119): "quantos pontos a cliente Mariana Costa tem?", "pontos do ana@email.com"
-    if re.search(r"\bpontos\b|\blupe\b", n):
-        if quem := _cliente_citado(texto):
-            return _consultar(executar, "consultar_pontos_cliente", {"busca": quem})
+    # Pontos de um cliente (decisão 124): dado do cliente não vai para a IA; fica em Atendimento > Lupe+
+    if re.search(r"\bpontos\b|\blupe\b", n) and _cliente_citado(texto):
+        return Rodada(DADO_DE_CLIENTE, [{"tipo": "link", "rotulo": "Abrir Atendimento > Lupe+", "destino": "/atendimento"}])
     if re.search(
         r"(\blupe\b|vulto\+|vulto mais|\bpontos\b|\bfidelidade\b|\bpassivo\b|\bcategorias? de clientes?\b|\bclientes?\b.*\bcategorias?\b)",
         n,
@@ -286,5 +317,5 @@ def responder(texto: str, ctx: Contexto, executar) -> Rodada:
         )
     return Rodada(
         "Não entendi a pergunta. Posso consultar vendas e faturamento, mais vendidos, cancelamentos, pedidos, atendimentos, estoque baixo ou parado, concentração de estoque, avarias, transferências, alertas e Lupe+.",
-        [{"tipo": "sugestoes", "itens": SUGESTOES[:6]}],
+        [{"tipo": "sugestoes", "itens": _sugestoes(ctx)}],
     )

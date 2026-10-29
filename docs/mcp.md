@@ -1,4 +1,4 @@
-# Copiloto no Claude: o servidor MCP (decisões 106, 109, 114 e 115)
+# Copiloto no Claude: o servidor MCP (decisões 106, 109, 114, 115 e 124)
 
 O copiloto gerencial também atende fora do painel: no **claude.ai**, no **Claude Code**, no **Claude Desktop** ou
 num agente do **n8n**, pelo protocolo MCP (Model Context Protocol). **Toda a equipe** com acesso ao Assistente IA
@@ -15,21 +15,15 @@ usa as mesmas consultas, as mesmas regras e as mesmas permissões do painel. Mud
 Pedidos e atendimentos saem sem nome, contato ou mensagens do cliente; nos pedidos, também sem a soma dos valores
 (que seria faturamento).
 
-**Pontos de um cliente (decisão 119):** Administrador e Lojista, que já veem a ficha do cliente no Atendimento,
-consultam o saldo do Lupe+ de um cliente pelo nome, e-mail, telefone ou CPF (`consultar_pontos_cliente`). Sai só o
-nome, o e-mail mascarado (`m***@gmail.com`), o saldo, o valor, a categoria e os próximos vencimentos; nada de CPF,
-telefone ou e-mail completo. Com vários clientes parecidos, a resposta lista os nomes para a pessoa escolher, sem
-pontos. Cada consulta fica na auditoria (`chamadas_mcp` e `chamadas_ferramenta`), com o que foi buscado.
-
-Atenção (LGPD): pelo Claude, esse dado sai da plataforma e fica na conversa da conta do claude.ai de quem
-perguntou. Use uma conta da empresa e, nas configurações de privacidade dela, desligue o uso das conversas para
-treinar modelos.
+**Dados de um cliente não vão para a IA (decisão 124, que desfaz a 119 e completa a 120):** nem pelo MCP nem no
+Assistente IA do painel; as consultas trazem só números agregados. O saldo do Lupe+ de um cliente fica na aba
+**Atendimento > Lupe+**, para Administrador e Lojista.
 
 | O quê | Como |
 | --- | --- |
 | Endereço | `https://<api>/api/conector-mcp` (local: `http://127.0.0.1:8000/api/conector-mcp`) |
 | Login | **claude.ai**: login OAuth, com o e-mail e a senha do painel (decisão 114). **Claude Code, Claude Desktop e n8n**: token pessoal (`Authorization: Bearer clmcp_...`), criado em **Inteligência > Conectar ao Claude** |
-| O que dá para consultar | As 14 ferramentas do copiloto (com pedidos e atendimentos, decisão 118, e os pontos de um cliente, decisão 119) e `ver_contexto` (data de hoje, até quando há vendas, lojas com os ids, categorias, permissões e definições das métricas) |
+| O que dá para consultar | As 13 ferramentas do copiloto (com pedidos e atendimentos, decisão 118) e `ver_contexto` (data de hoje, até quando há vendas, lojas com os ids, categorias, permissões e definições das métricas) |
 | O que não sai | Nada do cliente: pedidos, pontos, devoluções e conta ficam só na Lúcia, no site |
 | Permissão | Toda a equipe, conferida **a cada chamada**: papel, marca e conta ativa do dono, como no copiloto do painel |
 | Escrita | Nenhuma. As consultas rodam em transação READ ONLY, como no copiloto |

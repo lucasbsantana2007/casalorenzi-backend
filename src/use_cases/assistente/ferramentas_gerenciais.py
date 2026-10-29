@@ -14,13 +14,12 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from src import models as m
-from src.entities import fidelidade as regra_pontos
 from src.entities.assistente import DEFINICOES, MODULO_DO_ALERTA
 from src.entities.marca import na_marca
 from src.entities.papeis import loja_do_escopo, pode_acessar
 from src.entities.pedido import CANAIS
 from src.entities.periodo import PERIODO_PADRAO, PERIODOS, Periodo, resolver
-from src.repositories import alerta_repository, analise_repository, cadastro_repository, cliente_repository, fidelidade_repository
+from src.repositories import alerta_repository, analise_repository, cadastro_repository
 from src.use_cases import analises
 from src.use_cases.assistente.ferramentas import Contexto, Entrada, FalhaFerramenta, Ferramenta, Resultado
 from src.use_cases.assistente.formatacao import (
@@ -33,7 +32,6 @@ from src.use_cases.assistente.formatacao import (
     numero,
     pct,
 )
-from src.use_cases.fidelidade import lotes_em_aberto
 from src.utils.datas import fim_do_dia, hoje, inicio_do_dia, ler_data
 
 NomePeriodo = Literal[PERIODOS]  # type: ignore[valid-type]
@@ -1119,94 +1117,6 @@ def consultar_atendimentos(db: Session, ctx: Contexto, entrada: Atendimentos) ->
     return Resultado(dados=dados, blocos=blocos, texto=texto)
 
 
-# ---------- Lupe+ de um cliente (decisão 119) ----------
-
-
-class PontosCliente(Entrada):
-    busca: str = Field(
-        min_length=3,
-        max_length=80,
-        description="Nome, e-mail, telefone ou CPF do cliente. Com mais de um parecido, a resposta pede para especificar.",
-    )
-
-
-def _email_mascarado(email: str | None) -> str:
-    """m***@gmail.com: dá para a pessoa reconhecer o cliente sem o e-mail inteiro sair na conversa."""
-    if not email or "@" not in email or email.endswith(".invalid"):
-        return "sem e-mail"
-    usuario, dominio = email.split("@", 1)
-    return f"{usuario[:1]}***@{dominio}"
-
-
-def consultar_pontos_cliente(db: Session, ctx: Contexto, entrada: PontosCliente) -> Resultado:
-    """Saldo do Lupe+ de um cliente, como na ficha do cliente no Atendimento. Só calcula: não lança o vencimento
-    (o copiloto só lê); os pontos já vencidos ficam de fora do saldo."""
-    busca = entrada.busca.strip()
-    digitos = "".join(c for c in busca if c.isdigit())
-    encontrados = []
-    if len(digitos) == 11:
-        por_cpf = cliente_repository.por_cpf(db, digitos)
-        encontrados = [por_cpf] if por_cpf and por_cpf.excluido_em is None else []
-    if not encontrados:
-        encontrados = cliente_repository.listar(db, busca, limite=11)
-    if not encontrados:
-        return Resultado(
-            dados={"busca": busca, "encontrados": 0},
-            texto=f"Não encontrei cliente com {busca!r}. Tente o nome completo, o e-mail ou o CPF.",
-        )
-    if len(encontrados) > 1:
-        candidatos = [{"nome": c.nome, "email": _email_mascarado(c.email)} for c in encontrados[:10]]
-        mais = " (há mais de 10: refine a busca)" if len(encontrados) > 10 else ""
-        return Resultado(
-            dados={"busca": busca, "encontrados": len(encontrados), "candidatos": candidatos},
-            blocos=[bloco_tabela("Clientes parecidos", [("nome", "Nome", "texto"), ("email", "E-mail", "texto")], candidatos)],
-            texto=f"Encontrei {len(encontrados)} clientes com {busca!r}{mais}. Diga qual (pelo e-mail ou CPF) para ver os pontos.",
-        )
-    cliente = encontrados[0]
-    referencia = hoje()
-    lotes = [
-        (vence, pontos)
-        for vence, pontos in lotes_em_aberto(fidelidade_repository.movimentos(db, cliente.id))
-        if vence >= referencia
-    ]
-    saldo = sum(pontos for _, pontos in lotes)
-    vencimentos: dict = {}
-    for vence, pontos in lotes:
-        vencimentos[vence] = vencimentos.get(vence, 0) + pontos
-    categoria = regra_pontos.categoria_pelo_saldo(saldo)
-    proxima = regra_pontos.proxima_categoria(saldo)
-    proximos = [{"data": data(dia), "pontos": numero(qtd)} for dia, qtd in sorted(vencimentos.items())[:3]]
-    dados = {
-        "cliente": cliente.nome,
-        "email": _email_mascarado(cliente.email),
-        "saldo": numero(saldo),
-        "valorEmReais": brl(regra_pontos.valor_em_reais(saldo)),
-        "categoria": categoria.capitalize() if categoria else "Sem categoria",
-        "proximaCategoria": {"nome": proxima[0].capitalize(), "faltam": numero(proxima[1])} if proxima else None,
-        "proximosVencimentos": proximos,
-        "definicao": DEFINICOES["pontos_cliente"],
-    }
-    blocos = [
-        bloco_indicadores(
-            [
-                ("Saldo", saldo, "numero"),
-                ("Valor em desconto", regra_pontos.valor_em_reais(saldo), "moeda"),
-                ("Categoria", dados["categoria"], "texto"),
-            ],
-            f"Lupe+ · {cliente.nome}",
-        )
-    ]
-    if proximos:
-        blocos.append(
-            bloco_tabela("Próximos vencimentos", [("data", "Vence em", "texto"), ("pontos", "Pontos", "texto")], proximos)
-        )
-    blocos.append(bloco_fonte("consultar_pontos_cliente", None, [f"Cliente: {cliente.nome}"], DEFINICOES["pontos_cliente"], None))
-    texto = (
-        f"{cliente.nome} tem {dados['saldo']} pontos Lupe+ ({dados['valorEmReais']} em desconto), categoria {dados['categoria']}."
-    )
-    return Resultado(dados=dados, blocos=blocos, texto=texto)
-
-
 # ---------- Registro ----------
 
 FERRAMENTAS = [
@@ -1297,15 +1207,6 @@ FERRAMENTAS = [
         "mensagens do cliente. Use para 'chamados em aberto', 'atendimentos sem responsável', 'o que está aguardando'.",
         Atendimentos,
         consultar_atendimentos,
-        modulo="atendimento",
-    ),
-    Ferramenta(
-        "consultar_pontos_cliente",
-        "Saldo de pontos Lupe+ de UM cliente (saldo, valor em desconto, categoria e próximos vencimentos), buscando pelo "
-        "nome, e-mail, telefone ou CPF. Com vários clientes parecidos, devolve a lista para a pessoa escolher. Use só "
-        "quando perguntarem de um cliente específico; para números do programa, use consultar_fidelidade.",
-        PontosCliente,
-        consultar_pontos_cliente,
         modulo="atendimento",
     ),
     Ferramenta(

@@ -24,12 +24,15 @@ acesso = exigir_cliente_ou_modulo("atendimento")
 
 
 def lista_saida(db: Session, lista: list[m.Atendimento]) -> list[dict]:
-    ultimas = atendimento_repository.ultimas_mensagens(db, [a.id for a in lista])
-    return [atendimento_saida(a, ultimas.get(a.id)) for a in lista]
+    ids = [a.id for a in lista]
+    ultimas = atendimento_repository.ultimas_mensagens(db, ids)
+    esperas = atendimento_repository.espera_da_equipe(db, ids)
+    return [atendimento_saida(a, ultimas.get(a.id), esperas.get(a.id)) for a in lista]
 
 
 def detalhe_saida(db: Session, a: m.Atendimento) -> dict:
-    return atendimento_detalhado_saida(a, *atendimentos.totais_do_cliente(db, a.cliente_id))
+    espera = atendimento_repository.espera_da_equipe(db, [a.id]).get(a.id)
+    return atendimento_detalhado_saida(a, *atendimentos.totais_do_cliente(db, a.cliente_id), espera)
 
 
 @router.get("")

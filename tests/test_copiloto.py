@@ -230,6 +230,16 @@ def test_sugestoes_respeitam_o_perfil(client, helena):
     assert any("fatur" in s for s in client.get("/api/copiloto/sugestoes", headers=helena).json()["sugestoes"])
 
 
+def test_comparar_as_marcas_so_aparece_para_quem_ve_as_duas(client, helena):
+    # Decisão 123: o administrador de uma marca (Otávio, Casa Lorenzi) não vê a outra
+    otavio = entrar(client, "otavio.vasconcelos@casalorenzi.com.br")
+    pergunta = "Qual marca vendeu mais no mês passado?"
+    assert pergunta in client.get("/api/copiloto/sugestoes", headers=helena).json()["sugestoes"]
+    assert pergunta not in client.get("/api/copiloto/sugestoes", headers=otavio).json()["sugestoes"]
+    boas_vindas = client.post("/api/copiloto/conversas", headers=otavio).json()["mensagens"][0]["blocos"][0]["itens"]
+    assert pergunta not in boas_vindas and "Quanto faturamos em setembro?" in boas_vindas
+
+
 def test_agradecimento_so_tem_resposta_pronta_sem_pergunta(client, admin):
     conversa = abrir_copiloto(client, admin)
     assert pergunte(client, conversa, admin, "perfeito, obrigado")["texto"].startswith("Por nada!")

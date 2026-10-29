@@ -1,6 +1,7 @@
 """A Lúcia no WhatsApp (decisões 108, 116 e 117): o n8n chama a API com o segredo do canal; a primeira mensagem recebe o
-menu (respostas rápidas ou equipe); a equipe abre o chamado na hora e as mensagens seguintes entram nele; toda
-resposta da Lúcia traz o botão da equipe; uma conversa por telefone e nada respondido duas vezes."""
+menu (respostas rápidas ou equipe); a equipe abre o chamado na hora, com a conversa inteira, e as mensagens seguintes
+entram nele sem resposta automática; a Lúcia responde sem botões e oferece a equipe só depois de falhar (decisão 121);
+uma conversa por telefone e nada respondido duas vezes."""
 
 from datetime import datetime, timedelta
 
@@ -88,7 +89,7 @@ def test_pergunta_feita_antes_da_escolha_e_respondida_depois(client):
     assert canal.OPCOES_DO_MENU in menu["texto"]
     resposta = diga(client, botao="LUCIA")
     assert "•" in resposta["texto"] and f"{settings.URL_FRONTEND}/produto/" in resposta["texto"]
-    assert "EQUIPE" in botoes(resposta) or canal.DICA_DA_EQUIPE in resposta["texto"]
+    assert botoes(resposta) == [] and canal.DICA_DA_EQUIPE not in resposta["texto"]
 
 
 def test_responder_1_ou_2_vale_como_botao(client):
@@ -117,15 +118,18 @@ def test_escolher_a_equipe_abre_o_chamado_e_as_mensagens_seguintes_entram_nele(c
     diga(client, "minha encomenda não chegou")
     resposta = diga(client, botao="EQUIPE", nome="Ana Souza")
     protocolo = resposta["protocolo"]
-    assert protocolo and protocolo in resposta["texto"] and botoes(resposta) == ["LUCIA"]
+    assert protocolo and protocolo in resposta["texto"] and botoes(resposta) == []
     atendimento = chamado(protocolo)
     assert atendimento.canal == "WHATSAPP" and atendimento.contato == f"+{TELEFONE}" and atendimento.contato_nome == "Ana Souza"
     assert "minha encomenda não chegou" in atendimento.mensagens[0].conteudo
 
+    # As mensagens seguintes só entram no chamado: sem "Recebi!" a cada uma (decisão 121)
     seguinte = diga(client, "é o pedido CL-105093")
-    assert seguinte["protocolo"] == protocolo and protocolo in seguinte["texto"]
+    assert seguinte["responder"] is False and seguinte["mensagem"] is None and seguinte["protocolo"] == protocolo
+    assert diga(client, "2")["responder"] is False  # no meio do atendimento, "2" é mensagem para a equipe
     atendimento = chamado(protocolo)
-    assert atendimento.mensagens[-1].conteudo == "é o pedido CL-105093" and atendimento.mensagens[-1].autor_tipo == "CLIENTE"
+    assert [msg.conteudo for msg in atendimento.mensagens[-2:]] == ["é o pedido CL-105093", "2"]
+    assert atendimento.mensagens[-1].autor_tipo == "CLIENTE"
     with SessionLocal() as db:
         assert db.query(m.Atendimento).filter(m.Atendimento.canal == "WHATSAPP").count() == 1
 
@@ -139,8 +143,14 @@ def test_da_para_voltar_para_a_lucia_depois_de_chamar_a_equipe(client):
 
 def test_equipe_a_qualquer_momento_com_a_lucia(client):
     com_a_lucia(client)
-    resposta = diga(client, "2")
+    resposta = diga(client, "atendente")
     assert resposta["protocolo"] and "Passei a sua conversa" in resposta["texto"]
+
+
+def test_com_a_lucia_1_e_2_nao_sao_opcoes_do_menu(client):
+    com_a_lucia(client)
+    resposta = diga(client, "2")
+    assert resposta["protocolo"] is None and resposta["texto"] != canal.LUCIA_PRONTA
 
 
 def test_pedido_de_pessoa_no_meio_da_conversa_abre_o_chamado(client):
@@ -166,10 +176,33 @@ def test_chamado_encerrado_volta_ao_menu(client):
 # ---------- Respostas da Lúcia ----------
 
 
-def test_toda_resposta_da_lucia_traz_a_equipe(client):
-    com_a_lucia(client)
+def test_resposta_da_lucia_sai_sem_botoes(client):
+    assert botoes(com_a_lucia(client)) == []
     resposta = diga(client, "qual o horário da loja de Curitiba?")
-    assert "EQUIPE" in botoes(resposta) or canal.DICA_DA_EQUIPE in resposta["texto"]
+    assert botoes(resposta) == [] and resposta["protocolo"] is None
+
+
+def test_duas_falhas_oferecem_a_equipe_sem_abrir_o_chamado(client):
+    com_a_lucia(client)
+    assert botoes(diga(client, "asdf qwer zxcv")) == []
+    oferta = diga(client, "hjkl uiop vbnm")
+    assert botoes(oferta) == ["EQUIPE"] and canal.OFERTA_DA_EQUIPE in oferta["texto"]
+    assert oferta["protocolo"] is None and "Toque" not in oferta["texto"] and "Posso" not in oferta["texto"]
+    with SessionLocal() as db:
+        assert db.query(m.Atendimento).filter(m.Atendimento.canal == "WHATSAPP").count() == 0
+    aceita = diga(client, botao="EQUIPE")
+    assert aceita["protocolo"] and "Passei a sua conversa" in aceita["texto"]
+
+
+def test_chamado_leva_a_conversa_inteira_com_a_lucia(client):
+    com_a_lucia(client)
+    perguntas = [f"tem camisa tamanho {t}?" for t in ("PP", "P", "M", "G", "GG", "XG")]
+    for pergunta in perguntas:
+        diga(client, pergunta)
+    protocolo = diga(client, "atendente")["protocolo"]
+    resumo = chamado(protocolo).mensagens[0].conteudo
+    assert "Conversa com a assistente:" in resumo
+    assert all(f"- Cliente: {pergunta}" in resumo for pergunta in perguntas)  # mais que as 8 últimas mensagens
 
 
 def test_uma_conversa_por_telefone_sem_guardar_o_numero(client):
@@ -259,6 +292,24 @@ def test_texto_longo_vira_mensagem_de_texto_com_a_dica_da_equipe():
     assert mensagem["type"] == "text" and mensagem["text"]["body"].endswith(canal.DICA_DA_EQUIPE)
 
 
+def test_peca_ja_escrita_pelo_modelo_nao_se_repete():
+    # Decisão 121: o modelo citou as duas camisas com o link; a lista não repete
+    bloco = {
+        "tipo": "produtos",
+        "itens": [
+            {"nome": "Camisa de Linho Toscana", "precoFormatado": "R$ 489,00", "link": "/produto/1"},
+            {"nome": "Camisa de Linho Positano", "precoFormatado": "R$ 369,00", "link": "/produto/2"},
+        ],
+    }
+    citadas = "Encontrei a **Camisa de Linho Toscana** e a Camisa de Linho Positano, ambas no M."
+    assert canal.texto_para_whatsapp(citadas, [bloco]).count("Toscana") == 1
+    assert "•" not in canal.texto_para_whatsapp(citadas, [bloco])
+    so_uma = canal.texto_para_whatsapp(f"Veja: {settings.URL_FRONTEND}/produto/1", [bloco])
+    assert "Toscana" not in so_uma and "• *Camisa de Linho Positano*" in so_uma
+    resumo = canal.texto_para_whatsapp("Encontrei duas camisas de linho azul no M:", [bloco])
+    assert resumo.count("•") == 2
+
+
 def test_texto_longo_e_cortado_no_limite_do_whatsapp():
     longo = "\n".join(f"linha {i} " + "x" * 80 for i in range(100))
     cortado = canal.texto_para_whatsapp(longo, [])
@@ -334,8 +385,8 @@ def test_resposta_da_equipe_no_painel_vai_para_o_whatsapp(client, admin, entrega
     assert len(entregas) == 1
     mensagem = entregas[0]["corpo"]["mensagem"]
     assert entregas[0]["segredo"] == SEGREDO and mensagem["to"] == TELEFONE
-    corpo = mensagem["interactive"]["body"]["text"]
-    assert corpo.startswith("Oi, Ana! Vou verificar o seu pedido.") and protocolo in corpo
+    # Mensagem comum, sem assinatura, protocolo nem botão (decisão 121)
+    assert mensagem["type"] == "text" and mensagem["text"]["body"] == "Oi, Ana! Vou verificar o seu pedido."
 
 
 def test_chamado_do_site_nao_vai_para_o_whatsapp(client, admin, entregas):
@@ -395,5 +446,88 @@ def test_resposta_da_equipe_renova_o_ciclo(client, admin, entregas):
     _envelhecer(protocolo, "CLIENTE", 5)  # a conversa ficou 5 h parada esperando a equipe
     _equipe_responde(client, admin, protocolo)
     seguinte = diga(client, "obrigada, aguardo")
-    assert seguinte["protocolo"] == protocolo and protocolo in seguinte["texto"]
+    assert seguinte["protocolo"] == protocolo and seguinte["responder"] is False
     assert chamado(protocolo).mensagens[-1].conteudo == "obrigada, aguardo"
+
+
+# ---------- Depois da resposta: a checagem e o fim (decisão 125) ----------
+
+
+def _recuar_espera(conversa_id, minutos):
+    """Recua no tempo a resposta (da Lúcia ou da equipe) e a checagem, como se o cliente estivesse calado."""
+    with SessionLocal() as db:
+        conversa = db.get(m.ConversaAssistente, conversa_id)
+        contexto = dict(conversa.contexto)
+        for chave in ("whatsappRespondidoEm", "whatsappChecagemEm"):
+            if contexto.get(chave):
+                contexto[chave] = (datetime.fromisoformat(contexto[chave]) - timedelta(minutes=minutos)).isoformat()
+        conversa.contexto = contexto
+        db.commit()
+
+
+def _rotina(client):
+    resposta = client.post(f"{URL.rsplit('/', 1)[0]}/rotina", headers={"X-Canal-Segredo": SEGREDO})
+    assert resposta.status_code == 200, resposta.text
+    return resposta.json()
+
+
+def test_quinze_minutos_depois_da_lucia_vem_a_checagem(client, entregas):
+    com_a_lucia(client)
+    resposta = diga(client, "qual o horário da loja de Curitiba?")
+    assert _rotina(client) == {"checagens": 0, "finalizadas": 0}  # ainda não deu 15 min
+    _recuar_espera(resposta["conversaId"], 16)
+    assert _rotina(client)["checagens"] == 1
+    checagem = entregas[-1]["corpo"]["mensagem"]
+    assert checagem["to"] == TELEFONE and checagem["interactive"]["body"]["text"] == canal.CHECAGEM
+    assert [b["reply"]["id"] for b in checagem["interactive"]["action"]["buttons"]] == ["FINALIZAR"]
+    assert _rotina(client)["checagens"] == 0  # uma vez só
+
+
+def test_cliente_que_responde_nao_recebe_a_checagem(client, entregas):
+    com_a_lucia(client)
+    resposta = diga(client, "tem camisa?")
+    _recuar_espera(resposta["conversaId"], 10)
+    diga(client, "obrigada")  # cortesia: a Lúcia responde e a espera recomeça do zero
+    _recuar_espera(resposta["conversaId"], 10)
+    assert _rotina(client)["checagens"] == 0 and entregas == []
+
+
+def test_sem_resposta_por_mais_3h45_finaliza_e_avisa(client, entregas):
+    com_a_lucia(client)
+    resposta = diga(client, "tem camisa?")
+    _recuar_espera(resposta["conversaId"], 16)
+    _rotina(client)
+    _recuar_espera(resposta["conversaId"], 3 * 60 + 46)
+    assert _rotina(client)["finalizadas"] == 1
+    assert entregas[-1]["corpo"]["mensagem"]["text"]["body"] == canal.SEM_RESPOSTA
+    with SessionLocal() as db:
+        assert db.get(m.ConversaAssistente, resposta["conversaId"]).status == regra.ENCERRADA
+    nova = diga(client, "oi")
+    assert nova["conversaId"] != resposta["conversaId"] and canal.OPCOES_DO_MENU in nova["texto"]
+
+
+def test_depois_da_equipe_tambem_e_o_chamado_fecha(client, admin, entregas):
+    diga(client, "oi")
+    aberto = diga(client, botao="EQUIPE")
+    _equipe_responde(client, admin, aberto["protocolo"])
+    _recuar_espera(aberto["conversaId"], 16)
+    assert _rotina(client)["checagens"] == 1
+    _recuar_espera(aberto["conversaId"], 3 * 60 + 46)
+    assert _rotina(client)["finalizadas"] == 1
+    assert chamado(aberto["protocolo"]).status == "CONCLUIDO"
+    assert aberto["protocolo"] in entregas[-1]["corpo"]["mensagem"]["text"]["body"]
+
+
+def test_botao_finalizar_encerra_na_hora(client, admin, entregas):
+    diga(client, "oi")
+    aberto = diga(client, botao="EQUIPE")
+    _equipe_responde(client, admin, aberto["protocolo"])
+    fim = diga(client, botao="FINALIZAR")
+    assert fim["texto"] == canal.FINALIZADO and botoes(fim) == []
+    assert chamado(aberto["protocolo"]).status == "CONCLUIDO"
+    assert "Finalizado pelo cliente" in chamado(aberto["protocolo"]).mensagens[-1].conteudo
+    assert _rotina(client) == {"checagens": 0, "finalizadas": 0}
+
+
+def test_rotina_exige_o_segredo(client):
+    assert client.post(f"{URL.rsplit('/', 1)[0]}/rotina").status_code == 401

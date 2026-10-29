@@ -76,6 +76,11 @@ CHAVES_MEMORIA = {
     "whatsappModo",
     "perguntaPendente",
     "whatsappUltimoId",
+    # Depois da resposta (decisão 125): para onde mandar a checagem, quando a Lúcia ou a equipe respondeu e quando a
+    # checagem saiu (só enquanto espera o cliente)
+    "whatsappTelefone",
+    "whatsappRespondidoEm",
+    "whatsappChecagemEm",
 }
 
 
@@ -169,7 +174,7 @@ def _nova(
     sessao.gerar_ids(db)
     texto, sugestoes = saudacao or (
         prompts.BOAS_VINDAS[tipo],
-        regras_cliente.SUGESTOES if tipo == regra.CLIENTE else regras_gerenciais.SUGESTOES[:4],
+        regras_cliente.SUGESTOES if tipo == regra.CLIENTE else regras_gerenciais.sugestoes_para(None, True)[:4],
     )
     boas_vindas = m.MensagemAssistente(
         conversa_id=conversa.id,
@@ -222,7 +227,9 @@ def conversa_do_site(db: Session, conversa_id: str, chave: str | None, cliente: 
 
 
 def abrir_gerencial(db: Session, usuario: m.Usuario) -> m.ConversaAssistente:
-    conversa = _nova(db, tipo=regra.GERENCIAL, usuario_id=usuario.id)
+    # Boas-vindas com as perguntas que este perfil pode fazer (decisão 123)
+    sugestoes = regras_gerenciais.sugestoes_para(usuario.papel, usuario.marca == "GRUPO")[:4]
+    conversa = _nova(db, tipo=regra.GERENCIAL, usuario_id=usuario.id, saudacao=(prompts.BOAS_VINDAS[regra.GERENCIAL], sugestoes))
     sessao.confirmar(db)
     return conversa
 
@@ -297,7 +304,8 @@ def _dinamico_cliente(db: Session, ctx: Contexto, cliente: m.Cliente | None):
 # O que muda para o modelo quando o cliente fala pelo WhatsApp (decisão 108): só texto, sem botões, sem login
 NOTA_WHATSAPP = (
     "- Canal: WhatsApp. Aqui não há cards, botões, sacola nem login: responda em texto curto, com no máximo 5 peças, e "
-    "não diga para tocar em botões. O link de cada peça vai junto da resposta: para comprar, o cliente abre o link. "
+    "não diga para tocar em botões. A lista das peças (nome, preço e link) e das lojas vai logo depois do seu texto: "
+    "não repita nomes, preços, endereços nem links; apresente em uma frase e pergunte o próximo passo. "
     "Pedidos, pontos e dados da conta só no site, com login ({site}/login). Para falar com alguém da equipe, use "
     "solicitar_atendimento_humano: a equipe recebe o resumo e continua pelo WhatsApp."
 )
@@ -524,7 +532,11 @@ def registrar_acao(db: Session, conversa: m.ConversaAssistente, mensagem_id: int
     sessao.confirmar(db)
 
 
-def _resumo_para_atendimento(db: Session, conversa: m.ConversaAssistente, motivo: str | None, canal: str = "SITE") -> str:
+def _resumo_para_atendimento(
+    db: Session, conversa: m.ConversaAssistente, motivo: str | None, canal: str = "SITE", completa: bool = False
+) -> str:
+    """O resumo que abre o chamado. completa=True (WhatsApp, decisão 121): a conversa inteira com a Lúcia, para o
+    atendente acompanhar tudo; senão, as últimas 8 mensagens."""
     memoria = conversa.contexto or {}
     quem = f"{prompts.NOME_ASSISTENTE}, a assistente virtual do site"
     if canal == "WHATSAPP":
@@ -539,14 +551,15 @@ def _resumo_para_atendimento(db: Session, conversa: m.ConversaAssistente, motivo
         linhas.append(f"Peça em foco: {foco['nome']}{f' ({escolha})' if escolha else ''}")
     if busca := memoria.get("buscaDescricao"):
         linhas.append(f"Última busca: {busca}")
-    linhas.append("Últimas mensagens:")
-    for msg in assistente_repository.mensagens(db, conversa.id, limite=8):
+    limite, tamanho, total = (60, 1500, 20000) if completa else (8, 300, 3000)
+    linhas.append("Conversa com a assistente:" if completa else "Últimas mensagens:")
+    for msg in assistente_repository.mensagens(db, conversa.id, limite=limite):
         if msg.papel == regra.SISTEMA or not msg.conteudo:
             continue
-        autor = "Cliente" if msg.papel == regra.USUARIO else "Assistente"
-        linhas.append(f"- {autor}: {msg.conteudo.strip()[:300]}")
+        autor = "Cliente" if msg.papel == regra.USUARIO else prompts.NOME_ASSISTENTE if completa else "Assistente"
+        linhas.append(f"- {autor}: {msg.conteudo.strip()[:tamanho]}")
     linhas.append(f"(Registro do assistente: conversa {conversa.id})")
-    return "\n".join(linhas)[:3000]
+    return "\n".join(linhas)[:total]
 
 
 def _tipo_para_atendimento(db: Session) -> m.TipoSolicitacao:
