@@ -9,10 +9,13 @@ o formato: sem cards nem botões, tudo vira texto com os links das peças.
   fica salvo na conversa: ela é achada pelo HMAC do número (com o segredo do canal), guardado como chave_hash.
 - Sem login: o WhatsApp não identifica a conta do site, então pedidos, pontos e dados da conta ficam no site.
 - Ênfase na ajuda humana (decisão 116): a primeira mensagem recebe um menu com dois botões, "Respostas rápidas" (a
-  Lúcia) ou "Falar com a equipe" (1 ou 2 também valem). Toda resposta da Lúcia traz o botão da equipe.
-- Equipe (escolhida no menu, pedida a qualquer momento ou oferecida depois de duas falhas): abre o chamado na hora,
-  canal WHATSAPP, com o resumo e o telefone. As mensagens seguintes entram no mesmo chamado, para a equipe ler no
-  painel. Uma conversa abre no máximo um chamado.
+  Lúcia) ou "Falar com a equipe" (1 ou 2 também valem).
+- Conversa natural (decisão 121): a Lúcia responde em texto, sem botões; o botão da equipe volta só quando ela não
+  consegue resolver (duas falhas seguidas). Com a equipe, as mensagens do cliente entram no chamado sem resposta
+  automática, e a resposta da equipe chega como mensagem comum, sem protocolo nem botão.
+- Equipe (escolhida no menu, pedida a qualquer momento ou aceita depois da oferta): abre o chamado na hora, canal
+  WHATSAPP, com a conversa inteira com a Lúcia e o telefone. As mensagens seguintes entram no mesmo chamado, para a
+  equipe ler no painel. Uma conversa abre no máximo um chamado.
 - A mesma mensagem entregue duas vezes pela Meta (ela reenvia quando não recebe confirmação) não gera duas respostas.
 """
 
@@ -180,14 +183,15 @@ def texto_para_whatsapp(texto: str, blocos: list[dict]) -> str:
 
 
 def _passar_para_a_equipe(db: Session, conversa: m.ConversaAssistente, telefone: str, nome: str | None, motivo: str) -> str:
-    """Abre o chamado (canal WHATSAPP) com o resumo e o telefone. Se a conversa já tem chamado, só lembra o protocolo."""
+    """Abre o chamado (canal WHATSAPP) com a conversa inteira e o telefone. Se a conversa já tem chamado, só lembra o
+    protocolo."""
     assistente_repository.travar(db, conversa.id)
     if conversa.atendimento_id and (existente := db.get(m.Atendimento, conversa.atendimento_id)) is not None:
         return (
             f"A sua conversa já está com a nossa equipe (protocolo {existente.protocolo}). "
             "Alguém vai continuar com você por aqui, pelo WhatsApp."
         )
-    resumo = conversas._resumo_para_atendimento(db, conversa, motivo, CANAL)
+    resumo = conversas._resumo_para_atendimento(db, conversa, motivo, CANAL, completa=True)
     resumo = resumo.replace(
         "O cliente seguiu pelo WhatsApp com este protocolo.", f"O cliente falou com a Lúcia pelo WhatsApp: +{telefone}."
     )
@@ -201,8 +205,8 @@ def _passar_para_a_equipe(db: Session, conversa: m.ConversaAssistente, telefone:
     conversa.atualizada_em = agora()
     sessao.confirmar(db)
     return (
-        f"Pronto! Passei a sua conversa para a nossa equipe, com o resumo do que falamos (protocolo {atendimento.protocolo}). "
-        "Alguém vai continuar com você por aqui, pelo WhatsApp."
+        f"Pronto! Passei a sua conversa para a nossa equipe, com tudo o que falamos (protocolo {atendimento.protocolo}). "
+        "Alguém vai continuar com você por aqui, pelo WhatsApp. Pode ir mandando o que precisar."
     )
 
 
@@ -215,10 +219,9 @@ OPCOES_DO_MENU = (
     "1. Respostas rápidas comigo: peças, disponibilidade, lojas, horários e frete\n2. Falar com alguém da nossa equipe"
 )
 LEMBRETE_DO_MENU = "Para eu te ajudar, escolha uma opção: 1 para respostas rápidas comigo ou 2 para falar com a nossa equipe."
-LUCIA_PRONTA = (
-    "Perfeito! Pode me perguntar o que precisar. Se em qualquer momento quiser falar com uma pessoa, é só tocar em "
-    "“Falar com a equipe” ou responder 2."
-)
+LUCIA_PRONTA = "Perfeito! Pode me perguntar o que precisar. Se quiser falar com uma pessoa, é só me pedir."
+# Depois de duas falhas seguidas (decisão 121): a Lúcia oferece a equipe, com o botão, em vez de abrir sozinha
+OFERTA_DA_EQUIPE = "Se preferir, passo a nossa conversa para alguém da equipe. É só tocar em “Falar com a equipe”."
 
 
 def cumprimento(momento=None) -> str:
@@ -240,26 +243,27 @@ def texto_do_menu(nome: str | None, momento=None) -> str:
     )
 
 
-JA_COM_A_EQUIPE = (
-    "Recebi! Sua mensagem foi para a nossa equipe, junto com a conversa (protocolo {protocolo}). Alguém responde por "
-    "aqui. Se quiser respostas rápidas enquanto isso, toque em “Respostas rápidas”."
-)
-DICA_DA_EQUIPE = "Para falar com alguém da equipe, responda 2."
+# Cliente que toca de novo em "Falar com a equipe" (num botão antigo) com o chamado já aberto
+JA_COM_A_EQUIPE = "A sua conversa já está com a nossa equipe (protocolo {protocolo}). Alguém responde por aqui."
+DICA_DA_EQUIPE = "Para falar com alguém da equipe, responda “equipe”."
 # Corpo de mensagem com botões: até 1.024 caracteres (acima disso, sai texto com a dica)
 TAMANHO_COM_BOTOES = 1024
-_ESCOLHE_LUCIA = {"1", "um", "respostas rapidas", "resposta rapida", "lucia"}
-_ESCOLHE_EQUIPE = {"2", "dois", "equipe", "falar com a equipe", "atendente", "atendimento humano", "pessoa", "humano"}
+# 1 e 2 só valem no menu: no meio da conversa, "2" pode ser a resposta a uma pergunta ("quantas?")
+_NUMEROS_DO_MENU = {LUCIA: {"1", "um"}, EQUIPE: {"2", "dois"}}
+_ESCOLHE_LUCIA = {"respostas rapidas", "resposta rapida", "lucia"}
+_ESCOLHE_EQUIPE = {"equipe", "falar com a equipe", "atendente", "atendimento humano", "pessoa", "humano"}
 _PEDE_MENU = {"menu", "opcoes", "inicio"}
 
 
-def _escolha(texto: str, botao: str | None) -> str | None:
-    """LUCIA, EQUIPE ou MENU quando o cliente escolheu (botão ou resposta curta); senão None (é uma pergunta)."""
+def _escolha(texto: str, botao: str | None, no_menu: bool = True) -> str | None:
+    """LUCIA, EQUIPE ou MENU quando o cliente escolheu (botão ou resposta curta); senão None (é uma pergunta).
+    no_menu=False: 1 e 2 não valem como opção."""
     if botao in (LUCIA, EQUIPE, MENU):
         return botao
     curto = " ".join(re.findall(r"[a-z0-9]+", normalizar(texto)))
-    if curto in _ESCOLHE_LUCIA:
+    if curto in _ESCOLHE_LUCIA or (no_menu and curto in _NUMEROS_DO_MENU[LUCIA]):
         return LUCIA
-    if curto in _ESCOLHE_EQUIPE:
+    if curto in _ESCOLHE_EQUIPE or (no_menu and curto in _NUMEROS_DO_MENU[EQUIPE]):
         return EQUIPE
     if curto in _PEDE_MENU:
         return MENU
@@ -296,6 +300,11 @@ def _saida(telefone: str, texto: str, botoes: list[dict] | None, conversa: m.Con
     }
 
 
+def _silencio(conversa: m.ConversaAssistente, atendimento: m.Atendimento) -> dict:
+    """Mensagem do cliente que só entra no chamado (decisão 121): o n8n não manda nada, quem responde é a equipe."""
+    return {"responder": False, "texto": "", "mensagem": None, "conversaId": conversa.id, "protocolo": atendimento.protocolo}
+
+
 def _guardar(db: Session, conversa: m.ConversaAssistente, **valores) -> None:
     """Grava o estado do menu na memória da conversa (None apaga a chave)."""
     contexto = dict(conversa.contexto or {})
@@ -317,7 +326,7 @@ def _para_a_equipe(db, conversa, telefone, nome, motivo) -> dict:
     aviso = _passar_para_a_equipe(db, conversa, telefone, nome, motivo)
     conversa = assistente_repository.obter(db, conversa.id, regra.CLIENTE)
     _guardar(db, conversa, whatsappModo=EQUIPE, perguntaPendente=None)
-    return _saida(telefone, aviso, [BOTAO_LUCIA], conversa, db)
+    return _saida(telefone, aviso, None, conversa, db)
 
 
 # ---------- Um lugar só para o atendimento humano (decisão 117) ----------
@@ -360,7 +369,7 @@ def _vindo_do_site(db: Session, conversa: m.ConversaAssistente, telefone: str, t
         f"{saudacao} Recebi o seu protocolo {atendimento.protocolo}. A nossa equipe já tem o resumo da sua conversa no "
         "site e continua com você por aqui."
     )
-    return _saida(telefone, texto_resposta, [BOTAO_LUCIA], conversa, db)
+    return _saida(telefone, texto_resposta, None, conversa, db)
 
 
 def _telefone_do_chamado(atendimento: m.Atendimento) -> str | None:
@@ -409,8 +418,8 @@ def entregar_resposta_da_equipe(db: Session, atendimento: m.Atendimento, conteud
     for conversa in db.scalars(select(m.ConversaAssistente).where(m.ConversaAssistente.atendimento_id == atendimento.id)):
         conversa.atualizada_em = agora()
     sessao.confirmar(db)
-    texto = f"{conteudo.strip()}\n\nEquipe Casa Lorenzi e Vulto · protocolo {atendimento.protocolo}"
-    entregue = _entregar(mensagem_da_meta(telefone, texto[:TAMANHO_MAXIMO], [BOTAO_LUCIA]))
+    # Mensagem comum, como numa conversa (decisão 121): sem assinatura, protocolo nem botão
+    entregue = _entregar(mensagem_da_meta(telefone, conteudo.strip()[:TAMANHO_MAXIMO]))
     if not entregue:
         atendimentos.registrar_evento(
             db, atendimento, "Não consegui entregar esta resposta no WhatsApp do cliente. Tente de novo em instantes."
@@ -465,7 +474,7 @@ def responder(
 
     Na primeira mensagem, o cliente escolhe: respostas rápidas (a Lúcia) ou a equipe. Se a primeira mensagem já era
     uma pergunta, ela é respondida assim que ele escolher a Lúcia. Com a equipe, o chamado abre na hora e as mensagens
-    seguintes entram nele. Toda resposta da Lúcia traz o botão da equipe."""
+    seguintes entram nele, sem resposta automática. A Lúcia oferece a equipe só quando não consegue resolver."""
     texto = (texto or "").strip()
     if not texto and not botao:
         return {
@@ -496,7 +505,7 @@ def responder(
     ):
         return {"responder": False, "texto": "", "mensagem": None, "conversaId": conversa.id, "protocolo": None}
     modo = memoria.get("whatsappModo")
-    escolha = _escolha(texto, botao)
+    escolha = _escolha(texto, botao, no_menu=modo in (None, MENU))
     if id_cliente:
         _guardar(db, conversa, whatsappUltimoId=id_cliente)
 
@@ -514,7 +523,7 @@ def responder(
             pendente = memoria.get("perguntaPendente")
             _guardar(db, conversa, whatsappModo=LUCIA, perguntaPendente=None)
             if not pendente:
-                return _saida(telefone, LUCIA_PRONTA, [BOTAO_EQUIPE], conversa, db)
+                return _saida(telefone, LUCIA_PRONTA, None, conversa, db)
             texto = pendente  # a pergunta que chegou antes da escolha
         else:
             # Primeira mensagem (ou resposta que não é uma opção): o menu, guardando a pergunta para depois
@@ -526,20 +535,22 @@ def responder(
     elif modo == EQUIPE:
         if escolha == LUCIA:
             _guardar(db, conversa, whatsappModo=LUCIA)
-            return _saida(telefone, LUCIA_PRONTA, [BOTAO_EQUIPE], conversa, db)
+            return _saida(telefone, LUCIA_PRONTA, None, conversa, db)
         atendimento = db.get(m.Atendimento, conversa.atendimento_id) if conversa.atendimento_id else None
         if atendimento is None or atendimento.status == "CONCLUIDO":
             # O chamado foi encerrado: começa de novo, com o menu
             _guardar(db, conversa, whatsappModo=MENU, perguntaPendente=None if _so_saudacao(texto) else texto[:800])
             return _saida(telefone, texto_do_menu(nome), [BOTAO_LUCIA, BOTAO_EQUIPE], conversa, db)
-        if escolha != EQUIPE:
-            atendimentos.mensagem_do_whatsapp(db, atendimento, texto)
-        return _saida(telefone, JA_COM_A_EQUIPE.format(protocolo=atendimento.protocolo), [BOTAO_LUCIA], conversa, db)
+        if botao == EQUIPE:  # tocou de novo num botão antigo da equipe
+            return _saida(telefone, JA_COM_A_EQUIPE.format(protocolo=atendimento.protocolo), None, conversa, db)
+        # A mensagem entra no chamado e quem responde é a equipe, sem "Recebi!" a cada mensagem (decisão 121)
+        atendimentos.mensagem_do_whatsapp(db, atendimento, texto)
+        return _silencio(conversa, atendimento)
 
-    elif escolha == EQUIPE:  # modo LUCIA: botão ou "2" chama a equipe a qualquer momento
+    elif escolha == EQUIPE:  # modo LUCIA: botão ou pedido ("equipe", "atendente") chama a equipe a qualquer momento
         return _para_a_equipe(db, conversa, telefone, nome, "O cliente pediu para falar com a equipe no WhatsApp.")
     elif escolha == LUCIA:
-        return _saida(telefone, LUCIA_PRONTA, [BOTAO_EQUIPE], conversa, db)
+        return _saida(telefone, LUCIA_PRONTA, None, conversa, db)
 
     return _resposta_da_lucia(db, telefone, texto, id_cliente, nome)
 
@@ -559,14 +570,22 @@ def _resposta_da_lucia(db: Session, telefone: str, texto: str, id_cliente: str |
             db.rollback()
         except DadosInvalidos:
             db.rollback()
-            return _saida(telefone, LONGA_DEMAIS, [BOTAO_EQUIPE], conversa, db)
+            return _saida(telefone, LONGA_DEMAIS, None, conversa, db)
     else:
         raise Conflito("A conversa não ficou livre a tempo.")
 
     blocos = resposta.blocos or []
     oferta = next((b for b in blocos if b.get("tipo") == "acao_atendimento"), None)
+    conversa = assistente_repository.obter(db, conversa.id, regra.CLIENTE)
+    if (resposta.auditoria or {}).get("ofereceuPessoa"):
+        # Duas falhas seguidas (decisão 102): a Lúcia oferece a equipe com o botão; o cliente decide (decisão 121)
+        corpo = _OFERTA_DA_EQUIPE.sub("", resposta.conteudo or "").strip()
+        texto_final = texto_para_whatsapp(
+            f"{corpo}\n\n{OFERTA_DA_EQUIPE}", [b for b in blocos if b.get("tipo") != "acao_atendimento"]
+        )
+        return _saida(telefone, texto_final, [BOTAO_EQUIPE], conversa, db)
     if oferta is not None:
-        conversa = assistente_repository.obter(db, conversa.id, regra.CLIENTE)
+        # O cliente pediu uma pessoa (ou chegou irritado): abre o chamado na hora
         saida = _para_a_equipe(db, conversa, telefone, nome, oferta.get("motivo") or texto)
         # A oferta ("Posso passar você...", "Toque em...") já foi aceita: no lugar dela, o que foi feito
         corpo = _OFERTA_DA_EQUIPE.sub("", resposta.conteudo or "").strip()
@@ -574,7 +593,6 @@ def _resposta_da_lucia(db: Session, telefone: str, texto: str, id_cliente: str |
             saida["texto"] = texto_para_whatsapp(
                 f"{corpo}\n\n{saida['texto']}", [b for b in blocos if b.get("tipo") != "acao_atendimento"]
             )
-            saida["mensagem"] = mensagem_da_meta(telefone, saida["texto"], [BOTAO_LUCIA])
+            saida["mensagem"] = mensagem_da_meta(telefone, saida["texto"])
         return saida
-    conversa = assistente_repository.obter(db, conversa.id, regra.CLIENTE)
-    return _saida(telefone, texto_para_whatsapp(resposta.conteudo or "", blocos), [BOTAO_EQUIPE], conversa, db)
+    return _saida(telefone, texto_para_whatsapp(resposta.conteudo or "", blocos), None, conversa, db)
