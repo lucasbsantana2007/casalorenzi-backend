@@ -81,9 +81,10 @@ Painel → **Assistente IA** (`/inteligencia`).
 | `Que transferências você sugere?` | Sugestões para análise, com o aviso de que nada é transferido sozinho. |
 | `Quantos clientes têm pontos vencendo nos próximos 30 dias?` | Só números agregados, sem nome de cliente. |
 
-Aba **Alertas**: os alertas das automações (estoque baixo, parado, transferências, pontos a vencer), com resolver,
-descartar e "Atualizar alertas agora". Aba **Uso e custo da IA**: modo atual, chamadas, tokens, custo estimado e as
-consultas feitas.
+Aba **Automações** (decisão 127): os e-mails automáticos aos clientes (pontos a vencer, sacola abandonada e Avise-me),
+com o modo, a fila de cada um e o botão "Enviar e-mails agora". Depois do clique, os e-mails que saíram aparecem com o
+selo "Novo"; no modo teste, chegam na caixa do time com o cliente no assunto. Aba **Uso e custo da IA**: modo atual,
+chamadas, tokens, custo estimado e as consultas feitas.
 
 ## 6. Permissões e segurança
 
@@ -141,7 +142,11 @@ Apontar: o n8n só leva e traz as mensagens; quem responde, confere os números 
 
 - Site sem resposta: a API do Render pode estar dormindo (plano grátis); abrir `/api/health` e esperar ~1 minuto.
 - "Muitas mensagens seguidas" (429): é o limite de uso; abrir uma conversa nova (botão ↺) ou esperar 10 minutos.
-- Alertas vazios: rodar `python -m src.automacoes` ou o botão "Atualizar alertas agora".
+- Assistente IA sem alertas: rodar `python -m src.automacoes` ou o botão "Enviar e-mails agora" (aba Automações), que
+  também atualiza os alertas.
+- Aba Automações com os três envios "Desligado": faltam as variáveis no Render (`AVISO_PONTOS_ENVIAR`,
+  `LEMBRETE_SACOLA_ENVIAR`, `AVISO_ESTOQUE_ENVIAR` = `true`). Com `AVISO_PONTOS_TESTE_PARA` (o e-mail do time),
+  tudo vai para ele (modo teste); sem ele, modo real: só quem criou a conta no site recebe (decisão 128).
 - Claude Code não conecta no MCP com `InvalidHTTPResponse`: antivírus que inspeciona tráfego MCP (o Avast faz isso);
   liberar o endereço da API no antivírus ou usar outra máquina (`docs/mcp.md`).
 - WhatsApp sem resposta: conferir se o fluxo do n8n está ativo e se o celular está na lista de números de teste da Meta.
