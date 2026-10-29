@@ -32,6 +32,8 @@ def enviados(monkeypatch):
     monkeypatch.setattr(settings, "AVISO_PONTOS_TESTE_PARA", "")
     monkeypatch.setattr(avisos_pontos, "PAUSA_ENTRE_ENVIOS", 0)
     monkeypatch.setattr(avisos_pontos, "_enviar_de_verdade", caixa.append)
+    # Modo real: só quem criou a conta no site recebe (decisão 128)
+    sql("UPDATE clientes SET canal_cadastro = 'E-commerce' WHERE id IN (:a, :b)", a=MARIANA, b=RICARDO)
     return caixa
 
 
