@@ -55,7 +55,7 @@ só entrou no chamado e quem responde é a equipe.
   Passadas 24 h da última mensagem do cliente, a Meta não aceita mensagem livre: a resposta não sai e o chamado
   registra o aviso.
 - **Checagem e fim (decisão 125):** depois de uma resposta da Lúcia ou da equipe, se o cliente fica **15 minutos**
-  sem falar, chega "Precisa de mais alguma coisa?" com o botão **Finalizar atendimento**. Tocar nele (ou escrever
+  sem falar, chega "Precisa de mais alguma coisa?" com o botão **Encerrar atendimento** (a Meta aceita até 20 caracteres no título). Tocar nele (ou escrever
   "finalizar") encerra na hora. Sem resposta por mais **3 h 45** (4 h no total, `WHATSAPP_CICLO_HORAS`), o
   atendimento é finalizado: a conversa e o chamado, se houver, e o cliente recebe o aviso. A próxima mensagem
   recomeça pelo cumprimento e pelo menu. Se a última mensagem é do cliente, nada disso corre: quem deve resposta é
