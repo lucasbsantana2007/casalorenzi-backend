@@ -88,6 +88,17 @@ def _conversa_do_telefone(db: Session, telefone: str) -> m.ConversaAssistente:
     # Ciclo novo: fecha o chamado em que a equipe ficou esperando o cliente (se a automação ainda não fechou)
     for atendimento in _parados(db, telefone):
         _encerrar(db, atendimento, avisar=False)
+    # A conversa anterior venceu antes de a rotina passar: a espera dela acaba aqui, senão o cliente recebe o aviso
+    # de encerramento no meio da conversa nova (decisão 125)
+    for antiga in db.scalars(
+        select(m.ConversaAssistente).where(
+            m.ConversaAssistente.tipo == regra.CLIENTE,
+            m.ConversaAssistente.chave_hash == chave_hash,
+            m.ConversaAssistente.status != regra.ENCERRADA,
+        )
+    ).all():
+        if (antiga.contexto or {}).get("whatsappTelefone"):
+            _marcar(db, antiga, **_SEM_ESPERA)
     conversa = conversas._nova(db, tipo=regra.CLIENTE, marca=settings.CANAL_WHATSAPP_MARCA, chave_hash=chave_hash)
     sessao.confirmar(db)
     return conversa
@@ -607,8 +618,11 @@ def rotina(db: Session) -> dict:
             finalizadas += 1
         elif not checagem and momento - datetime.fromisoformat(respondido) >= ESPERA_DA_CHECAGEM:
             if _entregar(mensagem_da_meta(telefone, CHECAGEM, [BOTAO_FINALIZAR])):
-                _marcar(db, conversa, whatsappChecagemEm=momento.isoformat())
                 checagens += 1
+                # O cliente pode ter escrito enquanto a checagem saía: a memória lida antes não sobrescreve a nova
+                db.refresh(conversa)
+                if (conversa.contexto or {}).get("whatsappRespondidoEm") == respondido:
+                    _marcar(db, conversa, whatsappChecagemEm=momento.isoformat())
     return {"checagens": checagens, "finalizadas": finalizadas + encerrar_ciclos(db)}
 
 
