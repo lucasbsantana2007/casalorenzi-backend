@@ -1,5 +1,6 @@
 """Assistente do site → WhatsApp do atendimento (decisão 81): o chamado nasce com o resumo da conversa e o
-link wa.me leva o protocolo, com ou sem login."""
+link wa.me leva o protocolo, com ou sem login. Desde a decisão 128 o site não oferece mais esse caminho (a equipe
+atende no próprio site; o WhatsApp fica no botão do topo do chat), mas a rota segue valendo para links antigos."""
 
 from urllib.parse import parse_qs, urlparse
 
@@ -34,7 +35,7 @@ def test_sem_login_segue_pelo_whatsapp_com_o_resumo(client, whatsapp):
     conversa, chave = abrir_site(client, marca="VULTO")
     diga(client, conversa, chave, "camisa azul")
     oferta = blocos(diga(client, conversa, chave, "quero falar com um atendente"), "acao_atendimento")[0]
-    assert oferta["whatsapp"] is True and oferta["precisaLogin"] is True
+    assert oferta["whatsapp"] is False and oferta["precisaLogin"] is True  # decisão 128: no site, a equipe do site
 
     r = client.post(
         f"/api/assistente/conversas/{conversa}/atendimento",
@@ -78,8 +79,10 @@ def test_chamado_do_whatsapp_passa_a_ser_do_cliente_que_entra(client, whatsapp):
 def test_logado_tambem_pode_seguir_pelo_whatsapp(client, whatsapp):
     token = entrar(client, "mariana.costa@gmail.com")
     conversa, chave = abrir_site(client, token=token)
-    oferta = blocos(diga(client, conversa, chave, "quero falar com um atendente"), "acao_atendimento")[0]
-    assert oferta["whatsapp"] is True and oferta["precisaLogin"] is False
+    resposta = diga(client, conversa, chave, "quero falar com um atendente")
+    oferta = blocos(resposta, "acao_atendimento")[0]
+    assert oferta["whatsapp"] is False and oferta["precisaLogin"] is False  # decisão 128
+    assert "WhatsApp" not in resposta["texto"] and "aqui no site" in resposta["texto"]
     corpo = client.post(f"/api/assistente/conversas/{conversa}/atendimento", json={"canal": "WHATSAPP"}, headers=chave).json()
     assert corpo["link"] == f"/cliente/solicitacoes/{corpo['atendimentoId']}"
     assert sql("SELECT canal, cliente_id FROM atendimentos WHERE protocolo = :p", p=corpo["protocolo"])[0] == (
