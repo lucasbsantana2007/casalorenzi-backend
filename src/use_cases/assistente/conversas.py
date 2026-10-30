@@ -15,6 +15,7 @@ import hmac
 import secrets
 import uuid
 from datetime import datetime, timedelta
+from urllib.parse import quote
 
 from sqlalchemy.orm import Session
 
@@ -124,6 +125,13 @@ def mensagem_saida(mensagem: m.MensagemAssistente) -> dict:
     }
 
 
+def link_da_lucia() -> str | None:
+    """Link wa.me do número da Lúcia com um "Oi, Lúcia!" escrito; None sem WHATSAPP_ATENDIMENTO."""
+    if not settings.WHATSAPP_ATENDIMENTO:
+        return None
+    return f"https://wa.me/{settings.WHATSAPP_ATENDIMENTO}?text={quote('Oi, Lúcia!')}"
+
+
 def conversa_saida(db: Session, conversa: m.ConversaAssistente, com_mensagens: bool = True) -> dict:
     saida = {
         "id": conversa.id,
@@ -134,6 +142,8 @@ def conversa_saida(db: Session, conversa: m.ConversaAssistente, com_mensagens: b
         "criadaEm": ms(conversa.criada_em),
         "atualizadaEm": ms(conversa.atualizada_em),
         "atendimento": None,
+        # Falar com a Lúcia no WhatsApp, sem protocolo: cai no menu, e não na equipe (decisão 127)
+        "whatsappLucia": link_da_lucia() if conversa.tipo == regra.CLIENTE else None,
     }
     if conversa.atendimento_id:
         atendimento = db.get(m.Atendimento, conversa.atendimento_id)

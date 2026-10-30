@@ -619,3 +619,14 @@ def test_um_aviso_de_encerramento_so(client, admin, entregas):
         e for e in entregas if e["corpo"]["mensagem"]["type"] == "text" and "encerramos" in e["corpo"]["mensagem"]["text"]["body"]
     ]
     assert len(avisos) == 1 and chamado(aberto["protocolo"]).status == "CONCLUIDO"
+
+
+def test_site_oferece_a_lucia_no_whatsapp_sem_protocolo(client, monkeypatch):
+    # Decisão 127: o link do site abre o WhatsApp com "Oi, Lúcia!", sem protocolo, e cai no menu
+    monkeypatch.setattr(settings, "WHATSAPP_ATENDIMENTO", TELEFONE)
+    conversa = client.post("/api/assistente/conversas", json={}).json()
+    link = conversa["whatsappLucia"]
+    assert link.startswith(f"https://wa.me/{TELEFONE}?text=") and "ATD-" not in link
+    assert canal.OPCOES_DO_MENU in diga(client, "Oi, Lúcia!", telefone="5521912345678")["texto"]
+    monkeypatch.setattr(settings, "WHATSAPP_ATENDIMENTO", "")
+    assert client.post("/api/assistente/conversas", json={}).json()["whatsappLucia"] is None
