@@ -412,6 +412,12 @@ def test_ciclo_fecha_com_4_horas_sem_resposta_do_cliente(client, admin, entregas
     _envelhecer(protocolo, "CLIENTE", 6)  # a ordem se mantém: o cliente escreveu antes da equipe
     _envelhecer(protocolo, "ATENDENTE", 5)
     with SessionLocal() as db:
+        # Com a checagem acompanhando (decisão 125), o fechamento antigo não age: ela fecha, com um aviso só
+        assert canal.encerrar_ciclos(db) == 0
+        # Chamado sem checagem (de antes da decisão 125): o fechamento antigo fecha
+        for conversa in db.scalars(select(m.ConversaAssistente).where(m.ConversaAssistente.atendimento_id.is_not(None))):
+            conversa.contexto = {k: v for k, v in conversa.contexto.items() if k != "whatsappRespondidoEm"}
+        db.commit()
         assert canal.encerrar_ciclos(db) == 1
     atendimento = chamado(protocolo)
     assert atendimento.status == "CONCLUIDO" and "4 horas" in atendimento.mensagens[-1].conteudo
@@ -590,3 +596,26 @@ def test_equipe_atrasada_avisa_uma_vez_por_espera(client, admin, entregas):
     assert diga(client, "???")["responder"] is False  # na mesma espera, um aviso só
     _equipe_responde(client, admin, protocolo)  # a equipe respondeu: a espera recomeça
     assert diga(client, "obrigada")["responder"] is False
+
+
+def test_todo_botao_cabe_no_limite_da_meta():
+    # A Meta recusa em silêncio botão com título acima de 20 caracteres
+    for botao in (canal.BOTAO_LUCIA, canal.BOTAO_EQUIPE, canal.BOTAO_FINALIZAR):
+        assert len(botao["title"]) <= 20, botao
+
+
+def test_um_aviso_de_encerramento_so(client, admin, entregas):
+    diga(client, "oi")
+    aberto = diga(client, botao="EQUIPE")
+    _equipe_responde(client, admin, aberto["protocolo"])
+    _envelhecer(aberto["protocolo"], "CLIENTE", 6)  # a ordem se mantém: o cliente escreveu antes da equipe
+    _envelhecer(aberto["protocolo"], "ATENDENTE", 5)  # o fechamento antigo também já valeria
+    _recuar_espera(aberto["conversaId"], 16)
+    _rotina(client)
+    _recuar_espera(aberto["conversaId"], 3 * 60 + 46)
+    _rotina(client)
+    _rotina(client)
+    avisos = [
+        e for e in entregas if e["corpo"]["mensagem"]["type"] == "text" and "encerramos" in e["corpo"]["mensagem"]["text"]["body"]
+    ]
+    assert len(avisos) == 1 and chamado(aberto["protocolo"]).status == "CONCLUIDO"

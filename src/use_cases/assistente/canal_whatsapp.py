@@ -478,14 +478,26 @@ def _encerrar(db: Session, atendimento: m.Atendimento, avisar: bool) -> None:
     sessao.confirmar(db)
     telefone = _telefone_do_chamado(atendimento)
     ultima = _ultima_do_cliente(atendimento)
+    for conversa in _conversas_do_chamado(db, atendimento):
+        conversa.status = regra.ENCERRADA
+        _marcar(db, conversa, **_SEM_ESPERA)
     if avisar and telefone and ultima is not None and agora() - ultima <= JANELA_DA_META:
         _entregar(mensagem_da_meta(telefone, ENCERRAMENTO.format(protocolo=atendimento.protocolo)))
+
+
+def _conversas_do_chamado(db: Session, atendimento: m.Atendimento) -> list[m.ConversaAssistente]:
+    return list(db.scalars(select(m.ConversaAssistente).where(m.ConversaAssistente.atendimento_id == atendimento.id)))
 
 
 def encerrar_ciclos(db: Session) -> int:
     """Automação encerrar_whatsapp: fecha os chamados do WhatsApp em que o cliente ficou 4 horas sem responder depois
     da equipe, e avisa o cliente (dentro da janela de 24 h da Meta). Devolve quantos fechou."""
-    parados = _parados(db)
+    # O que a checagem (decisão 125) acompanha fica com ela: senão o cliente recebe dois avisos de encerramento
+    parados = [
+        atendimento
+        for atendimento in _parados(db)
+        if not any((c.contexto or {}).get("whatsappRespondidoEm") for c in _conversas_do_chamado(db, atendimento))
+    ]
     for atendimento in parados:
         _encerrar(db, atendimento, avisar=True)
     return len(parados)
@@ -499,8 +511,9 @@ def encerrar_ciclos(db: Session) -> int:
 # aberto no banco), para a rotina saber para onde mandar; some quando o cliente fala ou o atendimento termina.
 
 FINALIZAR = "FINALIZAR"
-BOTAO_FINALIZAR = {"id": FINALIZAR, "title": "Finalizar atendimento"}
-CHECAGEM = "Precisa de mais alguma coisa? Se estiver tudo certo, é só tocar em “Finalizar atendimento”."
+# A Meta recusa (em silêncio) botão com título acima de 20 caracteres: "Finalizar atendimento" tem 21
+BOTAO_FINALIZAR = {"id": FINALIZAR, "title": "Encerrar atendimento"}
+CHECAGEM = "Precisa de mais alguma coisa? Se estiver tudo certo, é só tocar em “Encerrar atendimento”."
 FINALIZADO = "Atendimento finalizado. Obrigada pelo contato! Quando precisar, é só mandar uma mensagem por aqui."
 SEM_RESPOSTA = (
     "Como não tivemos mais notícias, encerramos o atendimento por aqui. Obrigada pelo contato! Se precisar de algo, "
@@ -576,7 +589,8 @@ def rotina(db: Session) -> dict:
             m.ConversaAssistente.tipo == regra.CLIENTE,
             m.ConversaAssistente.chave_hash.is_not(None),
             m.ConversaAssistente.status != regra.ENCERRADA,
-            m.ConversaAssistente.atualizada_em >= momento - total - timedelta(hours=1),
+            # Margem larga: se o relógio parar um tempo, a conversa ainda fecha quando ele voltar
+            m.ConversaAssistente.atualizada_em >= momento - timedelta(hours=48),
         )
     ).all()
     for conversa in conversas_ativas:
