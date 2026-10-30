@@ -512,6 +512,24 @@ def test_sem_resposta_por_mais_3h45_finaliza_e_avisa(client, entregas):
     assert nova["conversaId"] != resposta["conversaId"] and canal.OPCOES_DO_MENU in nova["texto"]
 
 
+def test_conversa_vencida_antes_da_rotina_nao_avisa_no_meio_da_nova(client, entregas):
+    # A rotina roda a cada 5 min: quem volta depois das 4 h, antes dela, começa outra conversa sem o aviso de fim
+    com_a_lucia(client)
+    resposta = diga(client, "tem camisa?")
+    _recuar_espera(resposta["conversaId"], 16)
+    _rotina(client)
+    _recuar_espera(resposta["conversaId"], 3 * 60 + 40)  # a checagem ainda não completou 3 h 45
+    with SessionLocal() as db:
+        conversa = db.get(m.ConversaAssistente, resposta["conversaId"])
+        conversa.atualizada_em -= timedelta(hours=4, minutes=1)
+        db.commit()
+    nova = diga(client, "oi")
+    assert nova["conversaId"] != resposta["conversaId"]
+    _recuar_espera(resposta["conversaId"], 10)
+    entregas.clear()
+    assert _rotina(client)["finalizadas"] == 0 and entregas == []
+
+
 def test_depois_da_equipe_tambem_e_o_chamado_fecha(client, admin, entregas):
     diga(client, "oi")
     aberto = diga(client, botao="EQUIPE")
